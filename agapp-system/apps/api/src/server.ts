@@ -7,7 +7,8 @@ import {
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // In-Memory Database
 let lgus: LGU[] = [
@@ -454,6 +455,40 @@ app.post('/api/reports/verify-image', (req, res) => {
   res.json({ mlConfidence, mlVerified, isLowCredibility });
 });
 
+// File Upload Endpoint for Report Photos
+app.post('/api/upload/photo', async (req, res) => {
+  const { imageBase64, reportId, category } = req.body;
+  
+  if (!imageBase64 || !reportId) {
+    return res.status(400).json({ error: 'Missing required fields: imageBase64, reportId' });
+  }
+
+  try {
+    const result = await uploadReportPhoto(reportId, imageBase64, category);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        url: result.url,
+        path: result.path,
+        storageConfigured: isStorageConfigured(),
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        storageConfigured: isStorageConfigured(),
+      });
+    }
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Upload failed',
+      storageConfigured: isStorageConfigured(),
+    });
+  }
+});
+
 app.post('/api/reports', (req, res) => {
   const { 
     lguId, citizenId, citizenName, category, description, 
@@ -550,6 +585,9 @@ app.post('/api/reports/:id/rate', (req, res) => {
   res.json(report);
 });
 
+import { generateServiceRequestPDF } from './pdf-generator';
+import { uploadReportPhoto, isStorageConfigured } from './storage.service';
+
 // Service Requests Endpoints
 app.get('/api/services', (req, res) => {
   const { lguId, citizenId } = req.query;
@@ -606,6 +644,38 @@ app.patch('/api/services/:id/status', (req, res) => {
 
   writeLog(request.lguId, updatedBy, userEmail || 'system@agapp.gov.ph', userRole || 'LGU_PERSONNEL', 'SERVICE_REQUEST_STATUS_UPDATE', `Updated service request ${request.referenceNumber} to ${status}`);
   res.json(request);
+});
+
+// PDF Generation Endpoint
+app.get('/api/services/:id/pdf', async (req, res) => {
+  const { id } = req.params;
+  const request = serviceRequests.find(s => s.id === id);
+  
+  if (!request) {
+    return res.status(404).json({ error: 'Service request not found' });
+  }
+
+  const lgu = lgus.find(l => l.id === request.lguId);
+  
+  try {
+    const pdfBytes = await generateServiceRequestPDF({
+      referenceNumber: request.referenceNumber,
+      citizenName: request.citizenName,
+      serviceType: request.serviceType,
+      officeName: request.officeName,
+      formDetails: request.formDetails,
+      lguName: lgu?.name || 'Municipality of Liliw',
+      qrCodeUrl: request.qrCodeUrl,
+      createdAt: request.createdAt,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${request.referenceNumber}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
 });
 
 // Community Forum Endpoints

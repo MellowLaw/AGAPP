@@ -8,9 +8,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/admin\" \"npm run dev --workspace=apps/mobile\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/admin\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
     "install:all": "npm install",
-    "build:all": "npm run build --workspaces"
+    "build:all": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build --workspace=packages/shared"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

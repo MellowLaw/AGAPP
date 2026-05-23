@@ -79,6 +79,9 @@ export default function App() {
   const [reportDesc, setReportDesc] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [snappedPhoto, setSnappedPhoto] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null); // For real file uploads
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [mlResult, setMlResult] = useState<any>(null);
   const [gpsCoords] = useState({ lat: 13.9301, lng: 121.4651 });
   const [selectedBarangay, setSelectedBarangay] = useState('Poblacion');
@@ -263,6 +266,60 @@ export default function App() {
         setMlResult({ mlConfidence: 0.18, mlVerified: false, isLowCredibility: true });
       }
     }
+  };
+
+  // Handle real file upload from device (for prototype web version)
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setPhotoFile(file);
+    setIsUploading(true);
+
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      setSnappedPhoto(base64String); // Show preview
+
+      // Upload to Supabase via API
+      try {
+        const res = await fetch(`${API_BASE}/upload/photo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64String,
+            reportId: `temp-${Date.now()}`,
+            category: reportCategory
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success && data.url) {
+          setUploadedPhotoUrl(data.url);
+          setSnappedPhoto(data.url); // Use the uploaded URL
+          
+          // Run ML verification on uploaded photo
+          const verifyRes = await fetch(`${API_BASE}/reports/verify-image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoUrl: data.url, category: reportCategory })
+          });
+          
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            setMlResult(verifyData);
+          }
+        }
+      } catch (err) {
+        console.log('Upload failed, using local preview:', err);
+        // Keep using base64 preview if upload fails
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Apply for a service (Civil Registrar / BPLO)
@@ -927,7 +984,7 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Photo Input with Simulated YOLO Check */}
+              {/* Photo Input with Real Upload + Simulated YOLO Check */}
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Evidence Photo Capture</label>
                 {snappedPhoto ? (
@@ -936,7 +993,7 @@ export default function App() {
                       <img src={snappedPhoto} alt="Evidence" className="w-full h-full object-cover" />
                       <button 
                         type="button" 
-                        onClick={() => { setSnappedPhoto(null); setMlResult(null); }}
+                        onClick={() => { setSnappedPhoto(null); setMlResult(null); setUploadedPhotoUrl(null); setPhotoFile(null); }}
                         className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1"
                       >
                         <X weight="light" className="w-3 h-3" />
@@ -954,6 +1011,18 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Upload Status */}
+                    {isUploading && (
+                      <div className="p-2.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-100">
+                        <span className="font-bold text-[10px]">📤 Uploading to Supabase Storage...</span>
+                      </div>
+                    )}
+                    {uploadedPhotoUrl && (
+                      <div className="p-2.5 rounded-lg border bg-emerald-50 text-emerald-700 border-emerald-100">
+                        <span className="font-bold text-[10px]">✅ Uploaded to Supabase Storage</span>
+                      </div>
+                    )}
+
                     {/* Simulated GPS map preview */}
                     <div className="border border-color4 rounded-xl overflow-hidden h-20 bg-sky-50 relative mt-2">
                       <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:8px_8px]"></div>
@@ -965,14 +1034,38 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <button 
-                    type="button"
-                    onClick={() => setCameraOpen(true)}
-                    className="w-full h-24 border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-1"
-                  >
-                    <Camera weight="light" className="w-6 h-6" />
-                    <span>Open Camera Viewfinder</span>
-                  </button>
+                  <div className="space-y-3">
+                    {/* Real File Upload Option */}
+                    <label className="w-full h-20 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-1 cursor-pointer hover:border-color1 hover:text-slate-600 transition bg-slate-50">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <Camera weight="light" className="w-6 h-6" />
+                      <span className="text-[10px] font-medium">📷 Upload Real Photo</span>
+                      <span className="text-[8px]">(Stored in Supabase Storage)</span>
+                    </label>
+                    
+                    {/* Simulation Option */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200"></div>
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="px-2 bg-white text-[10px] text-slate-400">or simulate</span>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      type="button"
+                      onClick={() => setCameraOpen(true)}
+                      className="w-full h-16 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 gap-2 hover:bg-slate-50 transition"
+                    >
+                      <span className="text-[11px]">🎮 Open Demo Camera</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -1090,39 +1183,46 @@ export default function App() {
               {requests.map(req => (
                 <div 
                   key={req.id}
-                  onClick={() => setSelectedItemHistory({ item: req, isReport: false })}
                   className="bg-color2 border border-color4 rounded-xl p-3.5 shadow-sm space-y-2 text-xs hover:border-color1 active:scale-95 transition"
                 >
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-700">{req.referenceNumber}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      req.status === 'Submitted' ? 'bg-amber-100 text-amber-800' :
-                      req.status === 'Under Review' ? 'bg-blue-100 text-blue-800' :
-                      req.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
-                      req.status === 'Released' ? 'bg-emerald-100 text-emerald-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {req.status}
-                    </span>
-                  </div>
-                  <p className="text-slate-500 font-semibold text-[10px]">Type: Document Request ({req.serviceType})</p>
-                  <p className="text-slate-400 text-[9px] mt-1">Present QR at municipal hall to pay and collect.</p>
-
-                  {/* Inline vertical stepper */}
-                  <div className="mt-2.5 pt-2 border-t border-color4/60 space-y-2">
-                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Status Timeline</p>
-                    <div className="space-y-2 pl-3 border-l-2 border-color1 relative">
-                      {(req.statusHistory || [{ status: 'Submitted', timestamp: req.createdAt }]).map((hist: any, hIdx: number) => (
-                        <div key={hIdx} className="relative text-[9px]">
-                          <div className="absolute -left-[16px] top-1.5 w-1.5 h-1.5 rounded-full bg-slate-800 ring-2 ring-white"></div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-slate-700">{hist.status}</span>
-                            <span className="text-[8px] text-slate-400">{new Date(hist.timestamp).toLocaleDateString()}</span>
-                          </div>
-                          {hist.notes && <p className="text-[8.5px] text-slate-400 mt-0.5">{hist.notes}</p>}
-                        </div>
-                      ))}
+                  <div 
+                    onClick={() => setSelectedItemHistory({ item: req, isReport: false })}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-700">{req.referenceNumber}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        req.status === 'Submitted' ? 'bg-amber-100 text-amber-800' :
+                        req.status === 'Under Review' ? 'bg-blue-100 text-blue-800' :
+                        req.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                        req.status === 'Released' ? 'bg-emerald-100 text-emerald-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {req.status}
+                      </span>
                     </div>
+                    <p className="text-slate-500 font-semibold text-[10px]">Type: Document Request ({req.serviceType})</p>
+                    <p className="text-slate-400 text-[9px] mt-1">Tap to view details and download form.</p>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="flex gap-2 pt-2 border-t border-color4/60">
+                    <a 
+                      href={`${API_BASE}/services/${req.id}/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-color1 hover:bg-color4 text-slate-800 font-semibold py-2 rounded-lg text-[10px] transition"
+                    >
+                      <FileText weight="fill" className="w-3.5 h-3.5" />
+                      Download Form
+                    </a>
+                    <button
+                      onClick={() => setSelectedItemHistory({ item: req, isReport: false })}
+                      className="flex-1 bg-color3 hover:bg-color4 text-slate-700 font-semibold py-2 rounded-lg text-[10px] transition"
+                    >
+                      View Details
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1469,6 +1569,41 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* QR Code & PDF Download for Service Requests */}
+              {!selectedItemHistory.isReport && selectedItemHistory.item.qrCodeUrl && (
+                <div className="bg-color3 border border-color1 p-4 rounded-lg space-y-3">
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider text-center">Present at Municipal Hall Counter</p>
+                  
+                  {/* QR Code */}
+                  <div className="flex justify-center">
+                    <img 
+                      src={selectedItemHistory.item.qrCodeUrl} 
+                      alt="QR Code" 
+                      className="w-24 h-24 border-2 border-slate-200 rounded-lg"
+                    />
+                  </div>
+                  
+                  <p className="text-[9px] text-slate-500 text-center">
+                    Ref: <span className="font-mono font-bold text-slate-700">{selectedItemHistory.item.referenceNumber}</span>
+                  </p>
+                  
+                  {/* Download PDF Button */}
+                  <a 
+                    href={`${API_BASE}/services/${selectedItemHistory.item.id}/pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full bg-color1 hover:bg-color4 text-slate-800 font-semibold py-2.5 rounded-lg text-xs transition"
+                  >
+                    <FileText weight="fill" className="w-4 h-4" />
+                    Download Application Form (PDF)
+                  </a>
+                  
+                  <p className="text-[8px] text-slate-400 text-center">
+                    Download and print this form. Present at {selectedItemHistory.item.officeName || 'Municipal Hall'} with payment.
+                  </p>
+                </div>
+              )}
 
               {/* Document released attachment copy */}
               {selectedItemHistory.item.status === 'Released' && selectedItemHistory.item.attachmentUrl && (

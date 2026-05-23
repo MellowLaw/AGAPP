@@ -2,24 +2,27 @@
   "name": "@agapp/mobile",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "dev": "vite --port 19006 --host",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build": "tsc"
   },
-  "dependencies": {
-    "@agapp/shared": "file:../../packages/shared",
-    "@phosphor-icons/react": "^2.1.10",
-    "lucide-react": "^0.379.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
+    "dependencies": {
+      "@agapp/shared": "file:../../packages/shared",
+      "phosphor-react-native": "^2.0.0",
+      "react-native-svg": "15.2.0",
+      "expo": "~51.0.8",
+      "expo-camera": "~15.0.13",
+      "expo-location": "~17.0.1",
+      "expo-secure-store": "~13.0.2",
+      "react": "18.2.0",
+      "react-native": "0.74.1"
+    },
   "devDependencies": {
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.4.5",
-    "vite": "^8.0.14"
+    "@types/react": "~18.2.45",
+    "typescript": "^5.4.5"
   }
 }

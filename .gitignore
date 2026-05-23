@@ -4,3 +4,7 @@
 # Except the agapp-system folder (and this gitignore itself)
 !/agapp-system/
 !/.gitignore
+
+# Allow Manuscript folder for editing/review
+# !/Manuscript/
+# !/Wireframes/

@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-base: #e8e7e5;
+  --text-base: #1A1A1A;
+  --text-muted: #5a5a5a;
+  --text-faint: #8a8a8a;
+  --color1: #F497A2;
+  --color2: #ffffff;
+  --color3: #f4f3f0;
+  --color4: #dbdad7;
+  --color5: #f4f3f0;
+}
+
+.dark {
+  --bg-base: #1A1A1A;
+  --text-base: #e8e7e5;
+  --text-muted: #a0a0a0;
+  --text-faint: #666666;
+  --color1: #F497A2;
+  --color2: #242424;
+  --color3: #2d2d2d;
+  --color4: #333333;
+  --color5: #1f1f1f;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-base);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.display-font {
+  font-family: 'EB Garamond', serif !important;
+  font-style: italic;
+}
+
+.logo-font {
+  font-weight: 800;
+  letter-spacing: -0.08em;
+}
+
+.bg-color2 { background-color: var(--color2) !important; }
+.bg-color5 { background-color: var(--color5) !important; }
+.bg-color3 { background-color: var(--color3) !important; }
+.border-color4 { border-color: var(--color4) !important; }
+
+/* Premium custom CSS toggle switches */
+.toggle-track {
+  width: 42px;
+  height: 24px;
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 200ms ease;
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+}
+.toggle-track.on  { background-color: #F497A2; }
+.toggle-track.off { background-color: #cbcac8; }
+.dark .toggle-track.off { background-color: #444; }
+
+.toggle-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  position: absolute;
+  top: 3px;
+  transition: left 200ms cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.toggle-track.on  .toggle-knob { left: 21px; }
+.toggle-track.off .toggle-knob { left: 3px; }
