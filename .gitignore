@@ -6,5 +6,5 @@
 !/.gitignore
 
 # Allow Manuscript folder for editing/review
-# !/Manuscript/
+!/Manuscript/
 # !/Wireframes/
