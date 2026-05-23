@@ -1,0 +1,6 @@
+# Ignore all sibling folders and files in the parent directory
+/*
+
+# Except the agapp-system folder (and this gitignore itself)
+!/agapp-system/
+!/.gitignore
