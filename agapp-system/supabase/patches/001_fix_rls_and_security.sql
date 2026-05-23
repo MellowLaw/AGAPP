@@ -2,8 +2,8 @@
 --  AGAPP Supabase — Security Patch 001
 --  Run this in SQL Editor AFTER schema.sql
 --  Fixes:
---    1. Missing RLS policies on lgus, audit_logs, faq_embeddings
---    2. SECURITY DEFINER warnings on match_faqs + verify_geofence
+--    1. Missing RLS policies on lgus, audit_logs
+--    2. SECURITY DEFINER warnings on verify_geofence
 -- ============================================================
 
 -- ── 1. LGUs table — public read, service_role write ─────────────────────────
@@ -42,51 +42,7 @@ CREATE POLICY "LGU admins can read their LGU audit logs"
 -- The API (service_role) inserts audit logs — no policy needed for that
 
 
--- ── 3. FAQ Embeddings — public read per LGU ──────────────────────────────────
--- Anyone can read FAQ entries for their LGU (used by chatbot)
-CREATE POLICY "Allow public read of faq embeddings"
-  ON faq_embeddings FOR SELECT
-  USING (true);
-
-
--- ── 4. Fix SECURITY DEFINER warnings — add SET search_path ──────────────────
--- Recreate match_faqs with explicit search_path to silence the warning
-
-DROP FUNCTION IF EXISTS match_faqs(vector, double precision, integer, text);
-CREATE OR REPLACE FUNCTION match_faqs(
-  query_embedding vector(768),
-  similarity_threshold float,
-  match_count int,
-  p_lgu_id text
-)
-RETURNS TABLE (
-  id uuid,
-  question text,
-  answer text,
-  source text,
-  similarity float
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    f.id,
-    f.question,
-    f.answer,
-    f.source,
-    1 - (f.embedding <=> query_embedding) AS similarity
-  FROM faq_embeddings f
-  WHERE
-    f.lgu_id = p_lgu_id
-    AND 1 - (f.embedding <=> query_embedding) > similarity_threshold
-  ORDER BY similarity DESC
-  LIMIT match_count;
-END;
-$$;
-
+-- ── 3. Fix SECURITY DEFINER warnings — add SET search_path ──────────────────
 -- Recreate verify_geofence with explicit search_path
 CREATE OR REPLACE FUNCTION verify_geofence(
   p_latitude float,
@@ -109,5 +65,3 @@ BEGIN
 END;
 $$;
 
--- Revoke anon execute on match_faqs (should only be called server-side via service_role)
-REVOKE EXECUTE ON FUNCTION match_faqs(vector, float, int, text) FROM anon;

@@ -76,9 +76,9 @@ VALUES
     true
   ),
   (
-    'ce0ad144-cefa-4815-ae8c-d4d0efe7b44e', -- REPLACE: lawrence UUID
-    'dayolawrence754@gmail.com',
-    'Lawrence Dayo',
+    'ce0ad144-cefa-4815-ae8c-d4d0efe7b44e', -- REPLACE: demo citizen UUID
+    'citizen.demo@email.com',
+    'Juan Dela Cruz',
     'CITIZEN',
     'liliw-laguna',
     'Poblacion',
@@ -87,17 +87,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 
--- 3. SEED SAMPLE FAQ EMBEDDINGS (vectors will be populated by the API on first chatbot use)
--- These are placeholder rows without embeddings — the ChatbotController will upsert real
--- Gemini vectors the first time each FAQ is queried. For now they serve as a knowledge base.
--- NOTE: We cannot INSERT vector(768) zeros here easily, so we use the API's /chatbot/seed
--- endpoint once the API is running. These are reference records only.
-
--- Sample FAQ content for Liliw LGU (without embeddings — to be vectorized by API)
--- You can add your own by calling POST /api/chatbot/seed after the API is running.
-
-
--- 4. SAMPLE REPORT (for dashboard testing)
+-- 3. SAMPLE REPORT (for dashboard testing)
 INSERT INTO reports (
   reference_number, lgu_id, citizen_id, citizen_name,
   category, description, photo_url,
@@ -110,7 +100,7 @@ VALUES (
   'REP-2026-0001',
   'liliw-laguna',
   NULL,
-  'Lawrence Alcantara',
+  'Maria Santos',
   'pothole',
   'Large pothole near the municipal hall entrance causing traffic hazard.',
   'https://placehold.co/400x300/57534e/ffffff?text=Pothole+Detected',
@@ -129,7 +119,7 @@ VALUES (
 ON CONFLICT (reference_number) DO NOTHING;
 
 
--- 5. SAMPLE SERVICE REQUEST (for dashboard testing)
+-- 4. SAMPLE SERVICE REQUEST (for dashboard testing)
 INSERT INTO service_requests (
   reference_number, lgu_id, citizen_id, citizen_name,
   service_type, office_name, status,
@@ -139,11 +129,11 @@ VALUES (
   'REQ-2026-0001',
   'liliw-laguna',
   NULL,
-  'Lawrence Alcantara',
+  'Pedro Reyes',
   'Birth Certificate Request',
   'Civil Registrar',
   'Submitted',
-  '{"fullName": "Lawrence Alcantara", "dateOfBirth": "2000-01-15", "placeOfBirth": "Liliw, Laguna", "purpose": "Employment"}'::jsonb,
+  '{"fullName": "Pedro Reyes", "dateOfBirth": "2000-01-15", "placeOfBirth": "Liliw, Laguna", "purpose": "Employment"}'::jsonb,
   'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=REQ-2026-0001',
   '[{"status":"Submitted","updatedBy":"citizen","notes":"Document application submitted","timestamp":"2026-05-23T10:00:00Z"}]'::jsonb
 )

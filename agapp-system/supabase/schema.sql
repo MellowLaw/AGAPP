@@ -1,14 +1,12 @@
 -- AGAPP Database Schema for Supabase
 -- Core Multi-Tenant LGU, Citizen, Reporting, and Chatbot Schema
 
--- Enable standard spatial and vector extensions
+-- Enable spatial extension
 CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Drop existing tables to start fresh (if executing sequentially)
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS forum_posts CASCADE;
-DROP TABLE IF EXISTS faq_embeddings CASCADE;
 DROP TABLE IF EXISTS service_requests CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -88,18 +86,7 @@ CREATE TABLE service_requests (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. CHATBOT FAQ EMBEDDINGS (pgvector)
-CREATE TABLE faq_embeddings (
-    id bigserial PRIMARY KEY,
-    lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,
-    question text NOT NULL,
-    answer text NOT NULL,
-    source text NOT NULL,
-    embedding vector(768) NOT NULL, -- Size matches Gemini Text Embeddings (768 dims)
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 6. COMMUNITY FORUM POSTS
+-- 5. COMMUNITY FORUM POSTS
 CREATE TABLE forum_posts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,

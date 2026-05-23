@@ -3,7 +3,9 @@
     "target": "esnext",
     "module": "commonjs",
     "moduleResolution": "node",
-    "lib": ["esnext"],
+    "lib": [
+      "esnext"
+    ],
     "allowJs": true,
     "jsx": "react-jsx",
     "noEmit": true,
@@ -21,5 +23,6 @@
     "node_modules",
     "dist",
     "src"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
