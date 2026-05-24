@@ -81,7 +81,7 @@ flowchart TD
 
     LM --> Provision[Provision New Tenant Municipality]
     LM --> Deactivate[Deactivate Existing Tenant]
-    LM --> EditSub[Edit Per-LGU Subscription Records]
+    LM --> EditLGU[Edit LGU Tenant Details]
 
     CA --> Metrics[View Aggregated Metrics]
     CA --> Leader[Leaderboards: Resolution Time & Satisfaction]
@@ -92,21 +92,19 @@ flowchart TD
     Comp --> DPO[Check DPO Designation Status]
     Comp --> DPA[Review Data Privacy Artifacts]
 
-    Ext -->|Subscription Records| SubRec[Record One-Time Onboarding Fee]
     Ext -->|System Settings| Settings[Configure Auth, Notification & Storage]
     Ext -->|User Management| UM[Oversee Accounts Across All LGUs]
     Ext -->|Logout| Logout([End])
 
     Provision --> Done([End])
     Deactivate --> Done
-    EditSub --> Done
+    EditLGU --> Done
     Metrics --> Done
     Leader --> Done
     Toggle --> Done
     Audit --> Done
     DPO --> Done
     DPA --> Done
-    SubRec --> Done
     Settings --> Done
     UM --> Done
 ```
@@ -586,8 +584,7 @@ useCaseDiagram
         usecase "Manage Feature Flags" as UC3
         usecase "Monitor Cross-LGU Analytics" as UC4
         usecase "Supervise Compliance" as UC5
-        usecase "Record Onboarding Fees" as UC6
-        usecase "Oversee User Accounts" as UC7
+        usecase "Oversee User Accounts" as UC6
     }
     
     SA --> UC1
@@ -596,7 +593,6 @@ useCaseDiagram
     SA --> UC4
     SA --> UC5
     SA --> UC6
-    SA --> UC7
 ```
 
 ---

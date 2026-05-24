@@ -76,9 +76,18 @@ VALUES
     true
   ),
   (
-    'ce0ad144-cefa-4815-ae8c-d4d0efe7b44e', -- REPLACE: demo citizen UUID
+    'f0e69549-aa6b-4448-a133-e70c75d87f7f', -- REPLACE: demo citizen UUID
     'citizen.demo@email.com',
     'Juan Dela Cruz',
+    'CITIZEN',
+    'liliw-laguna',
+    'Poblacion',
+    true
+  ),
+  (
+    'ce0ad144-cefa-4815-ae8c-d4d0efe7b44e', -- REPLACE: demo citizen UUID
+    'dayolawrence754@gmail.com',
+    'Law Dayo',
     'CITIZEN',
     'liliw-laguna',
     'Poblacion',
