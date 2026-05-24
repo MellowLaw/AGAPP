@@ -3,29 +3,35 @@
 ## Figure 1: Conceptual Model of AGAPP
 ```mermaid
 flowchart TB
-    subgraph Input["📥 INPUT"]
-        I1[Knowledge Requirements]
-        I2[Software Requirements]
-        I3[Hardware Requirements]
+    subgraph Input["INPUT"]
+        I1[/Knowledge Requirements/]
+        I2[/Software Requirements/]
+        I3[/Hardware Requirements/]
     end
-    
-    subgraph Process["⚙️ PROCESS"]
-        P1[System Analysis & Design]
-        P2[Database Implementation]
-        P3[Mobile App Development]
-        P4[Web Dashboard Development]
-        P5[Testing & QA]
-        P6[Deployment]
+
+    subgraph Process["PROCESS"]
+        P1[Requirements Gathering]
+        P2[System Design]
+        P3[Development]
+        P4[Testing]
+        P5[Evaluation]
+        P6[Review and Improvement]
     end
-    
-    subgraph Output["📤 OUTPUT"]
-        O1[Citizen Mobile App]
-        O2[LGU Admin Dashboard]
-        O3[Super Admin Dashboard]
-        O4[AGAPP Platform]
+
+    subgraph Output["OUTPUT"]
+        O1[\E-Services Portal\]
+        O2[\Service Directory & Citizen Guide\]
+        O3[\Issue Reporting & Request Tracking\]
+        O4[\News, Forum, Chatbot, Maps\]
+        O5[\LGU Admin & Super Admin Dashboards\]
     end
-    
-    Input --> Process --> Output
+
+    subgraph Evaluation["EVALUATION"]
+        E1[/Functionality, Usability,
+Performance & Effectiveness/]
+    end
+
+    Input --> Process --> Output --> Evaluation
 ```
 
 ---
@@ -62,27 +68,47 @@ flowchart TB
 ## Figure 3: Flowchart of Main Interface for Super Administrator
 ```mermaid
 flowchart TD
-    Start([Login]) --> Main[Main Interface]
+    Start([Start]) --> Login[/Enter Email and Password/]
+    Login --> Auth{Authenticated?}
+    Auth -->|No| Login
+    Auth -->|Yes| Main[Main Interface]
+
     Main --> LM[LGU Management]
     Main --> CA[Cross-LGU Analytics]
     Main --> FF[Feature Flags]
     Main --> Comp[Compliance]
-    Main --> Ext[Extended Functions]
-    
-    LM --> Provision[Provision/Deactivate Tenants]
-    LM --> Sub[Edit Subscriptions]
-    
-    CA --> Metrics[View Metrics]
-    CA --> Leader[Leaderboards]
-    
-    FF --> Toggle[Enable/Disable Modules]
-    
-    Comp --> Audit[Audit Logs]
-    Comp --> DPO[DPO Status]
-    
-    Ext --> Settings[System Settings]
-    Ext --> UM[User Management]
-    Ext --> Logout([Logout])
+    Main --> Ext{No Selection Made}
+
+    LM --> Provision[Provision New Tenant Municipality]
+    LM --> Deactivate[Deactivate Existing Tenant]
+    LM --> EditSub[Edit Per-LGU Subscription Records]
+
+    CA --> Metrics[View Aggregated Metrics]
+    CA --> Leader[Leaderboards: Resolution Time & Satisfaction]
+
+    FF --> Toggle[Enable or Disable Modules per LGU]
+
+    Comp --> Audit[Monitor Audit Logs]
+    Comp --> DPO[Check DPO Designation Status]
+    Comp --> DPA[Review Data Privacy Artifacts]
+
+    Ext -->|Subscription Records| SubRec[Record One-Time Onboarding Fee]
+    Ext -->|System Settings| Settings[Configure Auth, Notification & Storage]
+    Ext -->|User Management| UM[Oversee Accounts Across All LGUs]
+    Ext -->|Logout| Logout([End])
+
+    Provision --> Done([End])
+    Deactivate --> Done
+    EditSub --> Done
+    Metrics --> Done
+    Leader --> Done
+    Toggle --> Done
+    Audit --> Done
+    DPO --> Done
+    DPA --> Done
+    SubRec --> Done
+    Settings --> Done
+    UM --> Done
 ```
 
 ---
@@ -90,22 +116,38 @@ flowchart TD
 ## Figure 4: Flowchart of Main Interface for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([Login]) --> Main[Main Interface]
+    Start([Start]) --> Login[/Enter Email and Password/]
+    Login --> Auth{Authenticated?}
+    Auth -->|No| Login
+    Auth -->|Yes| Main[Main Interface]
+
     Main --> Dash[Dashboard]
     Main --> SR[Service Requests]
     Main --> IR[Issue Reports]
-    Main --> News[News & Announcements]
+    Main --> News[News and Announcements]
     Main --> Forum[Forum Moderation]
-    Main --> Ext[Extended Functions]
-    
-    Ext --> OA[Office Assignments]
-    Ext --> KB[Knowledge Base]
-    Ext --> UM[User Management]
-    Ext --> Logout([Logout])
-    
-    Dash --> Metrics[View Metrics]
-    SR --> Process[Process Applications]
-    IR --> Handle[Handle Reports]
+    Main --> Ext{No Selection Made}
+
+    Dash --> Metrics[View Real-Time Municipal Metrics]
+    SR --> Queue[Access Citizen Document Applications]
+    IR --> MapQueue[Monitor GPS-Based Citizen Reports]
+
+    News --> Publish[Publish Official Advisories]
+    Forum --> Moderate[Review Flagged Posts]
+
+    Ext -->|Office Assignments| OA[Configure Report Routing Rules]
+    Ext -->|Knowledge Base| KB[Maintain Chatbot Source Documents]
+    Ext -->|User Management| UM[Oversee LGU Staff Accounts]
+    Ext -->|Logout| Logout([End])
+
+    Metrics --> Done([End])
+    Queue --> Done
+    MapQueue --> Done
+    Publish --> Done
+    Moderate --> Done
+    OA --> Done
+    KB --> Done
+    UM --> Done
 ```
 
 ---
@@ -113,13 +155,14 @@ flowchart TD
 ## Figure 5: Flowchart of Dashboard for Super Admin and LGU Admin
 ```mermaid
 flowchart TD
-    Start([Open Dashboard]) --> Gather[Gather Key Metrics]
-    Gather --> Display[Display Graphs & Heatmap]
+    Start([Start]) --> Open[Open Dashboard]
+    Open --> Gather[Gather Key Metrics]
+    Gather --> Display[\Display Graphs and Heatmap of Municipality\]
     Display --> Filter{Apply Filters?}
-    Filter -->|Yes| Adjust[Adjust Metrics]
+    Filter -->|Yes| Adjust[Adjust Metrics by Date, Barangay, Category or Status]
     Filter -->|No| Generate[Generate Report]
     Adjust --> Generate
-    Generate --> Export[Print/Export Report]
+    Generate --> Export[\Print or Export Report\]
     Export --> End([End])
 ```
 
@@ -128,16 +171,18 @@ flowchart TD
 ## Figure 6: Flowchart of Service Requests for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([View Service Requests]) --> Queue[Queue of Applications]
+    Start([Start]) --> Open[Open Service Requests Page]
+    Open --> Queue[\Queue of Incoming Citizen Document Applications\]
     Queue --> Filter{Apply Filters?}
-    Filter -->|Yes| Filtered[Filtered Results]
-    Filter -->|No| Action[Action Panel]
+    Filter -->|Yes| Filtered[Filter by Service Type, Status or Office]
+    Filter -->|No| Action[Select Application from Queue]
     Filtered --> Action
-    Action --> Update[Update Status]
-    Action --> Assign[Assign Personnel]
-    Action --> Attach[Attach Document]
-    Action --> Reject[Reject with Reason]
-    Update --> Log[Record in Audit Log]
+    Action --> Decision{Select Action}
+    Decision -->|Update Status| Update[Move to Submitted, In Progress or Resolved]
+    Decision -->|Assign Personnel| Assign[Assign to LGU Staff]
+    Decision -->|Attach Document| Attach[Attach Released Document]
+    Decision -->|Reject| Reject[Reject with Stated Reason]
+    Update --> Log[Record State Transition in Audit Log]
     Assign --> Log
     Attach --> Log
     Reject --> Log
@@ -149,19 +194,20 @@ flowchart TD
 ## Figure 7: Flowchart of Issue Reports for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([View Issue Reports]) --> MapView[Map View]
-    Start --> Queue[Queue by Category]
-    Queue --> AutoRoute[Auto-Routing Engine]
-    AutoRoute --> Route{Route to Office}
-    Route --> Verify[Verify Report]
-    Route --> Reroute[Reroute Report]
-    Route --> Reject[Reject Report]
-    Verify --> Status[Update Status]
-    Status --> Notify[Push Notification to Citizen]
-    Status --> Resolved{Resolved?}
-    Resolved -->|Yes| Log[Printable Resolution Log]
-    Resolved -->|No| Status
+    Start([Start]) --> Open[Open Issue Reports Page]
+    Open --> MapView[\Map View of All Open Reports\]
+    Open --> Queue[\Queue Grouped by Category\]
+    Queue --> AutoRoute[Auto-Routing Engine Assigns to Office]
+    AutoRoute --> Decision{Admin Action}
+    Decision -->|Verify| Acknowledge[Acknowledge Report]
+    Decision -->|Reroute| Reroute[Reroute to Another Office]
+    Decision -->|Reject| Reject[Reject with Stated Reason]
+    Acknowledge --> Status[Update Status]
     Reroute --> Status
+    Status --> Notify[\Push Notification Sent to Citizen\]
+    Notify --> Resolved{Resolved?}
+    Resolved -->|No| Status
+    Resolved -->|Yes| Log[\Generate Printable Resolution Log\]
     Reject --> End([End])
     Log --> End
 ```
@@ -171,15 +217,20 @@ flowchart TD
 ## Figure 8: Flowchart of News and Announcements for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([Create News Post]) --> Draft[Draft Editor]
-    Draft --> Attach[Attach Images/PDFs]
-    Attach --> Schedule{Schedule?}
-    Schedule -->|Yes| SetDate[Set Publish Date]
+    Start([Start]) --> Open[Open News and Announcements Page]
+    Open --> PostList[\List of Existing Announcements\]
+    PostList --> Action{Select Action}
+    Action -->|Create New| Draft[Open Draft Editor]
+    Action -->|Edit Existing| Edit[Edit Selected Post]
+    Draft --> Attach[Attach Images or PDFs]
+    Edit --> Attach
+    Attach --> Schedule{Schedule for Later?}
+    Schedule -->|Yes| SetDate[Set Publish Date and Time]
     Schedule -->|No| Publish[Publish Immediately]
-    SetDate --> Wait[Wait for Date]
+    SetDate --> Wait[Wait for Scheduled Date]
     Wait --> Publish
-    Publish --> Notify[Push Notification to Citizens]
-    Publish --> Visible[Visible in Mobile App]
+    Publish --> Visible[\Post Visible in Citizen Mobile App\]
+    Visible --> Notify[\Push Notification Sent to Citizens\]
     Notify --> End([End])
 ```
 
@@ -188,21 +239,23 @@ flowchart TD
 ## Figure 9: Flowchart of Forum Moderation for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([Forum Moderation]) --> NewPost[New Citizen Post]
-    NewPost --> Filter[Automated Filter]
+    Start([Start]) --> Open[Open Forum Moderation Page]
+    Open --> NewPost[\Citizen Submits New Post\]
+    NewPost --> Filter[Automated Profanity Filter and Image Safety Scan]
     Filter --> Pass{Passes Filter?}
-    Pass -->|Yes| Publish[Publish Immediately]
-    Pass -->|No| Queue[Moderation Queue]
-    Queue --> Review[Admin Review]
-    Review --> Action{Decision}
-    Action -->|Approve| Publish
-    Action -->|Edit| EditPost[Edit Post]
+    Pass -->|Yes| Publish[Publish Post Immediately]
+    Pass -->|No| Queue[Place in Moderation Queue]
+    Queue --> Review[Admin Reviews Queued Post]
+    Review --> Decision{Admin Decision}
+    Decision -->|Approve| Publish
+    Decision -->|Edit| EditPost[Edit Post Content]
     EditPost --> Publish
-    Action -->|Reject| Reject[Reject with Reason]
-    Publish --> Notify1[Citizen Notified: Published]
-    Reject --> Notify2[Citizen Notified: Rejected]
-    Notify1 --> Log1[Action Logged]
-    Notify2 --> Log2[Action Logged]
+    Decision -->|Reject| Reject[Reject with Stated Reason]
+    Publish --> Notify1[\Citizen Notified: Post Published\]
+    Reject --> Notify2[\Citizen Notified: Post Rejected\]
+    Notify1 --> Log[Action Logged]
+    Notify2 --> Log
+    Log --> End([End])
 ```
 
 ---
@@ -210,18 +263,20 @@ flowchart TD
 ## Figure 10: Flowchart of Office Assignments for LGU Administrator
 ```mermaid
 flowchart TD
-    Start([Office Assignments]) --> View[View Current Ruleset]
-    View --> Action{Action}
-    Action -->|Add| Add[Add New Rule]
-    Action -->|Edit| Edit[Edit Existing Rule]
+    Start([Start]) --> Open[Open Office Assignments Page]
+    Open --> View[\View Current Routing Ruleset\]
+    View --> Action{Select Action}
+    Action -->|Add New Rule| Add[Add New Routing Rule]
+    Action -->|Edit Existing| Edit[Edit Selected Rule]
     Action -->|Archive| Archive[Archive Outdated Rule]
-    Add --> Map[Map Category + Barangay]
+    Add --> Map[Map Report Category and Barangay]
     Edit --> Map
-    Map --> Office[Assign to Office]
-    Office --> SLA[Set SLA Tier]
+    Map --> Office[Assign to Target LGU Office]
+    Office --> SLA[Set RA 11032 Service-Level Category]
     SLA --> Save[Save Rule]
     Archive --> Save
-    Save --> Apply[Apply to New Reports]
+    Save --> Apply[Apply to All Newly Received Reports]
+    Apply --> End([End])
 ```
 
 ---
@@ -229,22 +284,25 @@ flowchart TD
 ## Figure 11: Flowchart of User Management for Super Admin and LGU Admin
 ```mermaid
 flowchart TD
-    Start([User Management]) --> Users[View User List]
-    Users --> Search[Search/Filter Users]
-    Search --> Action{Select Action}
-    Action -->|Add| Add[Add New User]
-    Action -->|Edit| Edit[Edit User Details]
-    Action -->|Archive| Archive[Archive User]
-    Action -->|Generate| Report[Generate User Report]
-    Action -->|View Logs| Logs[View User Logs]
-    Action -->|Backup| Backup[Backup & Restore]
+    Start([Start]) --> Open[Open User Management Page]
+    Open --> Users[\View List of User Accounts\]
+    Users --> Filter{Apply Filters?}
+    Filter -->|Yes| Search[Filter by Role or Status]
+    Filter -->|No| Action{Select Action}
+    Search --> Action
+    Action -->|Add User| Add[Add New User Account]
+    Action -->|Edit User| Edit[Edit User Details]
+    Action -->|Archive User| Archive[Archive User Account]
+    Action -->|Generate Report| Report[\Generate User Report\]
+    Action -->|View Logs| Logs[\View User Activity Logs\]
+    Action -->|Backup and Restore| Backup[Perform Backup or Restore]
     Add --> Save[Save Changes]
     Edit --> Save
     Archive --> Save
-    Report --> End([End])
+    Save --> End([End])
+    Report --> End
     Logs --> End
     Backup --> End
-    Save --> End
 ```
 
 ---
@@ -252,23 +310,40 @@ flowchart TD
 ## Figure 12: Flowchart of Main Interface for Citizen
 ```mermaid
 flowchart TD
-    Start([Sign Up/Login]) --> Profile[Complete Profile]
-    Profile --> Main[Main Interface]
-    
+    Start([Start]) --> Choice{New or Returning?}
+    Choice -->|New Citizen| SignUp[/Enter Email and Password/]
+    Choice -->|Returning| Login[/Enter Credentials or OTP/]
+    SignUp --> OTP[Send OTP to Email]
+    OTP --> Verify{OTP Verified?}
+    Verify -->|No| OTP
+    Verify -->|Yes| Profile[Complete Profile Form]
+    Login --> Auth{Authenticated?}
+    Auth -->|No| Login
+    Auth -->|Yes| Main[Main Interface]
+    Profile --> Main
+
     Main --> SD[Service Directory]
     Main --> SR[Submit Report]
     Main --> TR[Track Report]
-    Main --> News[News]
+    Main --> News[News and Announcements]
     Main --> Map[Town Map]
     Main --> SOS[Emergency Hotlines]
-    Main --> Forum[Forum]
+    Main --> Forum[Community Forum]
     Main --> Chat[Chatbot]
-    Main --> Settings[Account Settings]
-    Main --> Logout([Logout])
-    
-    SD --> Apply[Apply for Documents]
-    SR --> Report[Submit Issue Report]
-    TR --> Status[Check Status]
+    Main --> Ext{No Selection Made}
+
+    Ext -->|Account Settings| Settings[Manage Account Settings]
+    Ext -->|Submission History| History[View Submission History]
+    Ext -->|Logout| Logout([End])
+
+    SD --> Apply[Apply for LGU Documents]
+    SR --> Report[Submit GPS-Based Issue Report]
+    TR --> Status[\Check Submission Status\]
+    Apply --> End([End])
+    Report --> End
+    Status --> End
+    Settings --> End
+    History --> End
 ```
 
 ---
@@ -276,18 +351,18 @@ flowchart TD
 ## Figure 13: Flowchart of Service Directory for Citizen
 ```mermaid
 flowchart TD
-    Start([Open Service Directory]) --> Browse[Browse Catalog]
+    Start([Start]) --> Browse[Browse Catalog of Available LGU Services]
     Browse --> Select[Select Service]
-    Select --> Form[Guided Form]
+    Select --> Form[/Fill Out Guided Application Form/]
     Form --> Draft{Save as Draft?}
     Draft -->|Yes| Save[Save Draft]
     Draft -->|No| Submit[Submit Application]
     Save --> Continue{Continue Later?}
     Continue -->|Yes| Form
     Continue -->|No| End([End])
-    Submit --> QR[Generate Reference + QR Code]
-    QR --> Present[Present QR at Municipal Hall]
-    Present --> Pay[Payment & Release]
+    Submit --> QR[\Generate Reference Number and QR Code\]
+    QR --> Present[Present QR Code at Municipal Hall Counter]
+    Present --> Pay[Payment and Document Release In Person]
     Pay --> End
 ```
 
@@ -296,24 +371,25 @@ flowchart TD
 ## Figure 14: Flowchart of Submit Report for Citizen
 ```mermaid
 flowchart TD
-    Start([Open Report Form]) --> Category[Select Category]
-    Category --> Photo[Capture Photo]
-    Photo --> GPS[Confirm GPS Location]
-    GPS --> Check{Is Pothole?}
-    
-    Check -->|Yes| YOLO[YOLOv8n Detection]
-    YOLO --> Confidence{Confidence > Threshold?}
-    Confidence -->|Yes| Desc[Add Description]
-    Confidence -->|No| Warn[Show Warning]
-    Warn --> Confirm{User Confirms?}
+    Start([Start]) --> Form[Open Report Submission Form]
+    Form --> Category[/Select Report Category/]
+    Category --> Photo[/Capture Photo Using In-App Camera/]
+    Photo --> GPS[/Confirm GPS Location on Map/]
+    GPS --> Check{Category is Pothole?}
+
+    Check -->|Yes| YOLO[Run On-Device YOLOv8n Pothole Detector]
+    YOLO --> Confidence{Confidence Above Threshold?}
+    Confidence -->|Yes| Desc[/Add Optional Description/]
+    Confidence -->|No| Warn[Show Low-Confidence Warning]
+    Warn --> Confirm{Citizen Confirms Submission?}
     Confirm -->|Yes| Desc
     Confirm -->|No| Cancel[Cancel Report]
-    
+
     Check -->|No| Desc
     Desc --> Submit[Submit Report]
-    Submit --> Ref[Generate Reference Number]
-    Ref --> Track[Add to Tracking List]
-    Ref --> Success([Success])
+    Submit --> Ref[\Generate Reference Number\]
+    Ref --> Track[Add to Citizen Tracking List]
+    Track --> Success([End])
     Cancel --> End([End])
 ```
 
@@ -322,23 +398,25 @@ flowchart TD
 ## Figure 15: Flowchart of Track Report for Citizen
 ```mermaid
 flowchart TD
-    Start([Track Report]) --> List[View Submission List]
-    List --> Item[Select Item]
-    Item --> Status{Check Status}
-    Status --> Submitted[Submitted]
-    Status --> UnderReview[Under Review]
-    Status --> InProgress[In Progress]
-    Status --> Resolved[Resolved]
-    Status --> Rejected[Rejected]
-    Resolved --> Rate{Rate Resolution?}
-    Rate -->|Yes| Feedback[Provide Feedback]
+    Start([Start]) --> Open[Open Track Report Screen]
+    Open --> List[\View List of Service Requests and Issue Reports\]
+    List --> Select[Select a Submission]
+    Select --> Status[\View Current Status and Assigned Office\]
+    Status --> StatusVal{Current Status}
+    StatusVal -->|Submitted| S1[Submitted]
+    StatusVal -->|Under Review| S2[Under Review]
+    StatusVal -->|In Progress| S3[In Progress]
+    StatusVal -->|Rejected| S4[Rejected]
+    StatusVal -->|Resolved| S5[Resolved]
+    S5 --> Rate{Rate the Resolution?}
+    Rate -->|Yes| Feedback[/Provide Feedback and Rating/]
+    Feedback --> Score[Update LGU Citizen-Satisfaction Score]
     Rate -->|No| End([End])
-    Feedback --> Score[Update Satisfaction Score]
+    S1 --> End
+    S2 --> End
+    S3 --> End
+    S4 --> End
     Score --> End
-    Submitted --> End
-    UnderReview --> End
-    InProgress --> End
-    Rejected --> End
 ```
 
 ---
@@ -346,16 +424,16 @@ flowchart TD
 ## Figure 16: Flowchart of Town Map for Citizen
 ```mermaid
 flowchart TD
-    Start([Open Town Map]) --> OSM[OpenStreetMap Tiles]
-    OSM --> Landmarks[Key Landmarks Shown]
-    Landmarks --> Action{User Action}
-    Action -->|Search| Search[Search Landmark]
-    Action -->|Tap| Details[View Details]
-    Action -->|Directions| Navigate[Get Directions]
-    Search --> Pin[Landmark Pin]
+    Start([Start]) --> Open[Open Town Map]
+    Open --> OSM[\Render OpenStreetMap Tiles with Key Landmarks\]
+    OSM --> Action{User Action}
+    Action -->|Search| Search[/Enter Landmark Name/]
+    Action -->|Tap Pin| Details[View Landmark Details]
+    Action -->|Get Directions| Navigate[Get Route to Location]
+    Search --> Pin[Drop Pin on Matching Landmark]
     Pin --> Details
-    Details --> Info[Office Hours, Contact]
-    Navigate --> Route[Route to Location]
+    Details --> Info[\Display Office Hours and Contact Information\]
+    Navigate --> Route[\Display Route to Selected Location\]
     Info --> End([End])
     Route --> End
 ```
@@ -365,19 +443,20 @@ flowchart TD
 ## Figure 17: Flowchart of Emergency Hotlines for Citizen
 ```mermaid
 flowchart TD
-    Start([Emergency Hotlines]) --> Select[Select Hotline]
-    Select --> Type{Type}
-    Type -->|Police| Call1[Call Police]
-    Type -->|Fire| Call2[Call Fire Dept]
-    Type -->|Hospital| Call3[Call Hospital]
-    Type -->|MDRRMO| Call4[Call MDRRMO]
-    Call1 --> SOS{Enable SOS?}
+    Start([Start]) --> Open[Open Emergency Hotlines Screen]
+    Open --> Select[/Select a Hotline/]
+    Select --> Type{Hotline Type}
+    Type -->|Police| Call1[Place Call to Police]
+    Type -->|Fire Department| Call2[Place Call to Fire Dept]
+    Type -->|Hospital| Call3[Place Call to Hospital]
+    Type -->|MDRRMO| Call4[Place Call to MDRRMO Duty Desk]
+    Call1 --> SOS{Activate SOS?}
     Call2 --> SOS
     Call3 --> SOS
     Call4 --> SOS
-    SOS -->|Yes| Share[Share GPS Location]
+    SOS -->|Yes| Share[\Share GPS Location with MDRRMO Duty Desk\]
     SOS -->|No| End([End])
-    Share --> Duty[Notify Duty Desk]
+    Share --> Duty[Notify MDRRMO Duty Desk]
     Duty --> End
 ```
 
@@ -386,16 +465,20 @@ flowchart TD
 ## Figure 18: Flowchart of Community Forum for Citizen
 ```mermaid
 flowchart TD
-    Start([Community Forum]) --> Browse[Browse Posts]
-    Start --> Search[Search by Keyword]
-    Start --> Compose[Compose New Post]
-    Browse --> Interact[Like/Comment/Report]
-    Compose --> Filter[Automated Filter]
-    Filter --> Pass{Passes?}
-    Pass -->|Yes| Published[Published Immediately]
-    Pass -->|No| Await[Awaiting Moderation]
-    Published --> Notify1[User Notified]
-    Await --> Notify2[User Notified: Pending]
+    Start([Start]) --> Open[Open Community Forum]
+    Open --> Action{Select Action}
+    Action -->|Browse| Browse[\Browse Recent Posts\]
+    Action -->|Search| Search[/Enter Keyword/]
+    Action -->|Compose| Compose[/Write New Forum Post/]
+    Browse --> Interact[Like, Comment on, or Report a Post]
+    Search --> Results[\Display Matching Posts\]
+    Results --> Interact
+    Compose --> Filter[Automated Profanity Filter and Image Safety Scan]
+    Filter --> Pass{Passes Filter?}
+    Pass -->|Yes| Published[Post Published Immediately]
+    Pass -->|No| Await[Post Placed in Moderation Queue]
+    Published --> Notify1[\Citizen Notified: Post Published\]
+    Await --> Notify2[\Citizen Notified: Post Pending Moderation\]
     Notify1 --> End([End])
     Notify2 --> End
     Interact --> End
@@ -406,22 +489,20 @@ flowchart TD
 ## Figure 19: Flowchart of Chatbot for Citizen
 ```mermaid
 flowchart TD
-    Start([Citizen Types Question]) --> KM[Keyword Matching]
-    KM --> Check{Match Found?}
-    
-    Check -->|Yes| Answer[Return Predefined Answer]
-    Answer --> Source[Show Source Document]
+    Start([Start]) --> Open[Open Chatbot Interface]
+    Open --> Input[/Citizen Types a Question/]
+    Input --> RAG[Run Similarity Search Against LGU Knowledge Base via pgvector]
+    RAG --> Score{Similarity Score Above Threshold?}
+
+    Score -->|Yes| Answer[Retrieve Matching Answer from Knowledge Base]
+    Answer --> Source[\Return Answer with Source Document\]
     Source --> Done([End])
-    
-    Check -->|No| Gemini[Call Gemini API]
-    Gemini --> GeminiCheck{Gemini Can Answer?}
-    
-    GeminiCheck -->|Yes| GeminiAnswer[Return Gemini Response]
-    GeminiAnswer --> Done
-    
-    GeminiCheck -->|No| Fallback[Safe Fallback Message]
-    Fallback --> Ticket[Offer to File Support Ticket]
-    Ticket --> Done
+
+    Score -->|No| Fallback[Return Safe Fallback Message]
+    Fallback --> Ticket{Offer to File Support Ticket?}
+    Ticket -->|Yes| File[Open Support Ticket on Citizen Behalf]
+    Ticket -->|No| Done
+    File --> Done
 ```
 
 ---
@@ -429,20 +510,21 @@ flowchart TD
 ## Figure 20: Flowchart of Account Settings for Citizen
 ```mermaid
 flowchart TD
-    Start([Account Settings]) --> Review[Review Preferences]
-    Review --> Change{Need Changes?}
+    Start([Start]) --> Open[Open Account Settings Screen]
+    Open --> Review[\Review Current Preferences\]
+    Review --> Change{Changes Needed?}
     Change -->|No| Main[Return to Main Interface]
-    Change -->|Yes| Edit[Edit Settings]
-    Edit --> Pass[Change Password]
-    Edit --> Notif[Notification Preferences]
-    Edit --> Lang[Language Settings]
-    Edit --> Theme[Theme: Light/Dark]
+    Change -->|Yes| Edit{Select Setting to Edit}
+    Edit -->|Password| Pass[/Enter New Password/]
+    Edit -->|Notifications| Notif[/Set Notification Preferences/]
+    Edit -->|Language| Lang[/Select Language: English or Filipino/]
+    Edit -->|Theme| Theme[/Select Theme: Light or Dark Mode/]
     Pass --> Submit[Submit Changes]
     Notif --> Submit
     Lang --> Submit
     Theme --> Submit
-    Submit --> Confirm[Confirm Modifications]
-    Confirm --> Links[External Links: FB, YouTube]
+    Submit --> Confirm[\Confirm Modifications Applied\]
+    Confirm --> Links[\View External Links: Official Facebook and YouTube\]
     Links --> Main
     Main --> End([End])
 ```
