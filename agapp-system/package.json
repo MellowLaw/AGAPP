@@ -3,10 +3,23 @@
   "version": "1.0.0",
   "description": "AGAPP - Automated Governance and Public Service Platform",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/expo",
+      "**/expo/**",
+      "**/react-native",
+      "**/react-native/**",
+      "**/react",
+      "**/react/**",
+      "**/@expo/**",
+      "**/@react-native/**",
+      "**/@react-native-community/**"
+    ]
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/admin\"",
     "dev:api": "npm run dev --workspace=apps/api",
@@ -18,5 +31,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1"
   }
 }

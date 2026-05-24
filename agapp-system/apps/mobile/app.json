@@ -9,11 +9,35 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mellowlaw.agapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "AGAPP uses your camera to capture photos of road damage and community concerns for verified barangay reports.",
+        "NSLocationWhenInUseUsageDescription": "AGAPP uses your location to geo-tag reports for LGU geofence verification under RA 10173.",
+        "NSPhotoLibraryUsageDescription": "AGAPP may save captured report photos to your library."
+      }
     },
     "android": {
-      "package": "com.mellowlaw.agapp"
+      "package": "com.mellowlaw.agapp",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
-    "newArchEnabled": false
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AGAPP uses your camera to capture photos of road damage and community concerns."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "AGAPP uses your location to geo-tag reports for LGU geofence verification."
+        }
+      ]
+    ]
   }
 }

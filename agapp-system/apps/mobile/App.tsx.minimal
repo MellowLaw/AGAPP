@@ -1,0 +1,17 @@
+import React from 'react';
+import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
+
+export default function App() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>AGAPP Mobile</Text>
+      <Text style={styles.subtitle}>If you see this, Expo Go works!</Text>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A2B59F' },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#1A1A1A' },
+  subtitle: { fontSize: 16, marginTop: 12, color: '#1A1A1A' },
+});

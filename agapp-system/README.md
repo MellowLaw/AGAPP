@@ -1,101 +1,324 @@
-# AGAPP System - Prototype (50% MVP for Mock Defense)
+# AGAPP — Automated Governance and Public Service Platform
 
-This is the prototype monorepo of the **Automated Governance and Public Service Platform (AGAPP)**. It contains the core components:
-1.  **Shared Library (`packages/shared`)**: Interfaces, type definitions, and validator schemas.
-2.  **API Backend Server (`apps/api`)**: Node.js/Express server providing authentication, LGU details, reporting, and service request processing (with mock database seeds and geofencing coordinates check).
-3.  **Admin Dashboard (`apps/admin`)**: Next.js desktop web app representing the Super Admin and LGU Admin dashboard (logins, queues, maps, routing rules).
-4.  **Citizen App Simulator (`apps/mobile`)**: Mobile app mockup running inside a custom web-viewport browser frame representing the citizen's mobile client.
+> **Monorepo** for the AGAPP thesis prototype. Contains the citizen mobile app (Expo / React Native), the LGU & super-admin web dashboard (Next.js), the REST API (NestJS), and shared types (`zod` + TypeScript).
 
 ---
 
-## 🚀 How to Run the Applications
+## 📦 What's inside
 
-Ensure you have **Node.js (v18+)** and **npm** installed on your system.
-
-### Step 1: Install Dependencies
-Open a command prompt in the `/agapp-system` directory and run:
-```bash
-npm install
+```
+agapp-system/
+├── apps/
+│   ├── mobile/      # Citizen mobile app — Expo SDK 54, React Native 0.81
+│   ├── admin/       # LGU / Super-admin dashboard — Next.js 14
+│   └── api/         # REST API — NestJS + Supabase + zod
+├── packages/
+│   └── shared/      # Shared TS types & zod schemas (consumed by all apps)
+├── supabase/        # SQL migrations / seed data for Supabase Postgres
+└── package.json     # Root workspace (npm workspaces)
 ```
 
-### Step 2: Build Shared Packages
-Build the shared types library first so that the other apps can resolve the imports:
+---
+
+## ✅ Prerequisites
+
+Install these **before cloning**:
+
+| Tool | Version | Why | Install |
+|---|---|---|---|
+| **Node.js** | **20 LTS** (or 18+) | Runtime for all three apps | [nodejs.org](https://nodejs.org/) |
+| **npm** | 10+ | Comes with Node | — |
+| **Git** | any | Clone repo | [git-scm.com](https://git-scm.com/) |
+| **Expo Go app** | latest | Run mobile app on your physical phone | Play Store / App Store |
+| **Android Studio** *(optional)* | latest | Run mobile app on Android emulator | [developer.android.com](https://developer.android.com/studio) |
+| **Xcode** *(optional, macOS only)* | latest | Run mobile app on iOS simulator | Mac App Store |
+| **Supabase account** *(optional for full DB)* | free tier | Backend Postgres + Auth | [supabase.com](https://supabase.com/) |
+
+> ⚠ **Phone & PC must be on the same Wi-Fi network** for Expo Go to connect.
+
+---
+
+## 🚀 Quick start (first-time setup)
+
 ```bash
-npm run build --workspace=packages/shared
+# 1. Clone
+git clone <your-repo-url> AGAP
+cd AGAP/agapp-system
+
+# 2. Install ALL workspaces (uses npm workspaces, hoists deps automatically)
+npm install --legacy-peer-deps
+
+# 3. Build the shared types package once (other apps import from it)
+npm run build:shared
+
+# 4. Set up environment variables (see "Environment variables" section below)
+#    Create:  apps/api/.env
+#    Create:  apps/mobile/.env
+#    Create:  apps/admin/.env.local
+
+# 5. You're ready. See "Running the apps" below.
 ```
 
-### Step 3: Run All Applications Concurrently
-Boot all three applications (API, Admin Dashboard, Citizen App) in parallel:
+> **Why `--legacy-peer-deps`?** React 19 + Expo 54 has peer-dep mismatches with some packages (e.g. `react-native-maps`). This flag is the safe default and is also what `npx expo install` uses internally.
+
+---
+
+## 🔐 Environment variables
+
+Each app needs its own env file. **Never commit these.** Templates are below — ask the project lead for actual keys.
+
+### `apps/api/.env`
+```env
+PORT=5000
+SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...        # service role, server-only
+GEMINI_API_KEY=                                # optional, for chatbot
+JWT_SECRET=replace-me-with-a-long-random-string
+```
+
+### `apps/mobile/.env`
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.x:5000    # your PC's LAN IP, NOT localhost
+EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...    # anon/public key only
+REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.x     # your PC's LAN IP
+```
+
+> 📡 **How to find your LAN IP:**
+> - Windows: `ipconfig` → look for `IPv4 Address` under your Wi-Fi adapter
+> - macOS / Linux: `ifconfig | grep inet`
+>
+> Replace `192.168.1.x` with what you see (typically `192.168.x.x` or `10.0.x.x`).
+
+### `apps/admin/.env.local`
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+```
+
+---
+
+## ▶️ Running the apps
+
+### Option A — Run everything at once (API + Admin)
+
+From `agapp-system/`:
 ```bash
 npm run dev
 ```
+This boots:
+- **API**     → http://localhost:5000
+- **Admin**   → http://localhost:3000
 
-The apps will be available at:
-*   **Citizen Mobile App Simulator**: [http://localhost:19006](http://localhost:19006)
-*   **LGU / Super Admin Dashboard**: [http://localhost:3000](http://localhost:3000)
-*   **API Server Endpoint**: [http://localhost:5000/api](http://localhost:5000/api)
+The mobile app must be started separately (it's an Expo native dev server).
 
----
+### Option B — Run individually
 
-## 🔑 Demo Login Credentials
+```bash
+# API only (NestJS, hot reload)
+npm run dev:api
 
-For convenience, you can click the **Quick Login** buttons on the login screens, or use:
+# Admin only (Next.js, hot reload)
+npm run dev:admin
 
-| Role | Email | Password | Details |
-|---|---|---|---|
-| **Super Administrator** | `superadmin@agapp.gov.ph` | `password123` | Provision LGUs, check feature flags and billing tiers. |
-| **LGU Administrator** | `admin@naga.gov.ph` | `password123` | Review issues, process documents, moderate forum. |
-| **Citizen (Mobile)** | `lawrence@email.com` | (OTP: `123456`) | Apply for documents, submit pothole reports. |
-
----
-
-## 💡 Mock Defense Walkthrough Script
-
-Use this step-by-step flow to impress the defense panel:
-
-### Scenario 1: On-Device YOLO Pothole Credibility (Mitigating DoS/DDoS)
-1.  Open the **Citizen App** at `http://localhost:19006`. Use email `lawrence@email.com` and log in with OTP `123456`.
-2.  Select **Naga City LGU**.
-3.  Tap the **Report** button.
-4.  Select **Pothole** and click **Open Camera Viewfinder**.
-5.  *Demo Success*: Click **Snap Pothole Image**. You will see:
-    `YOLO Check: Valid Road Damage (95%)` -> The Submit button becomes active.
-6.  *Demo Spam Block*: Remove the photo and click **Open Camera** again. Click **Snap Random Image**. You will see:
-    `YOLO Alert: Non-damage detected (18%)` -> An alert warns that submitting this may tag the account as spam.
-7.  Submit the valid Pothole report.
-
-### Scenario 2: LGU Admin SLA Auto-Routing (Republic Act No. 11032)
-1.  Open the **Admin Dashboard** at `http://localhost:3000`. Login as **Naga LGU Admin**.
-2.  Click **Issue Reports** on the left menu.
-3.  Locate the newly submitted pothole report. Note that it has been **auto-assigned** to the *Engineering Office* with an SLA Tier of *Simple* (max 3 days resolution), in compliance with RA 11032.
-4.  Click **Acknowledge & Route**.
-
-### Scenario 3: Document Security & Processing (Data Privacy Act of 2012)
-1.  Go back to the **Citizen App** and tap **Services**.
-2.  Choose **Birth Certificate Request** and click **Apply Document**.
-3.  Fill in the guided form details and submit. Note that the app generates a **Reference Number and QR Code** for in-person municipal hall collection.
-4.  Switch to the **Admin Dashboard** and click **Service Requests**.
-5.  Locate the birth certificate application. View the detail panel. Note that you can click **Mark Under Review** -> **Process** -> **Mark Released**.
-
-### Scenario 4: Profanity Forum Moderation (RA 10175)
-1.  Go to the **Citizen App** and tap **Forum**.
-2.  Type a clean message (e.g. `"Good morning Naga!"`). It appears immediately.
-3.  Type a message containing a flagged word: `"This is annoying, putang ina!"`.
-4.  Notice the post is automatically flagged as **Awaiting Moderation** and hidden from public view.
-5.  Switch to the **Admin Dashboard** under **Forum Moderation** to approve or delete the post.
-
----
-
-## 🛠️ Folder Layout Architecture
-
+# Mobile only (Expo)
+npm run dev:mobile
 ```
-/agapp-system
-  ├── apps/
-  │    ├── admin/            # Next.js Admin Dashboard (Super Admin & LGU Admin)
-  │    ├── mobile/           # Expo Citizen App (runs on Mobile & Web Browser)
-  │    └── api/              # Node.js TypeScript REST API Backend
-  ├── packages/
-  │    └── shared/           # Common interfaces, types, and schema validators (zod)
-  ├── package.json           # Root workspace config (pnpm or npm)
-  └── README.md              # Startup instruction
+
+---
+
+## 📱 Running the mobile app on your phone
+
+1. **Install Expo Go** on your phone from the Play Store / App Store.
+2. **Connect phone to the same Wi-Fi as your PC.** (Mobile data won't work — Expo dev server is LAN-only.)
+3. Start Metro:
+   ```bash
+   cd apps/mobile
+   npx expo start --lan --clear
+   ```
+4. **Scan the QR code** that appears in the terminal:
+   - Android: open Expo Go → tap "Scan QR code"
+   - iOS: open the camera app → point at QR → tap the banner
+5. The app will bundle (~30–60 s first time) and load on your phone.
+
+### Common Metro hotkeys (in the terminal)
+| Key | Action |
+|---|---|
+| `r` | Reload the app |
+| `j` | Open the dev menu / debugger |
+| `m` | Toggle the in-app dev menu |
+| `c` | Clear the Metro cache and reload |
+| `Ctrl + C` | Stop the dev server |
+
+### Run on Android emulator
+```bash
+cd apps/mobile
+npx expo start --android
 ```
+
+### Run on iOS simulator (macOS only)
+```bash
+cd apps/mobile
+npx expo start --ios
+```
+
+---
+
+## 🛠 Mobile app — features that need real device permissions
+
+| Feature | Permission | Tested on |
+|---|---|---|
+| **Pothole report camera** | Camera | Expo Go (Android & iOS) |
+| **GPS auto-tag on reports** | Foreground location | Expo Go (Android & iOS) |
+| **Geofence verification** (Haversine vs LGU centroid) | Foreground location | runs locally |
+| **Map view** (`react-native-maps`) | none for testing | Apple Maps on iOS · Google Maps on Android |
+| **Secure session storage** (`expo-secure-store`) | none | Keychain / Keystore |
+
+### Production map keys (only when building with EAS)
+For production Android builds you'll need a Google Maps API key. Add it to `apps/mobile/app.json`:
+```json
+"android": {
+  "config": {
+    "googleMaps": { "apiKey": "AIza..." }
+  }
+}
+```
+Not needed in Expo Go (Expo's bundled key is used for development).
+
+---
+
+## 🗄 Supabase / Database
+
+The API expects a Supabase Postgres instance. SQL is in `supabase/`.
+
+```bash
+# To apply migrations (with Supabase CLI installed)
+cd supabase
+supabase db push
+```
+
+**Mock mode**: if `SUPABASE_URL` is unset, the API falls back to in-memory mock seeds — useful for offline demos but data resets on restart.
+
+---
+
+## 🔑 Demo credentials (mock mode)
+
+| Role | Login | Password / OTP |
+|---|---|---|
+| **Super Admin** (web) | `superadmin@agapp.gov.ph` | `password123` |
+| **LGU Admin** (web) | `admin@liliw.gov.ph` | `password123` |
+| **Citizen** (mobile) | any email | OTP `123456` (or leave blank to bypass) |
+
+---
+
+## 🧪 Defense walkthrough script
+
+### Scenario 1 — On-device YOLO pothole credibility *(mitigates spam DDoS)*
+1. Mobile → log in → select **Liliw**
+2. Tab **Reports** → category **Pothole** → tap **Capture photo**
+3. After capture, GPS auto-loads → mini-map shows your pin → submit
+4. ✓ "Inside LGU geofence" confirmation appears
+
+### Scenario 2 — LGU SLA auto-routing *(RA 11032)*
+1. Open admin dashboard → **Issue Reports**
+2. Locate the pothole report → it's pre-routed to *Engineering Office* with a **3-day SLA**
+3. Click **Acknowledge & Route**
+
+### Scenario 3 — Document request *(RA 10173 + RA 11032)*
+1. Mobile → tab **Services** → tap **Birth Certificate** → fill the form sheet → submit
+2. Reference number generated → bring to Treasurer's counter
+3. Admin dashboard → **Service Requests** → mark **Under Review** → **Released**
+
+### Scenario 4 — Forum profanity moderation *(RA 10175)*
+1. Mobile → forum → post a clean message ✓
+2. Post a message containing a flagged word → auto-flagged "Awaiting Moderation"
+3. Admin → **Forum Moderation** → approve or delete
+
+### Scenario 5 — Map view of LGU coverage
+1. Mobile → home → **Map** quick action
+2. See black pin (selected LGU centroid) + pastel pins (other municipalities) + pink pins (your reports)
+
+---
+
+## 🐛 Troubleshooting
+
+### Mobile app
+
+**"Network response timed out" / app stuck on splash**
+- Phone and PC not on same Wi-Fi. Check both.
+- Some routers block client-to-client traffic ("AP isolation"). Try a hotspot from another phone.
+- Set `REACT_NATIVE_PACKAGER_HOSTNAME` in `.env` to your PC's LAN IP.
+
+**Metro bundler errors / "Cannot find module"**
+```bash
+cd apps/mobile
+rm -rf node_modules .expo
+cd ../..
+npm install --legacy-peer-deps
+cd apps/mobile
+npx expo start --clear
+```
+
+**`'S' of undefined` or other Hermes crashes after installing a new package**
+- Always use `npx expo install <package>` (not `npm install`) — it picks Expo-compatible versions.
+- Restart Metro with `--clear` after any native dep install.
+
+**Camera / location alerts but nothing happens**
+- Check phone Settings → Apps → Expo Go → Permissions → enable Camera + Location.
+
+**TypeScript version warning**
+- Safe to ignore. The repo pins TS 5.3 for compatibility with all workspaces.
+
+### API / Admin
+
+**"ECONNREFUSED localhost:5000" from mobile**
+- Mobile cannot reach `localhost`. Use your PC's LAN IP in `EXPO_PUBLIC_API_URL`.
+
+**"Module not found: @agapp/shared"**
+- Run `npm run build:shared` from the repo root.
+
+**Port already in use**
+- Kill the process on the port:
+  - Windows: `netstat -ano | findstr :5000` → `taskkill /PID <pid> /F`
+  - macOS / Linux: `lsof -ti:5000 | xargs kill -9`
+
+---
+
+## 📚 Tech stack reference
+
+**Mobile** — Expo SDK 54 · React Native 0.81 · React 19 · TypeScript · `expo-camera` · `expo-location` · `expo-secure-store` · `react-native-maps` · `@expo/vector-icons` (Ionicons)
+
+**Admin** — Next.js 14 · React · TypeScript · TailwindCSS · Supabase JS
+
+**API** — NestJS 10 · Express · Supabase JS · Zod · `@google/generative-ai` (Gemini chatbot) · `pdf-lib` (cert generation)
+
+**Shared** — TypeScript declarations + Zod schemas, built once via `npm run build:shared`.
+
+---
+
+## 📝 Compliance notes (thesis context)
+
+- **RA 10173** — Data Privacy Act: opt-in consent for GPS + push, secure storage of session tokens via OS keychain.
+- **RA 11032** — Ease of Doing Business: SLA auto-routing for service requests (Simple = 3 days, Complex = 7, Highly Technical = 20).
+- **RA 10175** — Cybercrime Prevention: forum profanity filter + admin moderation queue.
+- **RA 10844** — DICT mandate: digital governance platform for LGUs.
+
+---
+
+## 🤝 Contributing
+
+1. Branch from `main`: `git checkout -b feat/<short-description>`
+2. Commit in small, focused chunks. Reference scenarios above when relevant.
+3. Run `npm run build:shared` after editing `packages/shared`.
+4. Open a PR — describe what changed in the mobile / admin / api column.
+
+---
+
+## 📞 Need help?
+
+- Check the **Troubleshooting** section above first.
+- Slack / Discord: ask the project lead.
+- Logs: Metro terminal output + the in-app dev menu (`j` in Metro).
+
+— Last updated: 2026-05
