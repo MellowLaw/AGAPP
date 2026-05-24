@@ -24,20 +24,6 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
-    },
-    "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "AGAPP uses your camera to capture photos of road damage and community concerns."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "AGAPP uses your location to geo-tag reports for LGU geofence verification."
-        }
-      ]
-    ]
+    }
   }
 }
