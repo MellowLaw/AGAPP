@@ -175,7 +175,29 @@ export default function App() {
   // Navigation state
   const [appLoading, setAppLoading] = useState(true);
   const [screen, setScreen] = useState<'login' | 'lgu-select' | 'main'>('login');
-  const [activeTab, setActiveTab] = useState<'home' | 'services' | 'reports' | 'chatbot' | 'profile'>('home');
+  const TABS = ['home', 'services', 'reports', 'chatbot', 'profile'] as const;
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]>('home');
+  const tabFadeAnim = useRef(new Animated.Value(1)).current;
+  const tabSlideAnim = useRef(new Animated.Value(0)).current;
+  const [tabBarWidth, setTabBarWidth] = useState(0);
+
+  const PILL_W = 66;
+  const switchTab = (tab: typeof TABS[number]) => {
+    const idx = TABS.indexOf(tab);
+    const tabW = tabBarWidth / TABS.length;
+    const centeredX = idx * tabW + (tabW - PILL_W) / 2;
+    Animated.spring(tabSlideAnim, {
+      toValue: centeredX,
+      useNativeDriver: true,
+      bounciness: 8,
+      speed: 14,
+    }).start();
+    Animated.sequence([
+      Animated.timing(tabFadeAnim, { toValue: 0, duration: 90, useNativeDriver: true }),
+      Animated.timing(tabFadeAnim, { toValue: 1, duration: 160, useNativeDriver: true }),
+    ]).start();
+    setTimeout(() => setActiveTab(tab), 90);
+  };
 
   // Theme
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -754,7 +776,7 @@ export default function App() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false} style={{ opacity: tabFadeAnim }}>
 
         {/* ───── HOME TAB ───── */}
         {activeTab === 'home' && (
@@ -769,7 +791,7 @@ export default function App() {
               </View>
               <TouchableOpacity
                 style={[styles.iconButton, { backgroundColor: T.card, borderColor: T.border }]}
-                onPress={() => setActiveTab('profile')}
+                onPress={() => switchTab('profile')}
               >
                 <Ionicons name="person-outline" size={20} color={T.text} />
               </TouchableOpacity>
@@ -1170,10 +1192,22 @@ export default function App() {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ───── BOTTOM TAB BAR ───── */}
-      <View style={[styles.tabBar, { backgroundColor: T.card, borderColor: T.border }]}>
+      <View
+        style={[styles.tabBar, { backgroundColor: T.card, borderColor: T.border }]}
+        onLayout={e => setTabBarWidth(e.nativeEvent.layout.width)}
+      >
+        {/* Sliding pill indicator */}
+        {tabBarWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.tabSlider,
+              { width: PILL_W, transform: [{ translateX: tabSlideAnim }] },
+            ]}
+          />
+        )}
         {[
           { id: 'home',     icon: 'home-outline',         iconActive: 'home' },
           { id: 'services', icon: 'grid-outline',         iconActive: 'grid' },
@@ -1186,15 +1220,18 @@ export default function App() {
             <Pressable
               key={t.id}
               style={styles.tabItem}
-              onPress={() => setActiveTab(t.id as any)}
+              onPress={() => switchTab(t.id as any)}
             >
-              <View style={[styles.tabIconWrap, isActive && { backgroundColor: T.text }]}>
+              <View style={styles.tabIconWrap}>
                 <Ionicons
                   name={(isActive ? t.iconActive : t.icon) as any}
-                  size={20}
-                  color={isActive ? T.bg : T.textMuted}
+                  size={21}
+                  color={isActive ? ACCENT : T.textMuted}
                 />
               </View>
+              <Text style={{ fontSize: 10, fontWeight: isActive ? '700' : '500', color: isActive ? ACCENT : T.textMuted, marginTop: 1, letterSpacing: 0.2 }}>
+                {t.id.charAt(0).toUpperCase() + t.id.slice(1)}
+              </Text>
             </Pressable>
           );
         })}
@@ -1209,7 +1246,7 @@ export default function App() {
 const { width: SCREEN_W } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
+  screen: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   splash: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   splashTag: { color: '#9CA3AF', fontSize: 10, letterSpacing: 3, marginTop: 16, fontWeight: '600' },
 
@@ -1459,12 +1496,17 @@ const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute', bottom: 16, left: 16, right: 16,
     height: 64, borderRadius: RADIUS.pill, borderWidth: 1,
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
-    paddingHorizontal: 8,
+    flexDirection: 'row', alignItems: 'center',
+    overflow: 'hidden',
   },
-  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tabSlider: {
+    position: 'absolute', top: 6, bottom: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: ACCENT + '22',
+  },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   tabIconWrap: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 28, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
 
