@@ -400,7 +400,7 @@ export default function App() {
 
   const openServiceForm = (svc: any) => {
     setActiveService(svc);
-    setSvcFullName(citizen.name);
+    setSvcFullName('');
     setSvcPurpose('');
     setSvcCopies('1');
     setSvcContact('');
