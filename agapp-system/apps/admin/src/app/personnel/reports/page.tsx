@@ -1,0 +1,237 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Search } from '@/components/ui/Search';
+import { ArrowsClockwise, Check, X } from '@phosphor-icons/react';
+import { useToast } from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
+
+interface Report {
+  id: string;
+  dbId: string;
+  category: string;
+  location: string;
+  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'rejected';
+  time: string;
+}
+
+type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
+
+const mapDbStatusToUi = (status: string): Report['status'] => {
+  switch (status as DbReportStatus) {
+    case 'Submitted':
+      return 'pending';
+    case 'Under Review':
+      return 'acknowledged';
+    case 'In Progress':
+      return 'in_progress';
+    case 'Resolved':
+      return 'resolved';
+    case 'Rejected':
+      return 'rejected';
+    default:
+      return 'pending';
+  }
+};
+
+const mapDbCategoryToLabel = (category: string): string => {
+  switch (category) {
+    case 'pothole':
+      return 'Pothole';
+    case 'clogged_drainage':
+      return 'Drainage';
+    case 'stray_animal':
+      return 'Stray Animal';
+    default:
+      return category || 'Other';
+  }
+};
+
+export default function PersonnelReportsPage() {
+  const [items, setItems] = useState<Report[]>([]);
+  const [active, setActive] = useState<Report | null>(null);
+  const [tab, setTab] = useState<'assigned' | 'office' | 'all'>('assigned');
+  const [q, setQ] = useState('');
+  const { showToast, ToastContainer } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      setLoading(true);
+      setLoadError(null);
+
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        console.error('Error fetching auth user', authError);
+        setLoadError('Not authenticated');
+        setLoading(false);
+        return;
+      }
+
+      const { data: userRow, error: userError } = await supabase
+        .from('users')
+        .select('id, lgu_id')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (userError || !userRow) {
+        console.error('Error loading personnel profile', userError);
+        setLoadError(userError?.message || 'Failed to load profile');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('reports')
+        .select('id, reference_number, category, status, barangay, created_at')
+        .eq('lgu_id', userRow.lgu_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading reports', error);
+        setLoadError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      const mapped: Report[] = (data || []).map((row: any) => ({
+        id: row.reference_number || row.id,
+        dbId: row.id,
+        category: mapDbCategoryToLabel(row.category || ''),
+        location: row.barangay,
+        status: mapDbStatusToUi(row.status || 'Submitted'),
+        time: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+      }));
+
+      setItems(mapped);
+      setActive(mapped[0] || null);
+      setLoading(false);
+    };
+
+    fetchReports();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return items.filter(i =>
+      (tab === 'all' || tab === 'assigned' || tab === 'office') &&
+      (i.id + i.category + i.location).toLowerCase().includes(q.toLowerCase())
+    );
+  }, [items, q, tab]);
+
+  const update = async (status: Report['status']) => {
+    if (!active) return;
+    
+    const prevItems = items;
+    const prevActive = active;
+
+    setItems(prev => prev.map(r => r.id === active.id ? { ...r, status } : r));
+    setActive({ ...active, status });
+
+    const dbStatusMap: Record<Report['status'], string> = {
+      pending: 'Submitted',
+      acknowledged: 'Under Review',
+      in_progress: 'In Progress',
+      resolved: 'Resolved',
+      rejected: 'Rejected'
+    };
+
+    const { error } = await supabase
+      .from('reports')
+      .update({ status: dbStatusMap[status] })
+      .eq('id', active.dbId);
+
+    if (error) {
+      console.error('Failed to update report status in database', error);
+      setItems(prevItems);
+      setActive(prevActive);
+      showToast('Failed to update report status. Please try again.', 'error');
+      return;
+    }
+
+    showToast(`${active.id} set to ${status}`, 'success');
+  };
+
+  return (
+    <DashboardLayout role="lgu-personnel" lguName="Liliw, Laguna" title="Issue Reports">
+      <ToastContainer />
+      {loading && (
+        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">
+          Loading reports…
+        </div>
+      )}
+      {loadError && !loading && (
+        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+          Failed to load reports: {loadError}
+        </div>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader title="Reports" action={<Search value={q} onChange={setQ} className="w-64" />} />
+            <div className="flex items-center gap-2 px-2 mb-3">
+              <button onClick={() => setTab('assigned')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='assigned'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>Assigned to me</button>
+              <button onClick={() => setTab('office')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='office'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>My office</button>
+              <button onClick={() => setTab('all')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='all'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>All</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-2">
+              {filtered.map(r => (
+                <button key={r.id} onClick={() => setActive(r)} className={`text-left p-3 rounded-md border ${active?.id===r.id?'border-[#1a1a1a]':'border-[#e5e5e5]'} hover:bg-[#fafafa]`}>
+                  <p className="text-sm font-medium text-[#1a1a1a]">{r.id}</p>
+                  <p className="text-xs text-[#737373]">{r.category} • {r.location}</p>
+                  <div className="mt-2">
+                    <Badge variant={r.status==='resolved'?'success':r.status==='in_progress'?'default':r.status==='acknowledged'?'info':'warning'}>
+                      {r.status.replace('_',' ')}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+        
+        <div>
+          <Card>
+            <CardHeader title={active ? active.id : 'Select a report'} />
+            {active && (
+              <div className="space-y-3">
+                <div className="text-sm text-[#1a1a1a]">
+                  <p><span className="text-[#737373]">Category:</span> {active.category}</p>
+                  <p><span className="text-[#737373]">Location:</span> {active.location}</p>
+                  <p><span className="text-[#737373]">Status:</span> {active.status.replace('_',' ')}</p>
+                </div>
+                <div className="flex gap-2 pt-3 border-t border-[#e5e5e5]">
+                  {(active.status==='pending' || active.status==='acknowledged') && (
+                    <>
+                      <Button variant="primary" onClick={() => update('acknowledged')}>
+                        <Check className="w-4 h-4 mr-1" /> Acknowledge
+                      </Button>
+                      <Button variant="secondary" onClick={() => update('in_progress')}>
+                        <ArrowsClockwise className="w-4 h-4 mr-1" /> Start
+                      </Button>
+                      <Button variant="danger" onClick={() => update('rejected')}>
+                        <X className="w-4 h-4 mr-1" /> Reject
+                      </Button>
+                    </>
+                  )}
+                  {active.status==='in_progress' && (
+                    <Button variant="primary" onClick={() => update('resolved')}>
+                      <Check className="w-4 h-4 mr-1" /> Mark Resolved
+                    </Button>
+                  )}
+                  {active.status==='resolved' && (
+                    <Button variant="secondary" disabled>Resolved</Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

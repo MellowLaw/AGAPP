@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ShieldWarning, Warning, CheckCircle, Clock, Trash, FileText, 
   Database, Bell, Check, X, CaretRight, HardDrive, SignOut
@@ -65,6 +65,14 @@ const INITIAL_FORUM_POSTS = [
 
 export default function LguAdminDashboard() {
   const router = useRouter();
+  const params = useSearchParams();
+  const lguParam = params?.get('lguName') || '';
+  useEffect(() => {
+    const base = '/lgu/dashboard';
+    const href = lguParam ? `${base}?lguName=${encodeURIComponent(lguParam)}` : base;
+    router.replace(href);
+  }, [router, lguParam]);
+  return null;
   const [reports, setReports] = useState(INITIAL_REPORTS);
   const [requests, setRequests] = useState(INITIAL_SERVICE_REQUESTS);
   const [posts, setPosts] = useState(INITIAL_FORUM_POSTS);

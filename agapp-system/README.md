@@ -1,6 +1,6 @@
 # AGAPP — Automated Governance and Public Service Platform
 
-> **Monorepo** for the AGAPP thesis prototype. Contains the citizen mobile app (Expo / React Native), the LGU & super-admin web dashboard (Next.js), the REST API (NestJS), and shared types (`zod` + TypeScript).
+> **Monorepo** for the AGAPP fully working system. Contains the citizen mobile app (Expo / React Native), the LGU & super-admin web dashboard (Next.js), the REST API (NestJS), and shared types (`zod` + TypeScript).
 
 ---
 

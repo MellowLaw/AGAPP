@@ -4,12 +4,12 @@ import {
   Image, Switch, ActivityIndicator, Alert, SafeAreaView, Platform, StatusBar,
   Animated, Easing, Dimensions, Pressable,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import { Camera, CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { supabase } from './supabaseClient';
 
 // ============================================================================
 // DESIGN TOKENS  ────────────────────────────────────────────────────────────
@@ -96,7 +96,6 @@ const REPORT_CATEGORIES = [
   { id: 'pothole',          label: 'Pothole',          icon: 'warning-outline' },
   { id: 'clogged_drainage', label: 'Drainage',         icon: 'water-outline' },
   { id: 'stray_animal',     label: 'Stray Animal',     icon: 'paw-outline' },
-  { id: 'streetlight',      label: 'Street Light',     icon: 'bulb-outline' },
 ];
 
 // ============================================================================
@@ -205,17 +204,19 @@ export default function App() {
 
   // User state
   const [selectedLgu, setSelectedLgu] = useState<any>(LOCAL_LGUS[0]);
-  const [citizen] = useState({
-    name: 'Lawrence Alcantara',
-    email: 'lawrence@email.com',
+  const [citizen, setCitizen] = useState<any>({
+    name: 'Demo Citizen',
+    email: 'citizen@example.com',
     barangay: 'Poblacion',
     role: 'Citizen',
   });
+  const [lgus, setLgus] = useState<any[]>(LOCAL_LGUS);
 
-  // Login form
-  const [email, setEmail] = useState('lawrence@email.com');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
+  // Login form (Supabase email + password)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(true);
 
   // Permissions
@@ -252,11 +253,47 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<any[]>([
     { sender: 'bot', text: 'Hi! I\'m your AGAPP assistant. Ask me about document applications, permits, or community concerns.' },
   ]);
+  const [homeMode, setHomeMode] = useState<'dashboard' | 'news'>('dashboard');
 
   // Initial loading splash
   useEffect(() => {
     const t = setTimeout(() => setAppLoading(false), 2200);
     return () => clearTimeout(t);
+  }, []);
+
+  // Load LGUs from Supabase (fallback to LOCAL_LGUS)
+  useEffect(() => {
+    const loadLgus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lgus')
+          .select('id, name, latitude, longitude, feature_flags')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true });
+        if (!error && data) {
+          const mapped = data.map((l: any, idx: number) => {
+            const fallback = LOCAL_LGUS[idx] ?? LOCAL_LGUS[0];
+            return {
+              id: l.id,
+              name: l.name,
+              region: fallback.region,
+              color: fallback.color,
+              accent: fallback.accent,
+              latitude: l.latitude,
+              longitude: l.longitude,
+              featureFlags: l.feature_flags || fallback.featureFlags,
+            };
+          });
+          setLgus(mapped);
+          if (mapped.length > 0 && !mapped.find(m => m.id === selectedLgu.id)) {
+            setSelectedLgu(mapped[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load LGUs from Supabase, using local seeds.', err);
+      }
+    };
+    loadLgus();
   }, []);
 
   if (!fontsLoaded) return null;
@@ -269,29 +306,173 @@ export default function App() {
     setHasLocationPermission(ls === 'granted');
   };
 
-  const handleRequestOtp = () => {
+  const loadUserData = async (overrideLgu?: any, overrideCitizen?: any) => {
+    const lguToUse = overrideLgu || selectedLgu;
+    const citizenToUse = overrideCitizen || citizen;
+    if (!lguToUse || !citizenToUse || !citizenToUse.id) return;
+    try {
+      const { data: reportData, error: reportError } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('lgu_id', lguToUse.id)
+        .eq('citizen_id', citizenToUse.id)
+        .order('created_at', { ascending: false });
+      if (!reportError && reportData) {
+        const mappedReports = reportData.map((r: any) => {
+          const distKm = haversineKm(r.latitude, r.longitude, lguToUse.latitude, lguToUse.longitude);
+          return {
+            id: r.id,
+            referenceNumber: r.reference_number,
+            category: r.category,
+            description: r.description,
+            status: r.status,
+            photoUrl: r.photo_url,
+            mlConfidence: r.ml_confidence,
+            location: {
+              lat: r.latitude,
+              lng: r.longitude,
+              accuracy: null,
+              address: r.barangay ? `Barangay ${r.barangay}` : '',
+            },
+            insideGeofence: distKm <= 15,
+            createdAt: r.created_at,
+          };
+        });
+        setReports(mappedReports);
+      }
+
+      const { data: serviceData, error: serviceError } = await supabase
+        .from('service_requests')
+        .select('*')
+        .eq('lgu_id', lguToUse.id)
+        .eq('citizen_id', citizenToUse.id)
+        .order('created_at', { ascending: false });
+      if (!serviceError && serviceData) {
+        const mappedRequests = serviceData.map((s: any) => ({
+          id: s.id,
+          referenceNumber: s.reference_number,
+          serviceType: s.service_type,
+          status: s.status,
+        }));
+        setServiceRequests(mappedRequests);
+      }
+    } catch (err) {
+      console.warn('Failed to load citizen data from Supabase.', err);
+    }
+  };
+
+  const handleSignup = async () => {
     if (!privacyAccepted) {
       Alert.alert('Privacy Notice', 'Please accept the Privacy Notice (RA 10173) to continue.');
       return;
     }
-    setOtpSent(true);
-    Alert.alert('Code Sent', 'Demo OTP: 123456 (or leave blank to bypass).');
-  };
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Missing fields', 'Please enter both email and password.');
+      return;
+    }
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error || !data.user) {
+        const msg = error?.message || 'Sign up failed';
+        setAuthError(msg);
+        Alert.alert('Sign up failed', msg);
+        return;
+      }
 
-  const handleVerifyOtp = async () => {
-    if (otpCode === '123456' || otpCode === '') {
+      const { error: profileError } = await supabase.from('users').insert({
+        id: data.user.id,
+        email,
+        name: data.user.user_metadata?.full_name || email,
+        role: 'CITIZEN',
+      });
+      if (profileError) {
+        console.warn('Failed to create user profile', profileError);
+      }
+
+      const nextCitizen = {
+        id: data.user.id,
+        email,
+        name: data.user.user_metadata?.full_name || email,
+        barangay: 'Poblacion',
+        role: 'Citizen',
+      };
+      setCitizen(nextCitizen);
       await requestPermissions();
-      try { await SecureStore.setItemAsync('agapp_session', 'mock-jwt'); } catch {}
       setScreen('lgu-select');
-    } else {
-      Alert.alert('Invalid Code', 'Please enter "123456" or leave blank.');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
-  const handleSelectLgu = (lgu: any) => {
+  const handleLogin = async () => {
+    if (!privacyAccepted) {
+      Alert.alert('Privacy Notice', 'Please accept the Privacy Notice (RA 10173) to continue.');
+      return;
+    }
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Missing fields', 'Please enter both email and password.');
+      return;
+    }
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error || !data.user) {
+        const msg = error?.message || 'Login failed';
+        setAuthError(msg);
+        Alert.alert('Login failed', msg);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      let nextCitizen: any;
+      if (profileError || !profile) {
+        nextCitizen = {
+          id: data.user.id,
+          email,
+          name: data.user.user_metadata?.full_name || email,
+          barangay: 'Poblacion',
+          role: 'Citizen',
+        };
+      } else {
+        nextCitizen = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          barangay: profile.barangay || 'Poblacion',
+          role: profile.role === 'CITIZEN' ? 'Citizen' : profile.role,
+          lgu_id: profile.lgu_id,
+        };
+      }
+      setCitizen(nextCitizen);
+      await requestPermissions();
+      setScreen('lgu-select');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSelectLgu = async (lgu: any) => {
     setSelectedLgu(lgu);
     setAppLoading(true);
-    setTimeout(() => { setAppLoading(false); setScreen('main'); }, 1200);
+    try {
+      await loadUserData(lgu);
+    } finally {
+      setTimeout(() => { setAppLoading(false); setScreen('main'); }, 800);
+    }
   };
 
   const openCamera = async () => {
@@ -370,7 +551,7 @@ export default function App() {
     }
   };
 
-  const submitReport = () => {
+  const submitReport = async () => {
     if (!snappedPhoto) {
       Alert.alert('Missing Photo', 'Please capture a photo first.');
       return;
@@ -379,16 +560,40 @@ export default function App() {
       Alert.alert('Missing Location', 'GPS coordinates are required. Tap "Use my location" to fetch them.');
       return;
     }
+    if (!citizen || !citizen.id) {
+      Alert.alert('Not signed in', 'Your session has expired. Please sign in again.');
+      setScreen('login');
+      return;
+    }
     // Simple geofence check vs selected LGU centroid (~10 km radius)
     const distKm = haversineKm(reportLocation.lat, reportLocation.lng, selectedLgu.latitude, selectedLgu.longitude);
     const insideGeofence = distKm <= 15;
     const ref = `REP-2026-${String(reports.length + 1).padStart(4, '0')}`;
-    setReports([{
-      id: `r-${Date.now()}`, referenceNumber: ref, category: reportCategory,
-      description: reportDesc, photoUrl: snappedPhoto, status: 'Submitted',
-      mlConfidence: mlConfidence || 1, location: reportLocation,
-      insideGeofence, createdAt: new Date().toISOString(),
-    }, ...reports]);
+
+    const payload = {
+      reference_number: ref,
+      lgu_id: selectedLgu.id,
+      citizen_id: citizen.id,
+      citizen_name: citizen.name,
+      category: reportCategory,
+      description: reportDesc,
+      photo_url: snappedPhoto,
+      latitude: reportLocation.lat,
+      longitude: reportLocation.lng,
+      barangay: citizen.barangay || 'Poblacion',
+      status: 'Submitted',
+      ml_confidence: mlConfidence || 1,
+      ml_verified: true,
+      is_low_credibility: false,
+    };
+
+    const { error } = await supabase.from('reports').insert(payload);
+    if (error) {
+      Alert.alert('Submission failed', error.message || 'Could not submit report. Please try again.');
+      return;
+    }
+
+    await loadUserData();
     setReportDesc(''); setSnappedPhoto(null); setMlConfidence(null); setReportLocation(null);
     Alert.alert(
       'Submitted',
@@ -406,25 +611,54 @@ export default function App() {
     setSvcContact('');
   };
 
-  const submitServiceForm = () => {
+  const submitServiceForm = async () => {
     if (!activeService) return;
     if (!svcFullName.trim()) { Alert.alert('Missing field', 'Please enter your full name.'); return; }
     if (!svcPurpose.trim()) { Alert.alert('Missing field', 'Please state the purpose of your request.'); return; }
+    if (!citizen || !citizen.id) {
+      Alert.alert('Not signed in', 'Your session has expired. Please sign in again.');
+      setScreen('login');
+      return;
+    }
     const copies = parseInt(svcCopies, 10) || 1;
     const ref = `REQ-2026-${String(serviceRequests.length + 1).padStart(4, '0')}`;
-    setServiceRequests([{
-      id: `s-${Date.now()}`, referenceNumber: ref, serviceType: activeService.label,
-      fullName: svcFullName, purpose: svcPurpose, copies, contact: svcContact,
-      status: 'Submitted', createdAt: new Date().toISOString(),
-    }, ...serviceRequests]);
+
+    const payload = {
+      reference_number: ref,
+      lgu_id: selectedLgu.id,
+      citizen_id: citizen.id,
+      citizen_name: citizen.name,
+      service_type: activeService.label,
+      office_name: activeService.label, // simple label until offices are wired
+      status: 'Submitted',
+      form_details: {
+        full_name: svcFullName,
+        purpose: svcPurpose,
+        copies,
+        contact: svcContact,
+      },
+      qr_code_url: '',
+      attachment_url: null,
+      assigned_personnel: null,
+      reject_reason: null,
+    };
+
+    const { error } = await supabase.from('service_requests').insert(payload);
+    if (error) {
+      Alert.alert('Application failed', error.message || 'Could not submit your application. Please try again.');
+      return;
+    }
+
+    await loadUserData();
     setActiveService(null);
     Alert.alert('Application Submitted', `Reference: ${ref}\nPay & claim at ${selectedLgu.name} Treasurer's counter.`);
   };
 
-  const sendChatMessage = () => {
-    if (!chatInput.trim()) return;
-    const userMsg = { sender: 'user', text: chatInput };
-    const q = chatInput.toLowerCase();
+  const sendChatMessage = (textOverride?: string) => {
+    const text = textOverride ?? chatInput;
+    if (!text.trim()) return;
+    const userMsg = { sender: 'user', text };
+    const q = text.toLowerCase();
     let reply = 'I couldn\'t find that in the FAQ. Want me to file a ticket with the LGU?';
     if (q.includes('permit') || q.includes('bplo')) reply = 'Business Permit: present barangay clearance + pay assessment at Treasurer. SLA 3 days.';
     else if (q.includes('birth') || q.includes('civil')) reply = 'Birth Certificate: bring valid ID. Show your QR code at Civil Registrar. SLA 3 days.';
@@ -478,20 +712,15 @@ export default function App() {
               keyboardType="email-address"
             />
 
-            {otpSent && (
-              <>
-                <Text style={[styles.label, { color: T.textMuted, marginTop: 4 }]}>VERIFICATION CODE</Text>
-                <TextInput
-                  style={[styles.input, styles.inputCenter, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
-                  value={otpCode}
-                  onChangeText={setOtpCode}
-                  placeholder="• • • • • •"
-                  placeholderTextColor={T.textMuted}
-                  keyboardType="numeric"
-                  maxLength={6}
-                />
-              </>
-            )}
+            <Text style={[styles.label, { color: T.textMuted }]}>PASSWORD</Text>
+            <TextInput
+              style={[styles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor={T.textMuted}
+              secureTextEntry
+            />
 
             <Pressable
               onPress={() => setPrivacyAccepted(!privacyAccepted)}
@@ -505,18 +734,31 @@ export default function App() {
               </Text>
             </Pressable>
 
+            {authError && (
+              <Text style={[styles.demoHint, { color: '#DC2626', textAlign: 'left' }]}>{authError}</Text>
+            )}
+
             <TouchableOpacity
               activeOpacity={0.85}
               style={[styles.primaryButton, { backgroundColor: privacyAccepted ? T.text : T.chip }]}
-              onPress={otpSent ? handleVerifyOtp : handleRequestOtp}
-              disabled={!privacyAccepted}
+              onPress={handleLogin}
+              disabled={!privacyAccepted || authLoading}
             >
               <Text style={[styles.primaryButtonText, { color: privacyAccepted ? T.bg : T.textMuted }]}>
-                {otpSent ? 'Verify & Sign In' : 'Send Verification Code'}
+                {authLoading ? 'Signing in…' : 'Sign in'}
               </Text>
             </TouchableOpacity>
 
-            <Text style={[styles.demoHint, { color: T.textMuted }]}>Demo OTP: 123456</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleSignup}
+              disabled={!privacyAccepted || authLoading}
+              style={{ marginTop: 10, alignSelf: 'center' }}
+            >
+              <Text style={[styles.muted, { color: T.textMuted }]}>
+                New here? <Text style={{ color: ACCENT, fontWeight: '700' }}>Create an account</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border }]}>
@@ -555,7 +797,7 @@ export default function App() {
             Select the LGU you reside in. You can switch anytime.
           </Text>
 
-          {LOCAL_LGUS.map(lgu => (
+          {lgus.map(lgu => (
             <TouchableOpacity
               key={lgu.id}
               activeOpacity={0.85}
@@ -642,7 +884,7 @@ export default function App() {
               pinColor="#1A1A1A"
             />
             {/* All other LGUs as ghost pins for context */}
-            {LOCAL_LGUS.filter(l => l.id !== selectedLgu.id).map(l => (
+            {lgus.filter(l => l.id !== selectedLgu.id).map(l => (
               <Marker
                 key={l.id}
                 coordinate={{ latitude: l.latitude, longitude: l.longitude }}
@@ -670,7 +912,7 @@ export default function App() {
           <View style={styles.fullMapTitle}>
             <View style={{ flex: 1 }}>
               <Text style={styles.fullMapTitleText}>{selectedLgu.name}</Text>
-              <Text style={styles.fullMapTitleSub}>{reports.filter(r => r.location).length} reports · {LOCAL_LGUS.length} LGUs</Text>
+              <Text style={styles.fullMapTitleSub}>{reports.filter(r => r.location).length} reports · {lgus.length} LGUs</Text>
             </View>
             <Ionicons name="layers-outline" size={20} color="#1A1A1A" />
           </View>
@@ -781,104 +1023,199 @@ export default function App() {
         {/* ───── HOME TAB ───── */}
         {activeTab === 'home' && (
           <View style={{ padding: 20 }}>
-            {/* Header */}
-            <View style={styles.topBar}>
-              <View>
-                <Text style={[styles.muted, { color: T.textMuted }]}>Magandang araw,</Text>
-                <Text style={[styles.serif, { color: T.text, fontSize: 24, marginTop: 2 }]}>
-                  {citizen.name.split(' ')[0]}.
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.iconButton, { backgroundColor: T.card, borderColor: T.border }]}
-                onPress={() => switchTab('profile')}
-              >
-                <Ionicons name="person-outline" size={20} color={T.text} />
-              </TouchableOpacity>
-            </View>
+            {homeMode === 'dashboard' ? (
+              <>
+                {/* Top pills row */}
+                <View style={styles.homePillsRow}>
+                  <TouchableOpacity
+                    style={[styles.helpPill, { backgroundColor: T.card, borderColor: T.border }]}
+                    onPress={() => Alert.alert('Help', 'For emergencies, use hotlines below. For app support, visit your LGU help desk.')}
+                    activeOpacity={0.9}
+                  >
+                    <Ionicons name="help-circle-outline" size={18} color={T.text} />
+                    <Text style={[styles.helpPillText, { color: T.text }]}>Help</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.cardPill, { backgroundColor: ACCENT }]}
+                    activeOpacity={0.9}
+                    onPress={() => Alert.alert('Citizen ID', 'In the future this will show your digital municipal ID card.')}
+                  >
+                    <Ionicons name="card-outline" size={18} color="#1A1A1A" />
+                    <Text style={styles.cardPillText}>Citizen Card</Text>
+                  </TouchableOpacity>
+                </View>
 
-            {/* Hero LGU Card */}
-            <View style={[styles.heroCard, { backgroundColor: selectedLgu.color }]}>
-              <View style={styles.heroTop}>
-                <View>
-                  <Text style={styles.heroLabel}>YOUR MUNICIPALITY</Text>
-                  <Text style={styles.heroLgu}>{selectedLgu.name.replace('Municipality of ', '')}</Text>
-                  <Text style={styles.heroBarangay}>Barangay {citizen.barangay}</Text>
-                </View>
-                <TouchableOpacity onPress={() => setScreen('lgu-select')} style={styles.heroSwitch}>
-                  <Ionicons name="swap-horizontal" size={16} color="#1A1A1A" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.heroStatsRow}>
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{serviceRequests.length}</Text>
-                  <Text style={styles.heroStatLabel}>Applications</Text>
-                </View>
-                <View style={[styles.heroStatDivider]} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{reports.length}</Text>
-                  <Text style={styles.heroStatLabel}>Reports</Text>
-                </View>
-                <View style={[styles.heroStatDivider]} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>3</Text>
-                  <Text style={styles.heroStatLabel}>Notices</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Quick actions */}
-            <SectionHeader title="Quick actions" T={T} />
-            <View style={styles.quickGrid}>
-              {[
-                { icon: 'document-text-outline', label: 'Apply',      onPress: () => setActiveTab('services'), color: PASTELS.sage },
-                { icon: 'camera-outline',        label: 'Report',     onPress: () => setActiveTab('reports'),  color: PASTELS.pink },
-                { icon: 'chatbubble-outline',    label: 'Assistant',  onPress: () => setActiveTab('chatbot'),  color: PASTELS.cream },
-                { icon: 'map-outline',           label: 'Map',        onPress: () => setMapOpen(true),         color: PASTELS.lilac },
-              ].map(a => (
-                <TouchableOpacity key={a.label} style={[styles.quickItem, { backgroundColor: a.color }]} onPress={a.onPress} activeOpacity={0.85}>
-                  <Ionicons name={a.icon as any} size={26} color="#1A1A1A" />
-                  <Text style={styles.quickLabel}>{a.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* News carousel */}
-            <SectionHeader title="What's happening" action="See all" T={T} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
-              {NEWS_FEED.map(n => (
-                <View key={n.id} style={[styles.newsCard, { backgroundColor: n.color }]}>
-                  <View style={styles.newsTag}><Text style={styles.newsTagText}>{n.tag}</Text></View>
-                  <Text style={styles.newsTitle}>{n.title}</Text>
-                  <Text style={styles.newsDate}>Dec 14, 2026</Text>
-                </View>
-              ))}
-            </ScrollView>
-
-            {/* Emergency */}
-            <SectionHeader title="Emergency hotlines" T={T} />
-            <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border, padding: 4 }]}>
-              {[
-                { name: 'Police (PNP)',     number: '117',  icon: 'shield-outline' },
-                { name: 'Fire Bureau (BFP)', number: '160', icon: 'flame-outline' },
-                { name: 'Medical / Rescue', number: '911',  icon: 'medkit-outline' },
-              ].map((h, i) => (
-                <TouchableOpacity
-                  key={h.name}
-                  style={[styles.emergencyRow, i < 2 && { borderBottomWidth: 1, borderBottomColor: T.border }]}
-                  onPress={() => Alert.alert('Calling…', `Dial ${h.number}?`)}
-                >
-                  <View style={[styles.emergencyIcon, { backgroundColor: T.cardAlt }]}>
-                    <Ionicons name={h.icon as any} size={18} color={T.text} />
+                {/* Header */}
+                <View style={styles.topBar}>
+                  <View>
+                    <Text style={[styles.muted, { color: T.textMuted }]}>Magandang araw,</Text>
+                    <Text style={[styles.serif, { color: T.text, fontSize: 24, marginTop: 2 }]}>
+                      {citizen.name.split(' ')[0]}.
+                    </Text>
                   </View>
+                  <TouchableOpacity
+                    style={[styles.iconButton, { backgroundColor: T.card, borderColor: T.border }]}
+                    onPress={() => switchTab('profile')}
+                  >
+                    <Ionicons name="person-outline" size={20} color={T.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Hero LGU Card */}
+                <View style={[styles.heroCard, { backgroundColor: selectedLgu.color }]}>
+                  <View style={styles.heroTop}>
+                    <View>
+                      <Text style={styles.heroLabel}>YOUR MUNICIPALITY</Text>
+                      <Text style={styles.heroLgu}>{selectedLgu.name.replace('Municipality of ', '')}</Text>
+                      <Text style={styles.heroBarangay}>Barangay {citizen.barangay}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setScreen('lgu-select')} style={styles.heroSwitch}>
+                      <Ionicons name="swap-horizontal" size={16} color="#1A1A1A" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.heroStatsRow}>
+                    <View style={styles.heroStat}>
+                      <Text style={styles.heroStatValue}>{serviceRequests.length}</Text>
+                      <Text style={styles.heroStatLabel}>Applications</Text>
+                    </View>
+                    <View style={[styles.heroStatDivider]} />
+                    <View style={styles.heroStat}>
+                      <Text style={styles.heroStatValue}>{reports.length}</Text>
+                      <Text style={styles.heroStatLabel}>Reports</Text>
+                    </View>
+                    <View style={[styles.heroStatDivider]} />
+                    <View style={styles.heroStat}>
+                      <Text style={styles.heroStatValue}>3</Text>
+                      <Text style={styles.heroStatLabel}>Notices</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Quick actions */}
+                <SectionHeader title="Quick actions" T={T} />
+                <View style={styles.quickGrid}>
+                  {[
+                    { icon: 'document-text-outline', label: 'Apply',      onPress: () => setActiveTab('services'), color: PASTELS.sage },
+                    { icon: 'camera-outline',        label: 'Report',     onPress: () => setActiveTab('reports'),  color: PASTELS.pink },
+                    { icon: 'chatbubble-outline',    label: 'Assistant',  onPress: () => setActiveTab('chatbot'),  color: PASTELS.cream },
+                    { icon: 'map-outline',           label: 'Map',        onPress: () => setMapOpen(true),         color: PASTELS.lilac },
+                  ].map(a => (
+                    <TouchableOpacity key={a.label} style={[styles.quickItem, { backgroundColor: a.color }]} onPress={a.onPress} activeOpacity={0.85}>
+                      <Ionicons name={a.icon as any} size={26} color="#1A1A1A" />
+                      <Text style={styles.quickLabel}>{a.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* News carousel */}
+                <SectionHeader
+                  title="What's happening"
+                  action="See all"
+                  onAction={() => setHomeMode('news')}
+                  T={T}
+                />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
+                  {NEWS_FEED.map(n => (
+                    <View key={n.id} style={[styles.newsCard, { backgroundColor: n.color }]}>
+                      <View style={styles.newsTag}><Text style={styles.newsTagText}>{n.tag}</Text></View>
+                      <Text style={styles.newsTitle}>{n.title}</Text>
+                      <Text style={styles.newsDate}>Dec 14, 2026</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {/* Emergency */}
+                <SectionHeader title="Emergency hotlines" T={T} />
+                <View style={[styles.card, { backgroundColor: T.card, borderColor: T.border, padding: 4 }]}>
+                  {[
+                    { name: 'Police (PNP)',     number: '117',  icon: 'shield-outline' },
+                    { name: 'Fire Bureau (BFP)', number: '160', icon: 'flame-outline' },
+                    { name: 'Medical / Rescue', number: '911',  icon: 'medkit-outline' },
+                  ].map((h, i) => (
+                    <TouchableOpacity
+                      key={h.name}
+                      style={[styles.emergencyRow, i < 2 && { borderBottomWidth: 1, borderBottomColor: T.border }]}
+                      onPress={() => Alert.alert('Calling…', `Dial ${h.number}?`)}
+                    >
+                      <View style={[styles.emergencyIcon, { backgroundColor: T.cardAlt }]}>
+                        <Ionicons name={h.icon as any} size={18} color={T.text} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: T.text, fontWeight: '600' }}>{h.name}</Text>
+                        <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Tap to dial · {h.number}</Text>
+                      </View>
+                      <Ionicons name="call-outline" size={18} color={ACCENT} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <>
+                {/* News & articles full view */}
+                <View style={styles.newsScreenHeader}>
+                  <TouchableOpacity
+                    style={[styles.newsBackButton, { borderColor: T.border, backgroundColor: T.card }]}
+                    onPress={() => setHomeMode('dashboard')}
+                  >
+                    <Ionicons name="chevron-back" size={18} color={T.text} />
+                  </TouchableOpacity>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: T.text, fontWeight: '600' }}>{h.name}</Text>
-                    <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Tap to dial · {h.number}</Text>
+                    <Text style={[styles.newsScreenTitle, { color: T.text }]}>News & updates</Text>
+                    <Text style={[styles.newsScreenSubtitle, { color: T.textMuted }]}>
+                      Latest advisories from {selectedLgu.name.replace('Municipality of ', '')}
+                    </Text>
                   </View>
-                  <Ionicons name="call-outline" size={18} color={ACCENT} />
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+
+                <View style={{ marginTop: 8 }}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: T.text }]}>Latest</Text>
+                    <Text style={[styles.sectionAction, { color: T.textMuted }]}>View all</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingRight: 20 }}
+                  >
+                    {NEWS_FEED.map(n => (
+                      <View key={n.id} style={[styles.newsHeroCard, { backgroundColor: n.color }]}>
+                        <View style={styles.newsHeroTagWrap}>
+                          <Text style={styles.newsHeroTag}>{n.tag}</Text>
+                        </View>
+                        <Text style={styles.newsHeroTitle}>{n.title}</Text>
+                        <Text style={styles.newsHeroMeta}>12h ago · Municipal Hall</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={{ marginTop: 24 }}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: T.text }]}>All news</Text>
+                  </View>
+                  {NEWS_FEED.map(n => (
+                    <View
+                      key={`list-${n.id}`}
+                      style={[styles.newsListCard, { backgroundColor: T.card, borderColor: T.border }]}
+                    >
+                      <View style={[styles.newsListBadge, { backgroundColor: n.color }]}>
+                        <Text style={styles.newsListBadgeText}>{n.tag}</Text>
+                      </View>
+                      <Text style={[styles.newsListTitle, { color: T.text }]}>{n.title}</Text>
+                      <Text style={[styles.newsListExcerpt, { color: T.textMuted }]}
+                        numberOfLines={2}
+                      >
+                        Key details about this advisory will show here so citizens can quickly scan what matters.
+                      </Text>
+                      <View style={styles.newsListMetaRow}>
+                        <Text style={[styles.newsListMeta, { color: T.textMuted }]}>12h ago</Text>
+                        <Ionicons name="share-outline" size={16} color={T.textMuted} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         )}
 
@@ -1080,26 +1417,72 @@ export default function App() {
         {/* ───── CHATBOT TAB ───── */}
         {activeTab === 'chatbot' && (
           <View style={{ padding: 20 }}>
-            <Text style={[styles.serif, { color: T.text, fontSize: 28 }]}>Assistant.</Text>
-            <Text style={[styles.muted, { color: T.textMuted, marginTop: 6, marginBottom: 22 }]}>
-              Ask about permits, certificates, and reports
+            <View style={styles.chatHeader}>
+              <View style={styles.chatHeaderAvatar}>
+                <AgappLogo size={18} color="#1A1A1A" accent={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.chatHeaderTitle, { color: T.text }]}>AGAPP Assistant</Text>
+                <Text style={[styles.chatHeaderSubtitle, { color: T.textMuted }]}
+                  numberOfLines={1}
+                >
+                  Online · {selectedLgu.name.replace('Municipality of ', '')}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.muted, { color: T.textMuted, marginTop: 6, marginBottom: 16 }]}
+              numberOfLines={2}
+            >
+              Ask about permits, certificates, reports, or how to use AGAPP.
             </Text>
 
             <View style={[styles.chatArea, { backgroundColor: T.card, borderColor: T.border }]}>
-              {chatMessages.map((m, idx) => (
-                <View
+              <ScrollView
+                contentContainerStyle={{ paddingVertical: 4 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {chatMessages.map((m, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.chatBubble,
+                      m.sender === 'user'
+                        ? [styles.userBubble, { backgroundColor: T.text }]
+                        : [styles.botBubble, { backgroundColor: T.cardAlt }],
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: m.sender === 'user' ? T.bg : T.text,
+                        fontSize: 14,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {m.text}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.chatSuggestionsRow}>
+              {[
+                'How do I apply for a business permit?',
+                'Track my application',
+                'Report a pothole',
+              ].map((s, idx) => (
+                <Pressable
                   key={idx}
-                  style={[
-                    styles.chatBubble,
-                    m.sender === 'user'
-                      ? [styles.userBubble, { backgroundColor: T.text }]
-                      : [styles.botBubble, { backgroundColor: T.cardAlt }],
-                  ]}
+                  style={[styles.chatSuggestionChip, { backgroundColor: T.card, borderColor: T.border }]}
+                  onPress={() => {
+                    sendChatMessage(s);
+                  }}
                 >
-                  <Text style={{ color: m.sender === 'user' ? T.bg : T.text, fontSize: 14, lineHeight: 20 }}>
-                    {m.text}
+                  <Text style={[styles.chatSuggestionText, { color: T.text }]} numberOfLines={1}>
+                    {s}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
 
@@ -1110,18 +1493,20 @@ export default function App() {
                 onChangeText={setChatInput}
                 placeholder="Ask anything…"
                 placeholderTextColor={T.textMuted}
-                onSubmitEditing={sendChatMessage}
+                onSubmitEditing={() => sendChatMessage()}
               />
               <TouchableOpacity
                 style={[styles.chatSend, { backgroundColor: ACCENT }]}
-                onPress={sendChatMessage}
+                onPress={() => sendChatMessage()}
               >
                 <Ionicons name="arrow-up" size={20} color="#1A1A1A" />
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.muted, { color: T.textMuted, fontSize: 11, textAlign: 'center', marginTop: 12 }]}>
-              Try: "How do I apply for a business permit?"
+            <Text style={[styles.muted, { color: T.textMuted, fontSize: 11, textAlign: 'center', marginTop: 10 }]}
+              numberOfLines={1}
+            >
+              Conversations may be logged for service improvement.
             </Text>
           </View>
         )}
@@ -1173,7 +1558,7 @@ export default function App() {
                 { icon: 'business-outline',    label: 'Switch municipality', onPress: () => setScreen('lgu-select') },
                 { icon: 'document-text-outline', label: 'Privacy notice (RA 10173)' },
                 { icon: 'help-circle-outline', label: 'Help & support' },
-                { icon: 'log-out-outline',     label: 'Sign out',            onPress: () => { setScreen('login'); setOtpSent(false); setOtpCode(''); } },
+                { icon: 'log-out-outline',     label: 'Sign out',            onPress: () => { setScreen('login'); setEmail(''); setPassword(''); setAuthError(null); } },
               ].map((m, i, arr) => (
                 <TouchableOpacity
                   key={m.label}
@@ -1321,6 +1706,19 @@ const styles = StyleSheet.create({
 
   // Top bar
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
+  homePillsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  helpPill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: RADIUS.pill, borderWidth: 1,
+  },
+  helpPillText: { fontSize: 13, fontWeight: '600', marginLeft: 6 },
+  cardPill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+  },
+  cardPillText: { fontSize: 13, fontWeight: '700', marginLeft: 6 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 
   // Hero
@@ -1378,6 +1776,48 @@ const styles = StyleSheet.create({
   newsTagText: { fontSize: 10, fontWeight: '700', color: '#1A1A1A', letterSpacing: 0.5 },
   newsTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.3, lineHeight: 20 },
   newsDate: { fontSize: 11, color: '#1A1A1A', opacity: 0.6, marginTop: 6 },
+  newsScreenHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18, marginTop: 4, columnGap: 12 },
+  newsBackButton: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+    marginRight: 10,
+  },
+  newsScreenTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
+  newsScreenSubtitle: { fontSize: 12, marginTop: 2 },
+  newsHeroCard: {
+    width: 260,
+    padding: 18,
+    marginRight: 14,
+    borderRadius: RADIUS.xl,
+    justifyContent: 'space-between',
+  },
+  newsHeroTagWrap: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    marginBottom: 60,
+  },
+  newsHeroTag: { fontSize: 10, fontWeight: '700', color: '#FFF', letterSpacing: 0.5 },
+  newsHeroTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.4, lineHeight: 22 },
+  newsHeroMeta: { fontSize: 11, color: '#1A1A1A', opacity: 0.7, marginTop: 6 },
+  newsListCard: {
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  newsListBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    marginBottom: 10,
+  },
+  newsListBadgeText: { fontSize: 10, fontWeight: '700', color: '#1A1A1A', letterSpacing: 0.4 },
+  newsListTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  newsListExcerpt: { fontSize: 13, lineHeight: 19 },
+  newsListMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  newsListMeta: { fontSize: 11 },
 
   // Emergency
   emergencyRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
@@ -1438,6 +1878,14 @@ const styles = StyleSheet.create({
   confidenceText: { fontSize: 10, fontWeight: '800', color: '#1A1A1A', letterSpacing: 0.3 },
 
   // Chat
+  chatHeader: { flexDirection: 'row', alignItems: 'center' },
+  chatHeaderAvatar: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ACCENT + '22', marginRight: 10,
+  },
+  chatHeaderTitle: { fontSize: 16, fontWeight: '700' },
+  chatHeaderSubtitle: { fontSize: 12, marginTop: 2 },
   chatArea: {
     minHeight: 380, padding: 14, borderRadius: RADIUS.lg, borderWidth: 1, marginBottom: 14,
   },
@@ -1450,6 +1898,12 @@ const styles = StyleSheet.create({
   },
   chatInput: { flex: 1, fontSize: 14, paddingHorizontal: 14, height: 42 },
   chatSend: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  chatSuggestionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chatSuggestionChip: {
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: RADIUS.pill, borderWidth: 1,
+  },
+  chatSuggestionText: { fontSize: 12, fontWeight: '500' },
 
   // Camera
   cameraOverlay: { flex: 1, padding: 20, justifyContent: 'space-between' },

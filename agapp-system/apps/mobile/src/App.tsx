@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import { 
   House as HomeIcon, Bell, User as UserIcon, MapPin, Phone as PhoneCall, 
   Chat as MessageSquare, FileText, Bank as Landmark, Camera, Warning as AlertTriangle, PaperPlaneRight as Send, CheckCircle as CheckCircle2,
   ArrowLeft, MagnifyingGlass as Search, Question as HelpCircle, Star,
   Newspaper, CaretRight as ChevronRight, X
 } from '@phosphor-icons/react';
+import { supabase } from './supabase';
+
+const apiFetch = async (url: string, options?: RequestInit) => {
+  const res = await fetch(url, options);
+  return res.json();
+};
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -12,7 +19,7 @@ export default function App() {
   // Mobile frame wrapper state
   const [selectedLgu, setSelectedLgu] = useState<any>(null);
   const [citizen, setCitizen] = useState<any>(null);
-  const [screen, setScreen] = useState('login'); // login, lgu-select, home, services, apply-service, submit-report, tracking, map, emergency, forum, chatbot, settings
+  const [screen, setScreen] = useState('login'); // login, signup, lgu-select, home, services, apply-service, submit-report, tracking, map, emergency, forum, chatbot, settings
   
   // Theme & Language
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -26,6 +33,31 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Fetch latest published news announcement for selected LGU
+  useEffect(() => {
+    const loadNews = async () => {
+      if (!selectedLgu) return;
+      try {
+        const { data, error } = await supabase
+          .from('news_announcements')
+          .select('*')
+          .eq('lgu_id', selectedLgu.id)
+          .eq('status', 'published')
+          .or('scheduled_for.is.null,scheduled_for.lte.now()')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (!error && data && data.length > 0) {
+          setLatestNews({ title: data[0].title, content: data[0].content });
+        } else {
+          setLatestNews(null);
+        }
+      } catch (e) {
+        setLatestNews(null);
+      }
+    };
+    loadNews();
+  }, [selectedLgu]);
+
   // Input states
   const [email, setEmail] = useState('lawrence@email.com');
   const [consentLocation, setConsentLocation] = useState(true);
@@ -33,14 +65,13 @@ export default function App() {
   const [consentAnalytics, setConsentAnalytics] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
 
-  const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
-  const [phone, setPhone] = useState('09123456789');
+  const [password, setPassword] = useState('');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [lguSearch, setLguSearch] = useState('');
   const [serviceFilter, setServiceFilter] = useState('All');
   
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   // Dynamic list states (local mirror for fallback)
   const [lgus, setLgus] = useState<any[]>([
@@ -96,48 +127,110 @@ export default function App() {
   ]);
   const [botInput, setBotInput] = useState('');
 
+  // Latest news announcement for home banner
+  const [latestNews, setLatestNews] = useState<{ title: string; content: string } | null>(null);
+
   // Tracking detailed view
   const [selectedItemHistory, setSelectedItemHistory] = useState<any>(null);
   const [ratingVal, setRatingVal] = useState(5);
   const [ratingFeedback, setRatingFeedback] = useState('');
 
-  // Fetch initial configs
+  // Derived markers for map view based on report coordinates
+  const reportMarkers = (() => {
+    const withCoords = reports.filter(r => typeof r.latitude === 'number' && typeof r.longitude === 'number');
+    if (withCoords.length === 0) return [] as { id: string; top: string; left: string; category: string; status: string }[];
+
+    const lats = withCoords.map((r: any) => r.latitude as number);
+    const lngs = withCoords.map((r: any) => r.longitude as number);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const hasLatSpread = maxLat !== minLat;
+    const hasLngSpread = maxLng !== minLng;
+    const latRange = hasLatSpread ? maxLat - minLat : 1;
+    const lngRange = hasLngSpread ? maxLng - minLng : 1;
+
+    return withCoords.map((r: any) => {
+      const normalizedY = hasLatSpread ? (maxLat - r.latitude) / latRange : 0.5;
+      const normalizedX = hasLngSpread ? (r.longitude - minLng) / lngRange : 0.5;
+      const top = 5 + 90 * normalizedY;
+      const left = 5 + 90 * normalizedX;
+      return {
+        id: (r.id as string) ?? (r.reference_number as string) ?? String(r.created_at),
+        top: `${top}%`,
+        left: `${left}%`,
+        category: (r.category as string) ?? 'Report',
+        status: (r.status as string) ?? 'Submitted',
+      };
+    });
+  })();
+
+  // Fetch initial configs from Supabase LGUs
   useEffect(() => {
     const loadConfigs = async () => {
       try {
-        const resLgus = await fetch(`${API_BASE}/lgus`);
-        if (resLgus.ok) {
-          const data = await resLgus.json();
-          setLgus(data.filter((l: any) => l.isActive));
+        const { data, error } = await supabase
+          .from('lgus')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true });
+        if (!error && data) {
+          setLgus(
+            data.map((l: any) => ({
+              id: l.id,
+              name: l.name,
+              logo: l.logo,
+              bannerUrl: l.banner_url,
+              primaryColor: l.primary_color,
+              secondaryColor: l.secondary_color,
+              latitude: l.latitude,
+              longitude: l.longitude,
+              featureFlags: l.feature_flags || { chatbot: true, potholeDetection: true, forum: true },
+            }))
+          );
         }
       } catch (e) {
-        console.warn('API Server offline. Using local simulated data.');
+        console.warn('Failed to load LGUs from Supabase, using local seeds.');
       }
     };
     loadConfigs();
   }, []);
 
-  // Fetch user data once LGU and login is complete
+  // Fetch user data once LGU and login is complete (Supabase)
   const loadUserData = async () => {
     if (!citizen || !selectedLgu) return;
     try {
-      const resReports = await fetch(`${API_BASE}/reports?lguId=${selectedLgu.id}&citizenId=${citizen.id}`);
-      if (resReports.ok) {
-        const data = await resReports.json();
-        setReports(data);
+      const { data: reportData, error: reportError } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('lgu_id', selectedLgu.id)
+        .eq('citizen_id', citizen.id)
+        .order('created_at', { ascending: false });
+      if (!reportError && reportData) {
+        setReports(reportData);
       }
-      const resRequests = await fetch(`${API_BASE}/services?lguId=${selectedLgu.id}&citizenId=${citizen.id}`);
-      if (resRequests.ok) {
-        const data = await resRequests.json();
-        setRequests(data);
+
+      const { data: serviceData, error: serviceError } = await supabase
+        .from('service_requests')
+        .select('*')
+        .eq('lgu_id', selectedLgu.id)
+        .eq('citizen_id', citizen.id)
+        .order('created_at', { ascending: false });
+      if (!serviceError && serviceData) {
+        setRequests(serviceData);
       }
-      const resForum = await fetch(`${API_BASE}/forum?lguId=${selectedLgu.id}`);
-      if (resForum.ok) {
-        const data = await resForum.json();
-        setForumPosts(data);
+
+      const { data: forumData, error: forumError } = await supabase
+        .from('forum_posts')
+        .select('*')
+        .eq('lgu_id', selectedLgu.id)
+        .order('created_at', { ascending: false });
+      if (!forumError && forumData) {
+        setForumPosts(forumData);
       }
     } catch (e) {
-      console.warn('API Server offline. Using local database seeds.');
+      console.warn('Failed to load citizen data from Supabase.');
     }
   };
 
@@ -145,96 +238,103 @@ export default function App() {
     loadUserData();
   }, [citizen, screen]);
 
-  // Auth logins
-  const handleRequestOtp = async () => {
+  // Auth: Supabase email + password
+  const handleSignup = async () => {
+    setAuthError(null);
+    setAuthLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
       });
-      if (res.ok) {
-        setOtpSent(true);
+      if (error || !data.user) {
+        setAuthError(error?.message || 'Sign up failed');
+        setAuthLoading(false);
+        return;
       }
-    } catch (e) {
-      setOtpSent(true);
-    }
-  };
 
-  const handleVerifyOtp = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'password123' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCitizen(data.user);
-        setScreen('lgu-select');
-      }
-    } catch (e) {
-      // Offline fallback
-      setCitizen({
-        id: 'usr-citizen',
-        email: email,
-        name: 'Lawrence Alcantara',
+      // Create or upsert user profile row
+      const { error: profileError } = await supabase.from('users').insert({
+        id: data.user.id,
+        email,
+        name: data.user.user_metadata?.full_name || email,
         role: 'CITIZEN',
-        lguId: 'liliw-laguna',
-        barangay: 'Poblacion',
-        notificationPreferences: { push: true, sms: true, email: true }
       });
+      if (profileError) {
+        console.warn('Failed to create user profile', profileError);
+      }
+
+      setCitizen({ id: data.user.id, email, name: data.user.user_metadata?.full_name || email, role: 'CITIZEN' });
       setScreen('lgu-select');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
-  // Submit report to LGU
+  const handleLogin = async () => {
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error || !data.user) {
+        setAuthError(error?.message || 'Login failed');
+        setAuthLoading(false);
+        return;
+      }
+
+      // Load profile row
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        setCitizen({ id: data.user.id, email, name: data.user.user_metadata?.full_name || email, role: 'CITIZEN' });
+      } else {
+        setCitizen(profile);
+      }
+      setScreen('lgu-select');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Submit report to LGU (Supabase)
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!snappedPhoto) return;
+    if (!citizen || !selectedLgu) return;
 
     const payload = {
-      lguId: selectedLgu.id,
-      citizenId: citizen.id,
-      citizenName: citizen.name,
+      lgu_id: selectedLgu.id,
+      citizen_id: citizen.id,
+      citizen_name: citizen.name,
       category: reportCategory,
       description: reportDesc,
-      photoUrl: snappedPhoto,
+      photo_url: snappedPhoto,
       latitude: gpsCoords.lat,
       longitude: gpsCoords.lng,
       barangay: selectedBarangay,
-      mlConfidence: mlResult?.mlConfidence || 1.0,
-      mlVerified: mlResult?.mlVerified ?? true,
-      isLowCredibility: mlResult?.isLowCredibility ?? false
+      status: 'Submitted',
+      ml_confidence: mlResult?.mlConfidence || 1.0,
+      ml_verified: mlResult?.mlVerified ?? true,
+      is_low_credibility: mlResult?.isLowCredibility ?? false,
     };
 
-    try {
-      const res = await fetch(`${API_BASE}/reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        setScreen('tracking');
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Submission failed');
-      }
-    } catch (e) {
-      // Local addition
-      const mockRef = `REP-2026-${String(reports.length + 1).padStart(4, '0')}`;
-      const newRep = {
-        id: `rep-${Date.now()}`,
-        referenceNumber: mockRef,
-        ...payload,
-        status: 'Submitted',
-        createdAt: new Date().toISOString(),
-        statusHistory: [{ status: 'Submitted', updatedBy: citizen.id, notes: 'Submitted locally', timestamp: new Date().toISOString() }]
-      };
-      setReports([newRep, ...reports]);
-      setScreen('tracking');
+    const { error } = await supabase
+      .from('reports')
+      .insert(payload);
+
+    if (error) {
+      Alert.alert('Error', error.message || 'Submission failed');
+      return;
     }
-    // reset form
+
+    await loadUserData();
+    setScreen('tracking');
     setSnappedPhoto(null);
     setMlResult(null);
     setReportDesc('');
@@ -270,7 +370,7 @@ export default function App() {
 
   // Handle real file upload from device (for prototype web version)
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files?.[0] ?? null;
     if (!file) return;
 
     setPhotoFile(file);
@@ -366,41 +466,22 @@ export default function App() {
   const handleSubmitForumPost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPostText.trim()) return;
+    if (!citizen || !selectedLgu) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/forum`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lguId: selectedLgu.id,
-          citizenId: citizen.id,
-          citizenName: citizen.name,
-          content: newPostText
-        })
-      });
-      if (res.ok) {
-        loadUserData();
-        setNewPostText('');
-      }
-    } catch (e) {
-      const profanityList = ['putang ina', 'gago', 'tarantado', 'pota'];
-      const flaggedKeywords = profanityList.filter(word => newPostText.toLowerCase().includes(word));
-      const isApproved = flaggedKeywords.length === 0;
+    const { error } = await supabase.from('forum_posts').insert({
+      lgu_id: selectedLgu.id,
+      citizen_id: citizen.id,
+      citizen_name: citizen.name,
+      content: newPostText,
+    });
 
-      const mockPost = {
-        id: `forum-${Date.now()}`,
-        lguId: selectedLgu.id,
-        citizenId: citizen.id,
-        citizenName: citizen.name,
-        content: newPostText,
-        isApproved,
-        flaggedKeywords,
-        createdAt: new Date().toISOString()
-      };
-      
-      setForumPosts([mockPost, ...forumPosts]);
-      setNewPostText('');
+    if (error) {
+      Alert.alert('Error', error.message || 'Failed to submit post');
+      return;
     }
+
+    await loadUserData();
+    setNewPostText('');
   };
 
   // Ask Chatbot FAQ RAG query
@@ -533,87 +614,67 @@ export default function App() {
                 </div>
                 
                 <div className="space-y-3.5 pt-1 text-left text-xs">
-                  {loginMethod === 'phone' ? (
-                    <div>
-                      <label className="block text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">Mobile Number</label>
-                      <input 
-                        type="text" 
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        className="w-full bg-color2 border border-color4 rounded-xl px-4 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-color1 transition"
-                        placeholder="e.g. +63 912 345 6789"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">Registered Email</label>
-                      <input 
-                        type="email" 
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        className="w-full bg-color2 border border-color4 rounded-xl px-4 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-color1 transition"
-                        placeholder="lawrence@email.com"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">Email</label>
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                      className="w-full bg-color2 border border-color4 rounded-xl px-4 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-color1 transition"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">Password</label>
+                    <input 
+                      type="password" 
+                      value={password}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                      className="w-full bg-color2 border border-color4 rounded-xl px-4 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-color1 transition"
+                      placeholder="••••••••"
+                    />
+                  </div>
 
-                  {otpSent && (
-                    <div>
-                      <label className="block text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">OTP Verification Code</label>
-                      <input 
-                        type="text" 
-                        value={otpCode}
-                        onChange={e => setOtpCode(e.target.value)}
-                        className="w-full bg-color2 border border-color4 rounded-xl px-4 py-2.5 text-slate-800 text-center font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-color1 transition"
-                        placeholder="123456"
-                      />
+                  {authError && (
+                    <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 mt-1">
+                      {authError}
                     </div>
                   )}
 
                   {/* Privacy Notice Checkbox */}
-                  <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                    <input 
-                      type="checkbox" 
-                      checked={privacyAccepted}
-                      onChange={e => setPrivacyAccepted(e.target.checked)}
-                      className="mt-0.5 rounded text-color1 focus:ring-color1"
-                    />
-                    <span className="text-[10px] text-slate-500 leading-snug">
-                      I accept the <span className="text-color1 font-bold hover:underline">Privacy Notice</span> and consent to location sharing for road damage reporting under RA 10173.
-                    </span>
-                  </label>
+                    <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                      <input 
+                        type="checkbox" 
+                        checked={privacyAccepted}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrivacyAccepted(e.target.checked)}
+                        className="mt-0.5 rounded text-color1 focus:ring-color1"
+                      />
+                      <span className="text-[10px] text-slate-500 leading-snug">
+                        I accept the <span className="text-color1 font-bold hover:underline">Privacy Notice</span> and consent to location sharing for road damage reporting under RA 10173.
+                      </span>
+                    </label>
                 </div>
               </div>
 
-              <div className="space-y-3.5 pt-2">
-                {!otpSent ? (
-                  <button 
-                    onClick={handleRequestOtp}
-                    disabled={!privacyAccepted}
-                    className={`w-full font-semibold py-2.5 rounded-xl shadow transition active:scale-95 text-xs ${privacyAccepted ? 'bg-color1 hover:bg-color4 text-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                  >
-                    Send OTP Verification
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleVerifyOtp}
-                    disabled={!privacyAccepted}
-                    className={`w-full font-semibold py-2.5 rounded-xl shadow transition active:scale-95 text-xs ${privacyAccepted ? 'bg-color1 hover:bg-color4 text-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                  >
-                    Verify and Log In
-                  </button>
-                )}
-                
-                {/* Secondary Button to toggle Email/Mobile method */}
+              <div className="space-y-2.5 pt-2">
                 <button 
-                  onClick={() => setLoginMethod(loginMethod === 'phone' ? 'email' : 'phone')}
-                  className="w-full text-slate-500 hover:text-slate-800 text-xs font-semibold py-1 hover:underline"
+                  onClick={handleLogin}
+                  disabled={!privacyAccepted || authLoading}
+                  className={`w-full font-semibold py-2.5 rounded-xl shadow transition active:scale-95 text-xs ${privacyAccepted && !authLoading ? 'bg-color1 hover:bg-color4 text-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
-                  {loginMethod === 'phone' ? 'Continue with Email' : 'Continue with Mobile Number'}
+                  {authLoading ? 'Signing in…' : 'Sign in'}
+                </button>
+
+                <button 
+                  onClick={handleSignup}
+                  disabled={!privacyAccepted || authLoading}
+                  className="w-full font-semibold py-2.5 rounded-xl border border-color4 bg-white text-xs text-slate-700 hover:bg-color2 active:scale-95 transition"
+                >
+                  Create new account
                 </button>
 
                 <div className="text-[9px] text-center text-slate-400">
-                  Demo bypass OTP code: 123456
+                  You can change to phone/PIN login later once SMS is enabled.
                 </div>
               </div>
             </div>
@@ -641,7 +702,7 @@ export default function App() {
                     type="text" 
                     placeholder="Search by city, municipality, or province…" 
                     value={lguSearch}
-                    onChange={e => setLguSearch(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLguSearch(e.target.value)}
                     className="bg-transparent outline-none text-slate-700 placeholder-slate-400 w-full"
                   />
                 </div>
@@ -686,7 +747,7 @@ export default function App() {
           <div className="flex flex-col flex-1 pb-16">
             {/* Hamburger + Bell Icon Header */}
             <div className="p-4 bg-color2 border-b border-color4 flex items-center justify-between shadow-sm">
-              <button onClick={() => alert('Menu opened')} className="text-slate-600 hover:text-slate-800">
+              <button onClick={() => Alert.alert('Menu', 'Menu opened')} className="text-slate-600 hover:text-slate-800">
                 <div className="w-4 h-3 flex flex-col justify-between">
                   <div className="h-0.5 w-full bg-slate-600 rounded"></div>
                   <div className="h-0.5 w-3/4 bg-slate-600 rounded"></div>
@@ -697,7 +758,7 @@ export default function App() {
                 <span className="font-extrabold text-xs tracking-wide text-slate-800">{selectedLgu.name}</span>
                 <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">{selectedLgu.province || 'Laguna'}</span>
               </div>
-              <button onClick={() => alert('Notifications')} className="text-slate-600 hover:text-slate-800 relative">
+              <button onClick={() => Alert.alert('Notifications', 'Opening notifications...')} className="text-slate-600 hover:text-slate-800 relative">
                 <Bell weight="light" className="w-4 h-4" />
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
               </button>
@@ -707,8 +768,10 @@ export default function App() {
             <div className="m-4 rounded-xl overflow-hidden shadow-sm relative h-28 border border-color4">
               <img src={selectedLgu.bannerUrl || 'https://placehold.co/800x200/f0b2c7/ffffff'} alt="LGU banner" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-slate-800/40 p-3 flex flex-col justify-end text-white">
-                <span className="bg-red-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full w-fit uppercase mb-1">Alert</span>
-                <p className="font-bold text-[10px] line-clamp-2">BPLO permit renewal extended until the end of the month.</p>
+                <span className="bg-red-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full w-fit uppercase mb-1">{latestNews ? 'Announcement' : 'Update'}</span>
+                <p className="font-bold text-[10px] line-clamp-2">
+                  {latestNews ? latestNews.title : 'Welcome to your LGU digital portal. Check back here for important announcements.'}
+                </p>
               </div>
             </div>
 
@@ -801,7 +864,7 @@ export default function App() {
                 <p className="text-[8px] text-white/80">Sends GPS & alerts MDRRMO desk</p>
               </div>
               <button 
-                onClick={() => alert('SOS Triggered! Location payload dispatched.')}
+                onClick={() => Alert.alert('SOS Triggered', 'Location payload dispatched to MDRRMO desk.')}
                 className="bg-white text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm active:scale-90 transition"
               >
                 Trigger SOS
@@ -886,54 +949,54 @@ export default function App() {
             <form onSubmit={handleApplyService} className="space-y-4 text-xs">
               {selectedService.name.includes('Birth') ? (
                 <>
-                  <div>
-                    <label className="block text-slate-500 font-semibold mb-1">Full Name of Child</label>
-                    <input 
-                      type="text" 
-                      onChange={e => setFormFields({ ...formFields, fullName: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 font-semibold mb-1">Date of Birth</label>
-                    <input 
-                      type="date" 
-                      onChange={e => setFormFields({ ...formFields, birthDate: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 font-semibold mb-1">Place of Birth</label>
-                    <input 
-                      type="text" 
-                      onChange={e => setFormFields({ ...formFields, placeOfBirth: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                      required
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-slate-500 font-semibold mb-1">Full Name of Child</label>
+                     <input 
+                       type="text" 
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormFields({ ...formFields, fullName: e.target.value })}
+                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                       required
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-slate-500 font-semibold mb-1">Date of Birth</label>
+                     <input 
+                       type="date" 
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormFields({ ...formFields, birthDate: e.target.value })}
+                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                       required
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-slate-500 font-semibold mb-1">Place of Birth</label>
+                     <input 
+                       type="text" 
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormFields({ ...formFields, placeOfBirth: e.target.value })}
+                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                       required
+                     />
+                   </div>
                 </>
               ) : (
                 <>
-                  <div>
-                    <label className="block text-slate-500 font-semibold mb-1">Business Name</label>
-                    <input 
-                      type="text" 
-                      onChange={e => setFormFields({ ...formFields, businessName: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 font-semibold mb-1">Owner Full Name</label>
-                    <input 
-                      type="text" 
-                      onChange={e => setFormFields({ ...formFields, ownerName: e.target.value })}
-                      className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                      required
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-slate-500 font-semibold mb-1">Business Name</label>
+                     <input 
+                       type="text" 
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormFields({ ...formFields, businessName: e.target.value })}
+                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                       required
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-slate-500 font-semibold mb-1">Owner Full Name</label>
+                     <input 
+                       type="text" 
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormFields({ ...formFields, ownerName: e.target.value })}
+                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                       required
+                     />
+                   </div>
                 </>
               )}
 
@@ -956,13 +1019,13 @@ export default function App() {
             </div>
 
             <form onSubmit={handleSubmitReport} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-500 font-semibold mb-1">Report Category</label>
-                <select 
-                  value={reportCategory}
-                  onChange={e => setReportCategory(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2"
-                >
+               <div>
+                 <label className="block text-slate-500 font-semibold mb-1">Report Category</label>
+                 <select 
+                   value={reportCategory}
+                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setReportCategory(e.target.value)}
+                   className="w-full border border-slate-200 rounded-lg p-2"
+                 >
                   <option value="pothole">Pothole & Road Damage</option>
                   <option value="clogged_drainage">Clogged Drainage</option>
                   <option value="stray_animal">Stray / Missing Pets</option>
@@ -970,13 +1033,13 @@ export default function App() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-slate-500 font-semibold mb-1">Barangay Location</label>
-                <select 
-                  value={selectedBarangay}
-                  onChange={e => setSelectedBarangay(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2"
-                >
+               <div>
+                 <label className="block text-slate-500 font-semibold mb-1">Barangay Location</label>
+                 <select 
+                   value={selectedBarangay}
+                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedBarangay(e.target.value)}
+                   className="w-full border border-slate-200 rounded-lg p-2"
+                 >
                   <option value="Concepcion Pequeña">Concepcion Pequeña</option>
                   <option value="Bagumbayan Sur">Bagumbayan Sur</option>
                   <option value="San Francisco">San Francisco</option>
@@ -1069,16 +1132,16 @@ export default function App() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-slate-500 font-semibold mb-1">Additional description (Optional)</label>
-                <textarea 
-                  value={reportDesc}
-                  onChange={e => setReportDesc(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                  rows={2}
-                  placeholder="Details like landmark, etc."
-                />
-              </div>
+               <div>
+                 <label className="block text-slate-500 font-semibold mb-1">Additional description (Optional)</label>
+                 <textarea 
+                   value={reportDesc}
+                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReportDesc(e.target.value)}
+                   className="w-full border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                   rows={2}
+                   placeholder="Details like landmark, etc."
+                 />
+               </div>
 
               <button 
                 type="submit"
@@ -1250,6 +1313,19 @@ export default function App() {
               <div className="absolute bottom-20 left-20 p-1.5 bg-emerald-600 text-white rounded text-[8px] font-bold shadow flex items-center gap-1">
                 <MapPin weight="light" className="w-3 h-3" /> Liliw Town Plaza
               </div>
+              {/* Dynamic report pins from Supabase data */}
+              {reportMarkers.map(pin => (
+                <div
+                  key={pin.id}
+                  style={{ top: pin.top, left: pin.left }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5"
+                >
+                  <div className="w-3 h-3 rounded-full bg-amber-500 border border-white shadow" />
+                  <span className="text-[7px] font-semibold text-slate-800 bg-white/80 px-1 py-0.5 rounded">
+                    {pin.category}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1284,7 +1360,7 @@ export default function App() {
                   </div>
                   <a 
                     href={`tel:${hot.num}`}
-                    onClick={(e) => { e.preventDefault(); alert(`Placing simulated outgoing call to ${hot.name} (${hot.num}).`); }}
+                    onClick={(e) => { e.preventDefault(); Alert.alert('Call', `Placing simulated outgoing call to ${hot.name} (${hot.num}).`); }}
                     className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
                   >
                     <PhoneCall weight="light" className="w-4 h-4" />
@@ -1303,14 +1379,14 @@ export default function App() {
               <h3 className="font-bold text-sm text-slate-800">Citizen Community Forum</h3>
             </div>
 
-            <form onSubmit={handleSubmitForumPost} className="flex gap-2 text-xs">
-              <input 
-                type="text" 
-                value={newPostText}
-                onChange={e => setNewPostText(e.target.value)}
-                placeholder="Share concerns or questions..."
-                className="flex-1 border border-color4 bg-color2 rounded-xl px-3 focus:outline-none focus:ring-1 focus:ring-color1"
-              />
+             <form onSubmit={handleSubmitForumPost} className="flex gap-2 text-xs">
+               <input 
+                 type="text" 
+                 value={newPostText}
+                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPostText(e.target.value)}
+                 placeholder="Share concerns or questions..."
+                 className="flex-1 border border-color4 bg-color2 rounded-xl px-3 focus:outline-none focus:ring-1 focus:ring-color1"
+               />
               <button type="submit" className="p-2.5 bg-color1 hover:bg-color4 text-slate-800 rounded-xl active:scale-95 transition"><Send weight="light" className="w-4 h-4" /></button>
             </form>
 
@@ -1365,7 +1441,7 @@ export default function App() {
                   {msg.offerTicket && (
                     <button 
                       onClick={() => {
-                        alert('Support Ticket filed in LGU Admin Helpdesk!');
+                        Alert.alert('Support Ticket', 'Support Ticket filed in LGU Admin Helpdesk!');
                         setChatMessages(prev => [...prev, { sender: 'bot', text: 'Support Ticket registered successfully. Code: TKT-2026-904', time: new Date().toLocaleTimeString() }]);
                       }}
                       className="mt-2 text-[10px] font-bold text-slate-700 bg-color3 border border-color1 px-3 py-1.5 rounded-lg active:scale-95 transition"
@@ -1378,14 +1454,14 @@ export default function App() {
             </div>
 
             {/* Chat Input form */}
-            <form onSubmit={handleChatbotAsk} className="p-3 bg-color2 border-t border-color4 flex gap-2 text-xs">
-              <input 
-                type="text" 
-                value={botInput}
-                onChange={e => setBotInput(e.target.value)}
-                placeholder="Ask permit guide, garbage schedules..."
-                className="flex-1 border border-color4 bg-color5 rounded-xl px-3 focus:outline-none focus:ring-1 focus:ring-color1"
-              />
+             <form onSubmit={handleChatbotAsk} className="p-3 bg-color2 border-t border-color4 flex gap-2 text-xs">
+               <input 
+                 type="text" 
+                 value={botInput}
+                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBotInput(e.target.value)}
+                 placeholder="Ask permit guide, garbage schedules..."
+                 className="flex-1 border border-color4 bg-color5 rounded-xl px-3 focus:outline-none focus:ring-1 focus:ring-color1"
+               />
               <button type="submit" className="p-2.5 bg-color1 hover:bg-color4 text-slate-800 rounded-xl active:scale-95 transition"><Send weight="light" className="w-4 h-4" /></button>
             </form>
           </div>
@@ -1456,11 +1532,11 @@ export default function App() {
                 </button>
 
                 <div className="pt-2 border-t border-color4 space-y-2 text-[10px]">
-                  <button type="button" onClick={() => alert('DSAR request submitted! Your data payload is being compiled and will be sent to your registered email.')} 
+                  <button type="button" onClick={() => Alert.alert('DSAR Request', 'Your data payload is being compiled and will be sent to your registered email.')} 
                     className="w-full text-left font-semibold hover:underline flex items-center gap-1.5 py-1">
                     📥 Download My Data (DSAR Request)
                   </button>
-                  <button type="button" onClick={() => alert('Erasure request submitted under RA 10173. An LGU DPO will review your request within 15 days.')} 
+                  <button type="button" onClick={() => Alert.alert('Erasure Request', 'Erasure request submitted under RA 10173. An LGU DPO will review your request within 15 days.')} 
                     className="w-full text-left text-red-500 font-semibold hover:underline flex items-center gap-1.5 py-1">
                     ⚠️ Request Account &amp; Data Erasure
                   </button>
@@ -1645,16 +1721,16 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-slate-500 font-semibold mb-1 text-[9px]">Tell us how we did (Optional)</label>
-                        <textarea 
-                          value={ratingFeedback}
-                          onChange={e => setRatingFeedback(e.target.value)}
-                          className="w-full border border-slate-200 rounded-lg p-2"
-                          rows={2}
-                          placeholder="Write comments..."
-                        />
-                      </div>
+                       <div>
+                         <label className="block text-slate-500 font-semibold mb-1 text-[9px]">Tell us how we did (Optional)</label>
+                         <textarea 
+                           value={ratingFeedback}
+                           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRatingFeedback(e.target.value)}
+                           className="w-full border border-slate-200 rounded-lg p-2"
+                           rows={2}
+                           placeholder="Write comments..."
+                         />
+                       </div>
                       <button 
                         onClick={() => handleRateResolution(selectedItemHistory.item.id, selectedItemHistory.isReport)}
                         className="w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg text-xs"

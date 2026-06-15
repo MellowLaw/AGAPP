@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import './globals.css';
 import { Plus_Jakarta_Sans, EB_Garamond } from 'next/font/google';
 
@@ -26,7 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${sansFont.variable} ${serifFont.variable}`}>
       <body className="min-h-screen">
-        {children}
+        <Suspense fallback={<div className="flex h-screen items-center justify-center text-[#737373] text-sm">Loading...</div>}>
+          {children}
+        </Suspense>
       </body>
     </html>
   );

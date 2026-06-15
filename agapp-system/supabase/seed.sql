@@ -3,23 +3,17 @@
 --  Run this AFTER schema.sql and AFTER creating Auth users
 --  in the Supabase Dashboard → Authentication → Users.
 --
---  Step-by-step:
---  1. Go to Supabase Dashboard → Authentication → Users
---  2. Click "Add user" → create:
---       superadmin@agapp.gov.ph  / password123
---       admin@liliw.gov.ph       / password123
---       lawrence@email.com       / password123
---  3. Copy each user's UUID from the Users list
---  4. Replace the placeholder UUIDs below with the real ones
---  5. Run this file in Supabase SQL Editor
+--  Auth Accounts
+--  ┌───────────────────────────────────────────────────────────────────────┐
+--  │ Email                      Role           LGU       Password          │
+--  ├───────────────────────────────────────────────────────────────────────┤
+--  │ superadmin@agapp.gov.ph    SUPER_ADMIN    —         24z8Dmm;{E<l     │
+--  │ admin@liliw.gov.ph         LGU_ADMIN      liliw     hQt00bB5[1$C     │
+--  │ personnel@liliw.gov.ph     LGU_PERSONNEL  liliw     password123      │
+--  │ citizen.demo@gmail.com     CITIZEN        liliw     password123      │
+--  │ dayolawrence754@gmail.com  CITIZEN        liliw     (your own)       │
+--  └───────────────────────────────────────────────────────────────────────┘
 -- ============================================================
-
--- ── REPLACE THESE THREE UUIDs WITH THE REAL AUTH USER IDs ──
--- You get them from: Dashboard → Authentication → Users
-DO $$
-BEGIN
-  RAISE NOTICE 'IMPORTANT: Replace placeholder UUIDs before running!';
-END $$;
 
 -- 1. SEED LGU DATA
 INSERT INTO lgus (id, name, logo, banner_url, primary_color, secondary_color, latitude, longitude, is_active, onboarding_fee_paid, feature_flags)
@@ -54,11 +48,12 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- 2. SEED USER PROFILES
--- !! Replace UUIDs below with real Auth user IDs from the Dashboard !!
+-- UUIDs must match the auth.users IDs from Supabase Dashboard → Authentication → Users
+-- These are the real UUIDs from the live AGAPP project (jrureblhypfdljwflout)
 INSERT INTO users (id, email, name, role, lgu_id, barangay, is_active)
 VALUES
   (
-    '42fe0700-7c7c-4e20-bff0-d40adf329a84', -- REPLACE: superadmin UUID
+    '42fe0700-7c7c-4e20-bff0-d40adf329a84',
     'superadmin@agapp.gov.ph',
     'AGAPP Super Admin',
     'SUPER_ADMIN',
@@ -67,7 +62,7 @@ VALUES
     true
   ),
   (
-    '8ff8bce8-38ae-4e2f-bf42-fd9b7acb71f1', -- REPLACE: admin@liliw UUID
+    '8ff8bce8-38ae-4e2f-bf42-fd9b7acb71f1',
     'admin@liliw.gov.ph',
     'LGU Liliw Administrator',
     'LGU_ADMIN',
@@ -76,8 +71,17 @@ VALUES
     true
   ),
   (
-    'f0e69549-aa6b-4448-a133-e70c75d87f7f', -- REPLACE: demo citizen UUID
-    'citizen.demo@email.com',
+    'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    'personnel@liliw.gov.ph',
+    'LGU Liliw Personnel',
+    'LGU_PERSONNEL',
+    'liliw-laguna',
+    NULL,
+    true
+  ),
+  (
+    'f0e69549-aa6b-4448-a133-e70c75d87f7f',
+    'citizen.demo@gmail.com',
     'Juan Dela Cruz',
     'CITIZEN',
     'liliw-laguna',
@@ -85,7 +89,7 @@ VALUES
     true
   ),
   (
-    'ce0ad144-cefa-4815-ae8c-d4d0efe7b44e', -- REPLACE: demo citizen UUID
+    '96f56b5a-3f27-480c-b0c2-04de405804e9',
     'dayolawrence754@gmail.com',
     'Law Dayo',
     'CITIZEN',

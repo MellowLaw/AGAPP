@@ -25,7 +25,8 @@ config.resolver.extraNodeModules = {
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Block the root node_modules/react and root node_modules/react-dom so
-// Metro can never accidentally pull React 18 in.
+// Metro can never accidentally pull React 18 in, and block the local src/
+// folder which contains web-only React DOM code not compatible with React Native.
 config.resolver.blockList = [
   new RegExp(
     escapeRegex(path.resolve(monorepoRoot, 'node_modules', 'react') + path.sep) + '.*'

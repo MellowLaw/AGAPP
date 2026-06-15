@@ -1,0 +1,168 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Search } from '@/components/ui/Search';
+import { Pagination } from '@/components/ui/Pagination';
+import { supabase } from '@/lib/supabase';
+
+interface Row { lgu: string; month: string; reports: number; requests: number; }
+
+export default function SuperAnalyticsPage() {
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      setLoadError(null);
+
+      const [{ data: lgus, error: lguError }, { data: reports, error: reportsError }, { data: services, error: servicesError }] = await Promise.all([
+        supabase
+          .from('lgus')
+          .select('id, name'),
+        supabase
+          .from('reports')
+          .select('lgu_id, created_at'),
+        supabase
+          .from('service_requests')
+          .select('lgu_id, created_at'),
+      ]);
+
+      if (lguError || reportsError || servicesError) {
+        console.error('Error loading analytics data', lguError || reportsError || servicesError);
+        setLoadError((lguError || reportsError || servicesError)?.message || 'Failed to load analytics');
+        setLoading(false);
+        return;
+      }
+
+      const lguNameMap = new Map<string, string>();
+      (lgus || []).forEach((l: any) => {
+        lguNameMap.set(l.id, l.name);
+      });
+
+      const bucket: Record<string, Row> = {};
+
+      const monthKey = (d: Date) => {
+        const month = d.toLocaleString('en-US', { month: 'short' });
+        const year = d.getFullYear();
+        return `${month} ${year}`;
+      };
+
+      (reports || []).forEach((r: any) => {
+        if (!r.created_at || !r.lgu_id) return;
+        const d = new Date(r.created_at);
+        const key = `${r.lgu_id}|${monthKey(d)}`;
+        if (!bucket[key]) {
+          bucket[key] = {
+            lgu: lguNameMap.get(r.lgu_id) || r.lgu_id,
+            month: monthKey(d),
+            reports: 0,
+            requests: 0,
+          };
+        }
+        bucket[key].reports++;
+      });
+
+      (services || []).forEach((s: any) => {
+        if (!s.created_at || !s.lgu_id) return;
+        const d = new Date(s.created_at);
+        const key = `${s.lgu_id}|${monthKey(d)}`;
+        if (!bucket[key]) {
+          bucket[key] = {
+            lgu: lguNameMap.get(s.lgu_id) || s.lgu_id,
+            month: monthKey(d),
+            reports: 0,
+            requests: 0,
+          };
+        }
+        bucket[key].requests++;
+      });
+
+      const aggregated = Object.values(bucket).sort((a, b) => {
+        if (a.lgu === b.lgu) {
+          return a.month.localeCompare(b.month);
+        }
+        return a.lgu.localeCompare(b.lgu);
+      });
+
+      setRows(aggregated);
+      setLoading(false);
+    };
+
+    fetchAnalytics();
+  }, []);
+
+  const filtered = useMemo(() => rows.filter(r =>
+    (r.lgu + r.month).toLowerCase().includes(q.toLowerCase())
+  ), [q, rows]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const start = (page - 1) * pageSize;
+  const paged = filtered.slice(start, start + pageSize);
+
+  const exportCsv = () => {
+    const header = 'LGU,Month,Reports,Requests\n';
+    const rows = filtered.map(r => `${r.lgu},${r.month},${r.reports},${r.requests}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'analytics.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <DashboardLayout role="super-admin" title="Analytics">
+      <Card>
+        <CardHeader 
+          title="Cross-LGU Metrics" 
+          action={
+            <div className="flex items-center gap-2">
+              <Search value={q} onChange={setQ} className="w-64" placeholder="Search LGU or month..." />
+              <Button variant="secondary" size="sm" onClick={exportCsv}>Export CSV</Button>
+            </div>
+          }
+        />
+
+        {loading && (
+          <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">Loading analytics…</div>
+        )}
+        {loadError && !loading && (
+          <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">Failed to load analytics: {loadError}</div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#e5e5e5]">
+                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">LGU</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Month</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Reports</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Requests</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((r, i) => (
+                <tr key={i} className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa]">
+                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.lgu}</td>
+                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.month}</td>
+                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.reports}</td>
+                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.requests}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} itemsPerPage={pageSize} />
+      </Card>
+    </DashboardLayout>
+  );
+}

@@ -202,6 +202,47 @@ export class LguController {
     await writeAuditLog(this.supabaseService, id, 'usr-liliw-admin', 'admin@liliw.gov.ph', 'LGU_ADMIN', 'FEATURE_FLAGS_UPDATE', `Updated settings: ${JSON.stringify(featureFlags)}`);
     return lgu;
   }
+
+  // Map metadata for a specific LGU (center + optional boundary polygon)
+  @Get(':id/map')
+  async getLguMap(@Param('id') id: string) {
+    const supabase = this.supabaseService.getClient();
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('lgus')
+        .select('id, name, latitude, longitude, boundary_geojson')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        throw new HttpException('LGU not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        center: {
+          latitude: data.latitude,
+          longitude: data.longitude,
+        },
+        boundary: data.boundary_geojson || null,
+      };
+    }
+
+    const lgu = initialLgus.find(l => l.id === id);
+    if (!lgu) throw new HttpException('LGU not found', HttpStatus.NOT_FOUND);
+
+    return {
+      id: lgu.id,
+      name: lgu.name,
+      center: {
+        latitude: lgu.latitude,
+        longitude: lgu.longitude,
+      },
+      boundary: null,
+    };
+  }
 }
 
 // 3. REPORTS CONTROLLER

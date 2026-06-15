@@ -4,7 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM"
     ],
     "allowJs": true,
     "jsx": "react-jsx",
@@ -22,8 +23,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src"
-  ],
-  "extends": "expo/tsconfig.base"
+    "dist"
+  ]
 }
