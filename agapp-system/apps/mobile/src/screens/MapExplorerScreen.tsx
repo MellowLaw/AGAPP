@@ -56,6 +56,7 @@ export function MapExplorerScreen() {
   const [selectedPoi, setSelectedPoi] = useState<any>(null);
   const [userLocation, setUserLocation] = useState<any>(null);
   const [fetchingUserLoc, setFetchingUserLoc] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(0.022);
 
   // Panel open/closed state
   const [panelOpen, setPanelOpen] = useState(false);
@@ -122,14 +123,6 @@ export function MapExplorerScreen() {
       setSelectedPoi(null);
       closePanel();
 
-      // Start far out (country-level view of Philippines)
-      const farRegion = {
-        latitude: 12.0,
-        longitude: 122.0,
-        latitudeDelta: 12.0,
-        longitudeDelta: 12.0,
-      };
-      // End at town level showing all landmarks
       const townRegion = {
         latitude: lat,
         longitude: lng,
@@ -137,16 +130,12 @@ export function MapExplorerScreen() {
         longitudeDelta: 0.022,
       };
 
-      // Snap to far-out first, then animate into town
-      const snap = setTimeout(() => {
-        mapRef.current?.animateToRegion(farRegion, 1);
-        const fly = setTimeout(() => {
-          mapRef.current?.animateToRegion(townRegion, 2200);
-        }, 300);
-        return () => clearTimeout(fly);
-      }, 400);
+      // Just animate directly to the town region quickly (800ms) on focus
+      const timer = setTimeout(() => {
+        mapRef.current?.animateToRegion(townRegion, 800);
+      }, 100);
 
-      return () => clearTimeout(snap);
+      return () => clearTimeout(timer);
     }, [selectedLgu])
   );
 
@@ -333,6 +322,7 @@ export function MapExplorerScreen() {
         initialRegion={initialRegion}
         showsUserLocation={false}
         showsMyLocationButton={false}
+        onRegionChangeComplete={(region) => setZoomLevel(region.latitudeDelta)}
       >
         {/* Town boundary polygon */}
         <Polygon
@@ -358,31 +348,71 @@ export function MapExplorerScreen() {
         {filteredFacilities.map(poi => {
           const isSelected   = selectedPoi?.id === poi.id;
           const markerColor  = getCategoryColor(poi.category);
-          const markerSize   = isSelected ? 42 : 36;
+          // Show label when selected or when zoomed in closely (prevents overlapping)
+          const showLabel    = isSelected || zoomLevel < 0.007;
+          
+          // Dynamic sizing for Classic Google Maps Pin
+          const outerCircleSize = isSelected ? 46 : 36;
+          const innerCircleSize = isSelected ? 28 : 22;
+          const iconSize        = isSelected ? 18 : 14;
+          const tailWidth       = isSelected ? 7 : 5;
+          const tailHeight      = isSelected ? 8 : 6;
+          
           return (
             <Marker
               key={poi.id}
               coordinate={{ latitude: poi.latitude, longitude: poi.longitude }}
               onPress={() => handleSelectPoi(poi)}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 1.0 }} // Tip of the tail is on coordinate
             >
-              <View style={[styles.markerContainer, { width: 44, height: 44 }]}>
-                <View style={[
-                  styles.markerCircle,
-                  {
-                    width: markerSize,
-                    height: markerSize,
-                    borderRadius: markerSize / 2,
-                    backgroundColor: isSelected ? markerColor : T.card,
-                    borderColor:     isSelected ? '#FFFFFF' : markerColor,
-                    borderWidth:     isSelected ? 2.5 : 2,
-                  },
-                ]}>
-                  <Ionicons
-                    name={getCategoryIcon(poi.category) as any}
-                    size={isSelected ? 18 : 16}
-                    color={isSelected ? '#FFFFFF' : markerColor}
-                  />
+              <View style={styles.markerWrapper}>
+                {/* 1. Label Bubble (Shown when zoomed in or selected) */}
+                {showLabel && (
+                  <View style={[styles.labelBubble, { backgroundColor: T.card, borderColor: T.border }]}>
+                    <Text style={[styles.labelText, { color: T.text }]} numberOfLines={1}>
+                      {poi.name}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 2. Classic Google Maps Pin (Colored teardrop + white inner circle + colored icon) */}
+                <View style={styles.markerPin}>
+                  <View style={[
+                    styles.markerCircle,
+                    {
+                      width: outerCircleSize,
+                      height: outerCircleSize,
+                      borderRadius: outerCircleSize / 2,
+                      backgroundColor: markerColor,
+                      borderColor: '#FFFFFF', // Thin white border around the outer circle for separation
+                      borderWidth: isSelected ? 2 : 1.5,
+                    },
+                  ]}>
+                    <View style={{
+                      width: innerCircleSize,
+                      height: innerCircleSize,
+                      borderRadius: innerCircleSize / 2,
+                      backgroundColor: '#FFFFFF',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <Ionicons
+                        name={getCategoryIcon(poi.category) as any}
+                        size={iconSize}
+                        color={markerColor}
+                      />
+                    </View>
+                  </View>
+                  <View style={[
+                    styles.markerTail,
+                    {
+                      borderTopColor: markerColor,
+                      borderLeftWidth: tailWidth,
+                      borderRightWidth: tailWidth,
+                      borderTopWidth: tailHeight,
+                      marginTop: -2,
+                    }
+                  ]} />
                 </View>
               </View>
             </Marker>
@@ -629,15 +659,60 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 4,
   },
-  markerContainer: { alignItems: 'center', justifyContent: 'center' },
+  markerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPin: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   markerCircle: {
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  markerTail: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    alignSelf: 'center',
+    marginTop: -2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  labelBubble: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2.5,
+    elevation: 2,
+    maxWidth: 110,
+    marginBottom: 4,
+  },
+  labelText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   userDotContainer: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   userDotPulse: {
