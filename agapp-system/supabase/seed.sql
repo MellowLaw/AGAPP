@@ -16,7 +16,7 @@
 -- ============================================================
 
 -- 1. SEED LGU DATA
-INSERT INTO lgus (id, name, logo, banner_url, primary_color, secondary_color, latitude, longitude, is_active, onboarding_fee_paid, feature_flags)
+INSERT INTO lgus (id, name, logo, banner_url, primary_color, secondary_color, latitude, longitude, boundary_geojson, is_active, onboarding_fee_paid, feature_flags)
 VALUES
   (
     'liliw-laguna',
@@ -25,8 +25,9 @@ VALUES
     'https://placehold.co/800x200/A2B59F/1A1A1A?text=Welcome+to+Liliw',
     '#A2B59F',
     '#D9CDB8',
-    13.9297,
-    121.4644,
+    14.1350,
+    121.4363,
+    '{"type": "Polygon", "coordinates": [[[121.408, 14.219], [121.425, 14.215], [121.445, 14.195], [121.468, 14.165], [121.492, 14.115], [121.488, 14.075], [121.465, 14.059], [121.450, 14.062], [121.438, 14.085], [121.428, 14.110], [121.405, 14.135], [121.385, 14.160], [121.370, 14.188], [121.375, 14.205], [121.392, 14.215], [121.408, 14.219]]]}'::jsonb,
     true,
     true,
     '{"chatbot": true, "potholeDetection": true, "forum": true}'::jsonb
@@ -38,8 +39,9 @@ VALUES
     'https://placehold.co/800x200/9FADB5/1A1A1A?text=Welcome+to+Nagcarlan',
     '#9FADB5',
     '#CAD3D9',
-    13.9214,
-    121.4157,
+    14.1360,
+    121.4150,
+    '{"type": "Polygon", "coordinates": [[[121.385, 14.210], [121.405, 14.205], [121.428, 14.175], [121.438, 14.135], [121.450, 14.095], [121.438, 14.060], [121.422, 14.062], [121.410, 14.085], [121.395, 14.115], [121.370, 14.145], [121.350, 14.178], [121.362, 14.200], [121.385, 14.210]]]}'::jsonb,
     true,
     false,
     '{"chatbot": false, "potholeDetection": true, "forum": false}'::jsonb
@@ -151,3 +153,31 @@ VALUES (
   '[{"status":"Submitted","updatedBy":"citizen","notes":"Document application submitted","timestamp":"2026-05-23T10:00:00Z"}]'::jsonb
 )
 ON CONFLICT (reference_number) DO NOTHING;
+
+-- 5. SEED LGU FACILITIES
+INSERT INTO lgu_facilities (lgu_id, name, category, address, latitude, longitude, phone, image_url)
+VALUES
+  ('liliw-laguna', 'Liliw Municipal Hall', 'municipal', 'Brgy. Poblacion, Liliw, Laguna', 14.1350, 121.4363, '+63 49 563 1234', 'https://images.unsplash.com/photo-1577086664693-894d8405334a?auto=format&fit=crop&w=400&q=80'),
+  ('liliw-laguna', 'Liliw Police Station', 'police', 'Brgy. Poblacion, Liliw, Laguna', 14.1345, 121.4358, '+63 998 598 5678', 'https://images.unsplash.com/photo-1517059224940-d4af9eec41b7?auto=format&fit=crop&w=400&q=80'),
+  ('liliw-laguna', 'Liliw Fire Station', 'fire', 'Brgy. Poblacion, Liliw, Laguna', 14.1355, 121.4370, '+63 917 123 4567', 'https://images.unsplash.com/photo-1616239121966-fd90cfdcf2d1?auto=format&fit=crop&w=400&q=80'),
+  ('liliw-laguna', 'Liliw Municipal Infirmary', 'hospital', 'Brgy. Kanluran Bukal, Liliw, Laguna', 14.1375, 121.4350, '+63 49 563 5678', 'https://images.unsplash.com/photo-1586773860418-d37222d8fce2?auto=format&fit=crop&w=400&q=80'),
+  ('liliw-laguna', 'Liliw Post Office', 'other', 'Brgy. Poblacion, Liliw, Laguna', 14.1338, 121.4352, '+63 49 563 1111', 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=400&q=80'),
+  ('liliw-laguna', 'Liliw Public Market', 'other', 'Brgy. San Roque, Liliw, Laguna', 14.1320, 121.4380, NULL, 'https://images.unsplash.com/photo-1488459718432-36af50b6d6fa?auto=format&fit=crop&w=400&q=80'),
+
+  ('nagcarlan-laguna', 'Nagcarlan Municipal Hall', 'municipal', 'Rizal Ave, Brgy. Poblacion, Nagcarlan, Laguna', 14.1360, 121.4150, '+63 49 563 2222', 'https://images.unsplash.com/photo-1577086664693-894d8405334a?auto=format&fit=crop&w=400&q=80'),
+  ('nagcarlan-laguna', 'Nagcarlan Police Station', 'police', 'Brgy. Poblacion, Nagcarlan, Laguna', 14.1355, 121.4140, '+63 998 598 9999', 'https://images.unsplash.com/photo-1517059224940-d4af9eec41b7?auto=format&fit=crop&w=400&q=80'),
+  ('nagcarlan-laguna', 'Nagcarlan Fire Station', 'fire', 'Brgy. Poblacion, Nagcarlan, Laguna', 14.1365, 121.4160, '+63 917 999 8888', 'https://images.unsplash.com/photo-1616239121966-fd90cfdcf2d1?auto=format&fit=crop&w=400&q=80'),
+  ('nagcarlan-laguna', 'Nagcarlan District Hospital', 'hospital', 'Brgy. Calihan, Nagcarlan, Laguna', 14.1400, 121.4120, '+63 49 563 3333', 'https://images.unsplash.com/photo-1586773860418-d37222d8fce2?auto=format&fit=crop&w=400&q=80')
+ON CONFLICT DO NOTHING;
+
+-- 6. SEED CHATBOT FAQS
+INSERT INTO chatbot_faqs (lgu_id, question, answer, source, tags)
+VALUES
+  ('liliw-laguna', 'How do I renew my business permit in Liliw?', 'To renew a business permit in Liliw, Laguna: (1) Go to the BPLO counter at the Liliw Municipal Hall. (2) Submit your barangay clearance, sanitary permit, and fire safety certificate. (3) Pay local taxes at the Municipal Treasurer. (4) Collect your physical permit plate. Processing is 1–3 working days.', 'BPLO Citizen Charter', ARRAY['business', 'permit', 'renew', 'renewal', 'bplo']),
+  ('liliw-laguna', 'How do I request a birth certificate?', 'To request a birth certificate in Liliw: (1) Present a valid ID. (2) Pay the ₱150 processing fee at the Municipal Treasurer. (3) Submit a request on AGAPP and present the generated QR at the Civil Registrar counter for priority release. Processing takes 1–2 days.', 'Civil Registrar Citizen Charter', ARRAY['birth', 'certificate', 'civil', 'registrar']),
+  ('liliw-laguna', 'How do I report a pothole or road damage?', 'To report a pothole in Liliw: (1) Go to the AGAPP Report screen. (2) Snap a photo (AI will verify the damage). (3) Confirm your GPS location and submit. The Engineering Office processes reports within a 3-day SLA.', 'Engineering Office Charter', ARRAY['pothole', 'road', 'damage', 'report']),
+  
+  ('nagcarlan-laguna', 'How do I renew my business permit in Nagcarlan?', 'To renew a business permit in Nagcarlan, Laguna: (1) Go to the BPLO counter at the Nagcarlan Municipal Hall. (2) Submit your barangay clearance, sanitary permit, and fire safety certificate. (3) Pay local taxes at the Municipal Treasurer. (4) Collect your physical permit plate. Processing is 1–3 working days.', 'BPLO Citizen Charter', ARRAY['business', 'permit', 'renew', 'renewal', 'bplo']),
+  ('nagcarlan-laguna', 'How do I request a birth certificate?', 'To request a birth certificate in Nagcarlan: (1) Present a valid ID. (2) Pay the ₱150 processing fee at the Municipal Treasurer. (3) Submit a request on AGAPP and present the generated QR at the Civil Registrar counter for priority release. Processing takes 1–2 days.', 'Civil Registrar Citizen Charter', ARRAY['birth', 'certificate', 'civil', 'registrar']),
+  ('nagcarlan-laguna', 'How do I report a pothole or road damage?', 'To report a pothole in Nagcarlan: (1) Go to the AGAPP Report screen. (2) Snap a photo (AI will verify the damage). (3) Confirm your GPS location and submit. The Engineering Office processes reports within a 3-day SLA.', 'Engineering Office Charter', ARRAY['pothole', 'road', 'damage', 'report'])
+ON CONFLICT DO NOTHING;

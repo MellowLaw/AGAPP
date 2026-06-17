@@ -421,11 +421,19 @@ export default function ReportsPage() {
                 </div>
 
                 {/* Photo */}
-                <div className="aspect-video bg-[#f5f5f5] rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <Warning className="w-12 h-12 text-[#737373] mx-auto mb-2" />
-                    <p className="text-[#737373]">[Photo Preview]</p>
-                  </div>
+                <div className="aspect-video bg-[#f5f5f5] rounded-lg overflow-hidden flex items-center justify-center border border-[#e5e5e5]">
+                  {selectedReport.photoUrl ? (
+                    <img 
+                      src={selectedReport.photoUrl} 
+                      alt="Report evidence" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <Warning className="w-12 h-12 text-[#737373] mx-auto mb-2" />
+                      <p className="text-[#737373]">No photo proof attached</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Details Grid */}

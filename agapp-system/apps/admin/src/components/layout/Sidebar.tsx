@@ -16,6 +16,7 @@ import {
   ChartBar,
   SignOut,
 } from '@phosphor-icons/react';
+import { AgappLogo } from '@/components/ui/AgappLogo';
 
 interface NavItem {
   label: string;
@@ -98,12 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
     <aside className="w-60 h-screen bg-white border-r border-[#e5e5e5] flex flex-col fixed left-0 top-0">
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-[#e5e5e5]">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#1a1a1a] rounded-md flex items-center justify-center">
-            <span className="text-white font-bold text-sm">A</span>
-          </div>
-          <span className="font-semibold text-[#1a1a1a]">AGAPP</span>
-        </div>
+        <AgappLogo size={32} />
       </div>
       
       {/* LGU Name (if applicable) */}

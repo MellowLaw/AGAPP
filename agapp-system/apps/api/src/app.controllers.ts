@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { SupabaseService } from './supabase.service';
 import { 
@@ -6,6 +6,22 @@ import {
   initialServiceRequests, initialForumPosts, initialAuditLogs, mockFaqs 
 } from './mock-db';
 import { LGU, User, Report, ServiceRequest, ForumPost, AuditLog } from '@agapp/shared';
+import { SupabaseAuthGuard } from './supabase-auth.guard';
+import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+
+export class ChatbotAskDto {
+  @IsString()
+  @IsNotEmpty()
+  query!: string;
+
+  @IsString()
+  @IsOptional()
+  lguId?: string;
+
+  @IsArray()
+  @IsOptional()
+  history?: { sender: string; text: string }[];
+}
 
 // Helper for generating custom audit logs
 async function writeAuditLog(
@@ -581,6 +597,56 @@ export class ServiceController {
   }
 }
 
+// Helper for local profanity, spam, and PII auto-moderation
+function localModeratePost(content: string): { isApproved: boolean; flaggedKeywords: string[] } {
+  const flaggedKeywords: string[] = [];
+  const text = content.toLowerCase();
+
+  // 1. Expanded list of Tagalog, English, and Taglish profanities
+  const localProfanities = [
+    'putang ina', 'putangina', 'tangina', 'gago', 'tarantado', 'pota', 'ulol', 'shet', 
+    'bwisit', 'fuck', 'shit', 'asshole', 'bitch', 'pakyaw', 'bobo', 'hudas', 'kupal'
+  ];
+  for (const word of localProfanities) {
+    if (text.includes(word)) {
+      flaggedKeywords.push(word);
+    }
+  }
+
+  // 2. Personally Identifiable Information (PII) Checks
+  // Phone numbers (e.g. 09171234567, +639171234567, 0917-123-4567)
+  const phoneRegex = /(?:09|\+639)\d{2}[-\s]?\d{3}[-\s]?\d{4}/g;
+  const phones = content.match(phoneRegex);
+  if (phones && phones.length > 0) {
+    for (const phone of phones) {
+      flaggedKeywords.push(`Phone: ${phone}`);
+    }
+  }
+
+  // Email addresses
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const emails = content.match(emailRegex);
+  if (emails && emails.length > 0) {
+    for (const email of emails) {
+      flaggedKeywords.push(`Email: ${email}`);
+    }
+  }
+
+  // 3. Spam / Suspicious links (URLs)
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const urls = content.match(urlRegex);
+  if (urls && urls.length > 0) {
+    for (const url of urls) {
+      flaggedKeywords.push(`Link: ${url}`);
+    }
+  }
+
+  return {
+    isApproved: flaggedKeywords.length === 0,
+    flaggedKeywords
+  };
+}
+
 // 5. FORUM CONTROLLER
 @Controller('api/forum')
 export class ForumController {
@@ -590,23 +656,31 @@ export class ForumController {
   async getForumPosts(@Query('lguId') lguId?: string, @Query('includePending') includePending?: string) {
     const supabase = this.supabaseService.getClient();
     if (supabase) {
-      let query = supabase.from('forum_posts').select('*');
+      // Select posts along with their comments so we can count them
+      let query = supabase.from('forum_posts').select('*, forum_comments(id, is_approved)');
       if (lguId) query = query.eq('lgu_id', lguId);
       if (includePending !== 'true') query = query.eq('is_approved', true);
       
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
       
-      return data.map((f: any) => ({
-        id: f.id,
-        lguId: f.lgu_id,
-        citizenId: f.citizen_id,
-        citizenName: f.citizen_name,
-        content: f.content,
-        isApproved: f.is_approved,
-        flaggedKeywords: f.flagged_keywords,
-        createdAt: f.created_at
-      }));
+      return data.map((f: any) => {
+        const approvedComments = (f.forum_comments || []).filter((c: any) => c.is_approved);
+        return {
+          id: f.id,
+          lguId: f.lgu_id,
+          citizenId: f.citizen_id,
+          citizenName: f.citizen_name,
+          title: f.title || 'General Discussion',
+          content: f.content,
+          tags: f.tags || [],
+          photoUrl: f.photo_url || null,
+          isApproved: f.is_approved,
+          flaggedKeywords: f.flagged_keywords,
+          createdAt: f.created_at,
+          commentsCount: approvedComments.length
+        };
+      });
     }
 
     let filtered = [...initialForumPosts];
@@ -614,27 +688,86 @@ export class ForumController {
     if (includePending !== 'true') {
       filtered = filtered.filter(f => f.isApproved);
     }
-    return filtered;
+    return filtered.map(f => ({
+      ...f,
+      title: f.title || 'General Discussion',
+      tags: f.tags || [],
+      photoUrl: f.photoUrl || null,
+      commentsCount: 0
+    }));
   }
 
   @Post()
   async createForumPost(@Body() body: any) {
-    const { lguId, citizenId, citizenName, content } = body;
+    const { lguId, citizenId, citizenName, title, content, tags, photoUrl } = body;
     
-    // Auto-moderation profanity checker matching database triggers
-    const profanities = ['putang ina', 'gago', 'tarantado', 'pota', 'ulol', 'shet'];
-    const flagged = profanities.filter(word => content.toLowerCase().includes(word));
-    const isApproved = flagged.length === 0;
+    // 1. Run local moderation check first (fast and covers basic profanities/PII)
+    const moderation = localModeratePost(content);
+
+    // 2. Run Gemini moderation check if key exists (to analyze context/hate speech/harassment/sentiment)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && moderation.isApproved) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-2.0-flash',
+          generationConfig: { responseMimeType: 'application/json' }
+        });
+
+        const prompt = `You are a strict, automated content moderation assistant for the AGAPP community forum of the Municipality of Laguna, Philippines.
+Evaluate if the following forum post content violates community standards.
+
+Community Standards include:
+1. Hate Speech or Bullying: Attack or abuse against individuals or groups based on race, ethnicity, religion, or personal traits.
+2. Harassment or Threats: Aggressive or threatening messages targeting specific municipal personnel, public servants, or citizens.
+3. Vulgarity, Nudity, or Inappropriate Content: Sexually explicit, violent, or highly offensive words (in English, Tagalog/Filipino, or Taglish).
+4. Spam or Self-Promotion: Unrelated commercial advertisements, scams, clickbait links, or repetitive postings.
+5. Personally Identifiable Information (PII): Unnecessary public exposure of phone numbers, emails, bank accounts, or home addresses.
+
+Evaluate the following forum post:
+"${content}"
+
+Respond in strict JSON format:
+{
+  "isApproved": boolean,
+  "flaggedKeywords": string[] (if not approved, list the violation categories, offending terms, or reasons, e.g. ["Hate Speech", "PII: Address"])
+}`;
+
+        const result = await model.generateContent(prompt);
+        const resText = result.response.text();
+        if (resText && resText.trim()) {
+          const parsed = JSON.parse(resText.trim());
+          if (parsed && typeof parsed.isApproved === 'boolean') {
+            moderation.isApproved = parsed.isApproved;
+            moderation.flaggedKeywords = [
+              ...moderation.flaggedKeywords,
+              ...(parsed.flaggedKeywords || [])
+            ];
+            // Remove duplicates
+            moderation.flaggedKeywords = Array.from(new Set(moderation.flaggedKeywords));
+          }
+        }
+      } catch (err) {
+        console.error('[ForumModeration] Gemini safety check failed:', (err as any).message);
+      }
+    }
+
+    const isApproved = moderation.isApproved;
+    const flagged = moderation.flaggedKeywords;
 
     const newPost: ForumPost = {
       id: `forum-${Date.now()}`,
       lguId,
       citizenId,
       citizenName,
+      title: title || 'General Discussion',
       content,
+      tags: tags || [],
+      photoUrl: photoUrl || null,
       isApproved,
       flaggedKeywords: flagged,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      commentsCount: 0
     };
 
     const supabase = this.supabaseService.getClient();
@@ -643,7 +776,10 @@ export class ForumController {
         lgu_id: lguId,
         citizen_id: citizenId === 'usr-citizen' ? null : citizenId,
         citizen_name: citizenName,
+        title: title || 'General Discussion',
         content,
+        tags: tags || [],
+        photo_url: photoUrl || null,
         is_approved: isApproved,
         flagged_keywords: flagged
       });
@@ -652,8 +788,140 @@ export class ForumController {
       initialForumPosts.unshift(newPost);
     }
 
-    await writeAuditLog(this.supabaseService, lguId, citizenId || 'system', citizenName, 'CITIZEN', 'FORUM_POST_CREATE', `Posted in forum. Approved: ${isApproved}`);
+    await writeAuditLog(this.supabaseService, lguId, citizenId || 'system', citizenName, 'CITIZEN', 'FORUM_POST_CREATE', `Posted in forum. Approved: ${isApproved}. Flagged: ${flagged.join(', ')}`);
     return newPost;
+  }
+
+  @Get(':postId/comments')
+  async getForumComments(@Param('postId') postId: string) {
+    const supabase = this.supabaseService.getClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('forum_comments')
+        .select('*')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      
+      return data.map((c: any) => ({
+        id: c.id,
+        postId: c.post_id,
+        parentCommentId: c.parent_comment_id || null,
+        citizenId: c.citizen_id,
+        citizenName: c.citizen_name,
+        content: c.content,
+        isApproved: c.is_approved,
+        flaggedKeywords: c.flagged_keywords,
+        createdAt: c.created_at
+      }));
+    }
+    
+    // Fallback
+    return [];
+  }
+
+  @Post(':postId/comments')
+  async createForumComment(@Param('postId') postId: string, @Body() body: any) {
+    const { citizenId, citizenName, content, parentCommentId } = body;
+    
+    // 1. Run local moderation check first
+    const moderation = localModeratePost(content);
+
+    // 2. Run Gemini moderation check if key exists
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && moderation.isApproved) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-2.0-flash',
+          generationConfig: { responseMimeType: 'application/json' }
+        });
+
+        const prompt = `You are a strict, automated content moderation assistant for the AGAPP community forum of the Municipality of Laguna, Philippines.
+Evaluate if the following forum COMMENT content violates community standards.
+
+Community Standards include:
+1. Hate Speech or Bullying: Attack or abuse against individuals or groups based on race, ethnicity, religion, or personal traits.
+2. Harassment or Threats: Aggressive or threatening messages targeting specific municipal personnel, public servants, or citizens.
+3. Vulgarity, Nudity, or Inappropriate Content: Sexually explicit, violent, or highly offensive words (in English, Tagalog/Filipino, or Taglish).
+4. Spam or Self-Promotion: Unrelated commercial advertisements, scams, clickbait links, or repetitive postings.
+5. Personally Identifiable Information (PII): Unnecessary public exposure of phone numbers, emails, bank accounts, or home addresses.
+
+Evaluate the following comment:
+"${content}"
+
+Respond in strict JSON format:
+{
+  "isApproved": boolean,
+  "flaggedKeywords": string[] (if not approved, list the violation categories, offending terms, or reasons, e.g. ["Hate Speech", "PII: Address"])
+}`;
+
+        const result = await model.generateContent(prompt);
+        const resText = result.response.text();
+        if (resText && resText.trim()) {
+          const parsed = JSON.parse(resText.trim());
+          if (parsed && typeof parsed.isApproved === 'boolean') {
+            moderation.isApproved = parsed.isApproved;
+            moderation.flaggedKeywords = [
+              ...moderation.flaggedKeywords,
+              ...(parsed.flaggedKeywords || [])
+            ];
+            moderation.flaggedKeywords = Array.from(new Set(moderation.flaggedKeywords));
+          }
+        }
+      } catch (err) {
+        console.error('[ForumCommentModeration] Gemini safety check failed:', (err as any).message);
+      }
+    }
+
+    const isApproved = moderation.isApproved;
+    const flagged = moderation.flaggedKeywords;
+
+    const supabase = this.supabaseService.getClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('forum_comments')
+        .insert({
+          post_id: postId,
+          parent_comment_id: parentCommentId || null,
+          citizen_id: citizenId === 'usr-citizen' ? null : citizenId,
+          citizen_name: citizenName,
+          content,
+          is_approved: isApproved,
+          flagged_keywords: flagged
+        })
+        .select()
+        .single();
+      if (error) throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      
+      await writeAuditLog(this.supabaseService, null, citizenId || 'system', citizenName, 'CITIZEN', 'FORUM_COMMENT_CREATE', `Posted comment in thread ${postId}. Approved: ${isApproved}. Flagged: ${flagged.join(', ')}`);
+      return {
+        id: data.id,
+        postId: data.post_id,
+        parentCommentId: data.parent_comment_id || null,
+        citizenId: data.citizen_id,
+        citizenName: data.citizen_name,
+        content: data.content,
+        isApproved: data.is_approved,
+        flaggedKeywords: data.flagged_keywords,
+        createdAt: data.created_at
+      };
+    }
+    
+    // Fallback mock return
+    const mockComment = {
+      id: `comment-${Date.now()}`,
+      postId,
+      parentCommentId: parentCommentId || null,
+      citizenId,
+      citizenName,
+      content,
+      isApproved,
+      flaggedKeywords: flagged,
+      createdAt: new Date().toISOString()
+    };
+    return mockComment;
   }
 
   @Patch(':id/approve')
@@ -733,18 +1001,53 @@ export class ChatbotController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   @Post('ask')
-  async askChatbot(@Body() body: any) {
-    const { query } = body;
+  @UseGuards(SupabaseAuthGuard)
+  async askChatbot(@Body() body: ChatbotAskDto) {
+    const { query, lguId, history } = body;
 
     if (!query || !query.trim()) {
-      return { answer: 'Please type a question so I can help you.', source: 'AGAPP Chatbot', found: false };
+      return { answer: 'Please type a question so I can help you.', source: 'AGAPP Chatbot', found: false, redirect: null };
+    }
+
+    // Resolve active LGU name and fetch FAQs dynamically from Supabase
+    let lguName = 'Liliw';
+    let faqs = mockFaqs;
+    const supabase = this.supabaseService.getClient();
+    if (supabase && lguId) {
+      try {
+        const { data: lguData } = await supabase.from('lgus').select('name').eq('id', lguId).single();
+        if (lguData) {
+          lguName = lguData.name.replace('Municipality of ', '');
+        }
+
+        const { data: faqData } = await supabase
+          .from('chatbot_faqs')
+          .select('question, answer, source, tags')
+          .eq('lgu_id', lguId);
+        
+        if (faqData && faqData.length > 0) {
+          faqs = faqData.map((d: any) => ({
+            question: d.question,
+            answer: d.answer,
+            source: d.source,
+            keywords: d.tags || []
+          }));
+        }
+      } catch (err) {
+        // Fallback to in-memory check
+        const match = initialLgus.find(l => l.id === lguId);
+        if (match) lguName = match.name.replace('Municipality of ', '');
+      }
+    } else if (lguId) {
+      const match = initialLgus.find(l => l.id === lguId);
+      if (match) lguName = match.name.replace('Municipality of ', '');
     }
 
     // ── STEP 1: Predefined keyword-scored matching ───────────────────────────
     let bestMatch: typeof mockFaqs[0] | null = null;
     let bestScore = 0;
 
-    for (const faq of mockFaqs) {
+    for (const faq of faqs) {
       const score = scoreFaq(query, faq.keywords);
       if (score > bestScore) {
         bestScore = score;
@@ -754,11 +1057,23 @@ export class ChatbotController {
 
     // Threshold: at least 1 keyword must match to use predefined answer
     if (bestMatch && bestScore >= 1) {
+      // Predefined FAQ redirect mapper
+      let faqRedirect: { screen: string; label: string } | null = null;
+      const kw = bestMatch.keywords;
+      if (kw.includes('pothole') || kw.includes('drainage') || kw.includes('stray') || kw.includes('lost') || kw.includes('report')) {
+        faqRedirect = { screen: 'ReportsTab', label: 'Submit a Report' };
+      } else if (kw.includes('track') || kw.includes('status')) {
+        faqRedirect = { screen: 'ReportsTab', label: 'Track My Reports' };
+      } else if (kw.includes('business') || kw.includes('birth') || kw.includes('marriage') || kw.includes('death') || kw.includes('cedula') || kw.includes('indigency') || kw.includes('health') || kw.includes('building') || kw.includes('permit') || kw.includes('document')) {
+        faqRedirect = { screen: 'ServicesTab', label: 'Go to Services' };
+      }
+
       return {
-        answer: bestMatch.answer,
+        answer: bestMatch.answer.replace(/Liliw/g, lguName), // Personalize answer to LGU
         source: bestMatch.source,
         found: true,
-        method: 'predefined'
+        method: 'predefined',
+        redirect: faqRedirect
       };
     }
 
@@ -767,25 +1082,61 @@ export class ChatbotController {
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-2.0-flash',
+          generationConfig: { responseMimeType: 'application/json' }
+        });
 
-        const prompt = `You are a helpful government service assistant for the Municipality of Liliw, Laguna, Philippines. 
-A citizen asked: "${query}"
+        // Format chat history context
+        let historyContextText = '';
+        if (history && Array.isArray(history) && history.length > 0) {
+          historyContextText = '\nHere is the recent conversation history for context:\n' + 
+            history.slice(-6).map((h: any) => `${h.sender === 'user' ? 'Citizen' : 'AI'}: "${h.text}"`).join('\n') + '\n';
+        }
 
-Answer concisely and practically based on standard Philippine LGU services and RA 11032 (Ease of Doing Business Act). 
-If the question is outside government services scope, politely say so and suggest they visit the Municipal Hall or use the AGAPP report feature.
-Keep the answer under 5 sentences.`;
+        const prompt = `You are a helpful, professional government service AI assistant built strictly for the AGAPP mobile application of the Municipality of ${lguName}, Laguna, Philippines.
+
+You must ONLY answer queries related to ${lguName} LGU municipal services (such as document applications, business permits, community reports, local government operations, or AGAPP application guide).
+If the citizen's question is unrelated to ${lguName} government services, or if it asks for general knowledge, coding, creative tasks, recipes, sports, or other countries outside of municipal service scopes, you MUST politely decline to answer, state your narrow scope as an LGU assistant, and guide them to use AGAPP's features.
+${historyContextText}
+Based on the citizen's current query: "${query}" (incorporating the conversation history context above), determine if the query implies they want to perform an action inside the AGAPP application. If so, determine which tab/screen they should navigate to:
+- If they want to submit a report, file a complaint, report road issues, potholes, stray animals, clogged drainage, etc. -> screen is "ReportsTab", label is "Submit a Report".
+- If they want to request a birth certificate, marriage certificate, death certificate, business permit, cedula, or any other government document/clearance -> screen is "ServicesTab", label is "Go to Services".
+- If they want to view local government buildings, find the police station, municipal hall, fire station, hospital, public market, or explore the town map -> screen is "MapTab", label is "Open Map Explorer".
+- If they want to read/participate in community discussions or ask other citizens -> screen is "Forum", label is "Go to Forum".
+- Otherwise -> redirect is null.
+
+You MUST respond in valid JSON format matching this schema:
+{
+  "answer": "string (your concise answer under 5 sentences, keeping the tone helpful, polite and professional)",
+  "redirect": null or {
+    "screen": "ReportsTab" | "ServicesTab" | "MapTab" | "Forum",
+    "label": "string (matching the action, e.g. 'Submit a Report', 'Go to Services', 'Open Map Explorer', 'Go to Forum')"
+  }
+}`;
 
         const result = await model.generateContent(prompt);
         const text = result.response.text();
 
         if (text && text.trim()) {
-          return {
-            answer: text.trim(),
-            source: 'Gemini AI — Liliw LGU Assistant',
-            found: true,
-            method: 'gemini'
-          };
+          try {
+            const parsed = JSON.parse(text.trim());
+            return {
+              answer: parsed.answer,
+              source: `Gemini AI — ${lguName} LGU Assistant`,
+              found: true,
+              method: 'gemini',
+              redirect: parsed.redirect || null
+            };
+          } catch (jsonErr) {
+            return {
+              answer: text.trim(),
+              source: `Gemini AI — ${lguName} LGU Assistant`,
+              found: true,
+              method: 'gemini',
+              redirect: null
+            };
+          }
         }
       } catch (err) {
         console.error('[ChatbotController] Gemini fallback failed:', (err as any).message);
@@ -794,10 +1145,11 @@ Keep the answer under 5 sentences.`;
 
     // ── STEP 3: No answer found ───────────────────────────────────────────────
     return {
-      answer: "I'm sorry, I couldn't find an answer for that in the Liliw LGU knowledge base. For specific concerns, please visit the Municipal Hall (Mon–Fri, 8AM–5PM) or use the AGAPP Report feature to file your concern directly.",
+      answer: `I'm sorry, I couldn't find an answer for that in the ${lguName} LGU knowledge base. For specific concerns, please visit the Municipal Hall (Mon–Fri, 8AM–5PM) or use the AGAPP Report feature to file your concern directly.`,
       source: 'AGAPP Chatbot',
       found: false,
-      offerTicket: true
+      offerTicket: true,
+      redirect: null
     };
   }
 }

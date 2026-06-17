@@ -15,6 +15,7 @@ import {
   Image,
   Keyboard,
   KeyboardEvent,
+  PanResponder,
 } from 'react-native';
 import MapView, { Marker, Polygon, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,10 +38,9 @@ const CATEGORIES = [
   { id: 'other',     label: 'Others',    icon: 'location-outline',  color: '#9B59B6' },
 ];
 
-// Sheet height states
-const SHEET_PEEK     = 50;   // handle always visible
-const SHEET_EXPANDED = 300;  // normal open
-const SHEET_DETAIL   = 390;  // POI detail open
+// Collapsed bottom sheet height (peeks so the handle is visible) vs expanded height
+const SHEET_COLLAPSED = 35;
+const SHEET_EXPANDED  = 300;
 
 export function MapExplorerScreen() {
   const { T, isDarkMode } = useTheme();
@@ -61,11 +61,10 @@ export function MapExplorerScreen() {
   const [panelOpen, setPanelOpen] = useState(false);
 
   // Animation values
-  const panelAnim      = useRef(new Animated.Value(SHEET_PEEK)).current;
+  const panelHeightRef = useRef(SHEET_COLLAPSED);
+  const panelAnim      = useRef(new Animated.Value(SHEET_COLLAPSED)).current;
+  const detailAnim     = useRef(new Animated.Value(0)).current;
   const keyboardOffset = useRef(new Animated.Value(0)).current;
-
-  // Drag gesture tracking
-  const dragStartHeight = useRef(SHEET_PEEK);
 
   // ── Keyboard listener — slides panel up when keyboard opens ─────────────
   useEffect(() => {
@@ -121,14 +120,7 @@ export function MapExplorerScreen() {
 
       // Reset UI state when returning to tab
       setSelectedPoi(null);
-      // Snap back to peek (not fully close) so handle stays grabbable
-      setPanelOpen(false);
-      Animated.spring(panelAnim, {
-        toValue: SHEET_PEEK,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 60,
-      }).start();
+      closePanel();
 
       // Start far out (country-level view of Philippines)
       const farRegion = {
@@ -158,11 +150,12 @@ export function MapExplorerScreen() {
     }, [selectedLgu])
   );
 
-  // ── Panel toggle ─────────────────────────────────────────────────
-  const openPanel = (targetHeight = SHEET_EXPANDED) => {
+  // ── Panel toggle animation ───────────────────────────────────────────────
+  const openPanel = () => {
     setPanelOpen(true);
+    panelHeightRef.current = selectedPoi ? 380 : SHEET_EXPANDED;
     Animated.spring(panelAnim, {
-      toValue: targetHeight,
+      toValue: panelHeightRef.current,
       useNativeDriver: false,
       friction: 9,
       tension: 60,
@@ -170,43 +163,46 @@ export function MapExplorerScreen() {
   };
 
   const closePanel = () => {
-    Keyboard.dismiss();
     setSearchQuery('');
     setSelectedPoi(null);
+    panelHeightRef.current = SHEET_COLLAPSED;
     Animated.spring(panelAnim, {
-      toValue: SHEET_PEEK,
+      toValue: SHEET_COLLAPSED,
       useNativeDriver: false,
       friction: 9,
       tension: 60,
     }).start(() => setPanelOpen(false));
   };
 
-  // ── Drag handle PanResponder ───────────────────────────────────────
-  const handlePanResponder = useRef(
+  // Keep latest actions in a ref to avoid stale closures in PanResponder
+  const actionsRef = useRef({ openPanel, closePanel });
+  actionsRef.current = { openPanel, closePanel };
+
+  // ── Pan Responder for Draggable Sheet ────────────────────────────────────
+  const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  (_, g) => Math.abs(g.dy) > 4,
-      onPanResponderGrant: () => {
-        // Capture height at gesture start
-        panelAnim.stopAnimation(v => { dragStartHeight.current = v; });
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+      onPanResponderMove: (_, gesture) => {
+        let newHeight = panelHeightRef.current - gesture.dy;
+        if (newHeight < SHEET_COLLAPSED) newHeight = SHEET_COLLAPSED;
+        panelAnim.setValue(newHeight);
       },
-      onPanResponderMove: (_, g) => {
-        // Dragging UP = negative dy = bigger height
-        const next = Math.max(SHEET_PEEK, Math.min(SHEET_DETAIL + 30, dragStartHeight.current - g.dy));
-        panelAnim.setValue(next);
-      },
-      onPanResponderRelease: (_, g) => {
-        const current  = dragStartHeight.current - g.dy;
-        const midpoint = (SHEET_PEEK + SHEET_EXPANDED) / 2;
-        // Open if fast swipe up OR dragged past midpoint
-        if (g.vy < -0.4 || current > midpoint) {
-          openPanel(selectedPoi ? SHEET_DETAIL : SHEET_EXPANDED);
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.vy < -0.5 || gesture.dy < -50) {
+          actionsRef.current.openPanel();
+        } else if (gesture.vy > 0.5 || gesture.dy > 50) {
+          actionsRef.current.closePanel();
         } else {
-          closePanel();
+          // snap back to whatever it was
+          if (panelHeightRef.current > SHEET_COLLAPSED) actionsRef.current.openPanel();
+          else actionsRef.current.closePanel();
         }
-      },
+      }
     })
   ).current;
+
+
 
   // ── Detail panel ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -217,9 +213,17 @@ export function MapExplorerScreen() {
       tension: 50,
     }).start();
     if (selectedPoi) {
-      openPanel(SHEET_DETAIL);
+      // Ensure panel is open when a POI is selected
+      openPanel();
     } else if (!selectedPoi && panelOpen) {
-      openPanel(SHEET_EXPANDED);
+      Animated.spring(panelAnim, {
+        toValue: SHEET_EXPANDED,
+        useNativeDriver: false,
+        friction: 9,
+        tension: 60,
+      }).start(() => {
+        panelHeightRef.current = SHEET_EXPANDED;
+      });
     }
   }, [selectedPoi]);
 
@@ -440,9 +444,10 @@ export function MapExplorerScreen() {
             styles.bottomSheet,
             { height: panelAnim, backgroundColor: T.card, borderTopColor: T.border },
           ]}
+          pointerEvents="auto"
         >
-          {/* Draggable handle */}
-          <View style={styles.handleArea} {...handlePanResponder.panHandlers}>
+          {/* Drag handle wrapper */}
+          <View {...panResponder.panHandlers} style={styles.dragArea}>
             <View style={styles.sheetHandle} />
           </View>
 
@@ -667,13 +672,18 @@ const styles = StyleSheet.create({
     elevation: 10,
     overflow: 'hidden',
   },
+  dragArea: {
+    paddingTop: 8,
+    paddingBottom: 16,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sheetHandle: {
     width: 40,
     height: 5,
     borderRadius: 2.5,
     backgroundColor: '#E5E7EB',
-    alignSelf: 'center',
-    marginBottom: 14,
   },
   searchContainer: {
     flexDirection: 'row',

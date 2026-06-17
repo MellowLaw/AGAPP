@@ -142,8 +142,23 @@ export interface ForumPost {
   lguId: string;
   citizenId: string;
   citizenName: string;
+  title?: string;
   content: string;
+  tags?: string[];
+  photoUrl?: string;
   isApproved: boolean; // Moderation flag
+  flaggedKeywords: string[];
+  createdAt: string;
+  commentsCount?: number;
+}
+
+export interface ForumComment {
+  id: string;
+  postId: string;
+  citizenId: string;
+  citizenName: string;
+  content: string;
+  isApproved: boolean;
   flaggedKeywords: string[];
   createdAt: string;
 }

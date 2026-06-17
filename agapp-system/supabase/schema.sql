@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS service_requests CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS offices CASCADE;
 DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS lgu_facilities CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS lgus CASCADE;
 
@@ -113,6 +114,22 @@ CREATE TABLE forum_posts (
     lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,
     citizen_id uuid REFERENCES users(id) ON DELETE SET NULL,
     citizen_name text NOT NULL,
+    title text,
+    content text NOT NULL,
+    tags text[] DEFAULT '{}'::text[],
+    photo_url text,
+    is_approved boolean DEFAULT true,
+    flagged_keywords text[] DEFAULT '{}'::text[],
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. COMMUNITY FORUM COMMENTS
+CREATE TABLE forum_comments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id uuid REFERENCES forum_posts(id) ON DELETE CASCADE NOT NULL,
+    parent_comment_id uuid REFERENCES forum_comments(id) ON DELETE CASCADE,
+    citizen_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    citizen_name text NOT NULL,
     content text NOT NULL,
     is_approved boolean DEFAULT true,
     flagged_keywords text[] DEFAULT '{}'::text[],
@@ -177,6 +194,20 @@ CREATE TABLE chatbot_faqs (
 
 CREATE INDEX chatbot_faqs_lgu_idx ON chatbot_faqs(lgu_id);
 
+-- 13.5 LGU FACILITIES (Points of Interest for Map Explorer)
+CREATE TABLE lgu_facilities (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,
+    name text NOT NULL,
+    category text NOT NULL CHECK (category IN ('municipal', 'police', 'fire', 'hospital', 'other')),
+    address text NOT NULL,
+    latitude double precision NOT NULL,
+    longitude double precision NOT NULL,
+    phone text,
+    image_url text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 14. FAQ EMBEDDINGS (pgvector semantic chatbot, requires vector extension)
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -233,18 +264,20 @@ RETURNS trigger AS $$
 DECLARE
   v_word text;
   v_bad_words text[] := ARRAY['putang ina', 'gago', 'tarantado', 'pota', 'ulol', 'shet', 'bwisit'];
-  v_flagged text[] := '{}'::text[];
+  v_flagged text[] := coalesce(NEW.flagged_keywords, '{}'::text[]);
 BEGIN
   FOREACH v_word IN ARRAY v_bad_words LOOP
     IF position(v_word in lower(NEW.content)) > 0 THEN
-      v_flagged := array_append(v_flagged, v_word);
+      IF NOT (v_word = ANY(v_flagged)) THEN
+        v_flagged := array_append(v_flagged, v_word);
+      END IF;
     END IF;
   END LOOP;
   
   IF array_length(v_flagged, 1) > 0 THEN
     NEW.is_approved := false;
     NEW.flagged_keywords := v_flagged;
-  ELSE
+  ELSIF NEW.is_approved IS NOT FALSE THEN
     NEW.is_approved := true;
   END IF;
   
@@ -278,6 +311,9 @@ CREATE POLICY "Authenticated users can read all users" ON users
 
 CREATE POLICY "Users can update their own record" ON users
   FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert their own record" ON users
+  FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- 2. Policies for Reports Table
 CREATE POLICY "Allow Citizens to read reports in their LGU" ON reports FOR SELECT USING (
@@ -359,6 +395,17 @@ CREATE POLICY "Allow LGU Admins to manage chatbot FAQs" ON chatbot_faqs FOR ALL 
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = chatbot_faqs.lgu_id)
 );
 
+-- 8.5 Policies for LGU Facilities
+ALTER TABLE lgu_facilities ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all users to read LGU facilities" ON lgu_facilities
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow LGU admins to manage facilities" ON lgu_facilities
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = lgu_facilities.lgu_id)
+  );
+
 -- 9. Policies for Audit Logs
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
@@ -369,3 +416,23 @@ CREATE POLICY "Super admins can read all audit logs" ON audit_logs FOR SELECT US
 CREATE POLICY "LGU admins can read their LGU audit logs" ON audit_logs FOR SELECT USING (
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL') AND u.lgu_id = audit_logs.lgu_id)
 );
+
+-- 10. Policies and Triggers for Forum Comments
+ALTER TABLE forum_comments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow viewing approved forum comments" ON forum_comments FOR SELECT USING (
+  is_approved = true OR citizen_id = auth.uid() OR EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN')
+);
+
+CREATE POLICY "Allow Citizens to insert comments" ON forum_comments FOR INSERT WITH CHECK (
+  auth.uid() = citizen_id OR auth.uid() IS NOT NULL
+);
+
+CREATE POLICY "Allow LGU Admins to moderate comments" ON forum_comments FOR ALL USING (
+  EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN')
+);
+
+CREATE TRIGGER trg_moderate_forum_comment
+  BEFORE INSERT OR UPDATE ON forum_comments
+  FOR EACH ROW
+  EXECUTE FUNCTION check_forum_profanity();

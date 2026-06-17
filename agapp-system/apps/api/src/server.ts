@@ -739,7 +739,15 @@ app.delete('/api/forum/:id', (req, res) => {
 
 // Chatbot RAG FAQ similarity search endpoint
 app.post('/api/chatbot/ask', (req, res) => {
-  const { query } = req.body;
+  const { query, lguId } = req.body;
+
+  let lguName = 'Liliw';
+  if (lguId) {
+    const match = lgus.find(l => l.id === lguId);
+    if (match) {
+      lguName = match.name.replace('Municipality of ', '');
+    }
+  }
   
   // Simple similarity score check based on keyword matching
   let bestMatch: typeof FAQ_KNOWLEDGE_BASE[number] | null = null;
@@ -759,17 +767,29 @@ app.post('/api/chatbot/ask', (req, res) => {
   });
 
   if (bestMatch && maxMatches > 0) {
+    let faqRedirect: { screen: string; label: string } | null = null;
+    const kw = (bestMatch as any).keywords;
+    if (kw.includes('pothole') || kw.includes('drainage') || kw.includes('stray') || kw.includes('lost') || kw.includes('report')) {
+      faqRedirect = { screen: 'ReportsTab', label: 'Submit a Report' };
+    } else if (kw.includes('track') || kw.includes('status')) {
+      faqRedirect = { screen: 'ReportsTab', label: 'Track My Reports' };
+    } else if (kw.includes('business') || kw.includes('birth') || kw.includes('marriage') || kw.includes('death') || kw.includes('cedula') || kw.includes('indigency') || kw.includes('health') || kw.includes('building') || kw.includes('permit') || kw.includes('document')) {
+      faqRedirect = { screen: 'ServicesTab', label: 'Go to Services' };
+    }
+
     res.json({
-      answer: (bestMatch as any).answer,
+      answer: (bestMatch as any).answer.replace(/Liliw/g, lguName),
       source: (bestMatch as any).source,
-      found: true
+      found: true,
+      redirect: faqRedirect
     });
   } else {
     res.json({
-      answer: "I'm sorry, I couldn't find a direct answer in the LGU Knowledge Base. Would you like to file a support ticket to the Help Desk?",
+      answer: `I'm sorry, I couldn't find a direct answer in the ${lguName} LGU Knowledge Base. Would you like to file a support ticket to the Help Desk?`,
       source: "RAG System Fallback",
       found: false,
-      offerTicket: true
+      offerTicket: true,
+      redirect: null
     });
   }
 });

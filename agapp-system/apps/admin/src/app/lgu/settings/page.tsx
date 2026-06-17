@@ -410,7 +410,7 @@ export default function SettingsPage() {
                         <p className="font-medium text-[#1a1a1a]">{member.name}</p>
                         <p className="text-sm text-[#737373]">{member.email}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant={member.role === 'LGU_ADMIN' ? 'primary' : 'default'}>
+                          <Badge variant={member.role === 'LGU_ADMIN' ? 'info' : 'default'}>
                             {member.role.replace('_', ' ')}
                           </Badge>
                         </div>
