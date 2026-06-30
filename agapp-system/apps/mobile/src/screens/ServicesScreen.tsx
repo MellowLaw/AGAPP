@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
+import { isVerified } from '../utils/verification';
 
 export function ServicesScreen({ navigation }: any) {
   const { T } = useTheme();
@@ -18,6 +19,7 @@ export function ServicesScreen({ navigation }: any) {
   const [fullName, setFullName] = useState(profile?.name || '');
   const [purpose, setPurpose] = useState('');
   const [copies, setCopies] = useState('1');
+  const verified = isVerified(profile);
 
   useEffect(() => {
     if (!selectedLgu || !profile) return;
@@ -55,6 +57,10 @@ export function ServicesScreen({ navigation }: any) {
   }, [selectedLgu, profile]);
 
   const submitApplication = async () => {
+    if (!verified) {
+      Alert.alert('Verification Required', 'Please verify your identity before applying for services.');
+      return;
+    }
     if (!fullName || !purpose) {
       Alert.alert('Missing fields', 'Please fill in all required fields.');
       return;
@@ -102,6 +108,24 @@ export function ServicesScreen({ navigation }: any) {
             Application form · Pay at Municipal Hall
           </Text>
 
+          {!verified && (
+            <View style={[styles.verificationBanner, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="shield-checkmark-outline" size={22} color="#B45309" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 14 }}>Verification Required</Text>
+                  <Text style={{ color: '#A16207', fontSize: 12, marginTop: 2 }}>Verify your identity to submit service applications.</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.verifyBtn, { backgroundColor: '#B45309' }]}
+                  onPress={() => navigation.navigate('VerifyIdentity')}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border }]}>
             <Text style={[globalStyles.label, { color: T.textMuted }]}>FULL NAME</Text>
             <TextInput
@@ -131,10 +155,13 @@ export function ServicesScreen({ navigation }: any) {
             />
 
             <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: ACCENT, marginTop: 12 }]}
-              onPress={submitApplication}
+              style={[globalStyles.primaryButton, { backgroundColor: !verified ? '#D1D5DB' : ACCENT, marginTop: 12 }]}
+              onPress={verified ? submitApplication : () => navigation.navigate('VerifyIdentity')}
+              disabled={!verified}
             >
-              <Text style={[globalStyles.primaryButtonText, { color: '#1A1A1A' }]}>Submit application</Text>
+              <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
+                {!verified ? 'Verify to Submit' : 'Submit application'}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -197,6 +224,8 @@ export function ServicesScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  verificationBanner: { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
+  verifyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   serviceCard: { width: '48%', padding: 20, borderRadius: 20 },
   iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.4)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },

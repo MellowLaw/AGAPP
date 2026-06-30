@@ -15,6 +15,7 @@ import {
   Users,
   ChartBar,
   SignOut,
+  IdentificationBadge,
 } from '@phosphor-icons/react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 
@@ -35,6 +36,7 @@ const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'Issue Reports', href: '/lgu/reports', icon: Warning },
   { label: 'News', href: '/lgu/news', icon: Newspaper },
   { label: 'Forum', href: '/lgu/forum', icon: ChatCircle },
+  { label: 'Verifications', href: '/lgu/verifications', icon: IdentificationBadge },
   { label: 'Settings', href: '/lgu/settings', icon: Gear },
 ];
 

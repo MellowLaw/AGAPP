@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { globalStyles, PASTELS } from '../theme';
+import { globalStyles, PASTELS, ACCENT } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
+import { getVerificationStatus, statusLabel, VerificationStatus } from '../utils/verification';
 
-export function ProfileScreen() {
+// Per-status badge styling on the profile card
+const BADGE_STYLE: Record<VerificationStatus, { bg: string; icon: any; iconColor: string; textColor: string }> = {
+  verified:   { bg: 'rgba(34,197,94,0.25)',  icon: 'shield-checkmark',  iconColor: '#166534', textColor: '#166534' },
+  pending:    { bg: 'rgba(234,179,8,0.25)',   icon: 'hourglass',          iconColor: '#854D0E', textColor: '#854D0E' },
+  rejected:   { bg: 'rgba(239,68,68,0.25)',   icon: 'alert-circle',       iconColor: '#991B1B', textColor: '#991B1B' },
+  unverified: { bg: 'rgba(26,26,26,0.08)',    icon: 'shield-half-outline', iconColor: '#1A1A1A', textColor: '#1A1A1A' },
+};
+
+export function ProfileScreen({ navigation }: any) {
   const { T, isDarkMode, setIsDarkMode } = useTheme();
   const { profile, selectedLgu, signOut } = useAuth();
   const [consentLocation, setConsentLocation] = useState(true);
@@ -15,6 +24,15 @@ export function ProfileScreen() {
   // Parse first name/initials
   const name = profile?.name || 'Citizen';
   const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+
+  const status = getVerificationStatus(profile);
+  const badge = BADGE_STYLE[status];
+  const ctaLabel = status === 'verified' ? null
+    : status === 'pending' ? null
+    : status === 'rejected' ? 'Re-submit verification'
+    : 'Verify your identity';
+
+  const goToVerify = () => navigation?.navigate('VerifyIdentity');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
@@ -30,11 +48,26 @@ export function ProfileScreen() {
           </View>
           <Text style={styles.profileName}>{name}</Text>
           <Text style={styles.profileMeta}>{profile?.email}</Text>
-          <View style={styles.profileBadge}>
-            <Ionicons name="shield-checkmark" size={12} color="#1A1A1A" />
-            <Text style={styles.profileBadgeText}>Citizen · Verified</Text>
+          <View style={[styles.profileBadge, { backgroundColor: badge.bg }]}>
+            <Ionicons name={badge.icon as any} size={12} color={badge.iconColor} />
+            <Text style={[styles.profileBadgeText, { color: badge.textColor }]}>{statusLabel(status)}</Text>
           </View>
+          {status === 'rejected' && profile?.rejection_reason && (
+            <Text style={[styles.rejectionNote, { color: badge.textColor }]}>
+              {profile.rejection_reason}
+            </Text>
+          )}
         </View>
+
+        {ctaLabel && (
+          <TouchableOpacity
+            style={[globalStyles.primaryButton, { backgroundColor: ACCENT, marginBottom: 16 }]}
+            onPress={goToVerify}
+          >
+            <Ionicons name="shield-checkmark-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={[globalStyles.primaryButtonText, { color: '#FFF' }]}>{ctaLabel}</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border, padding: 4 }]}>
           <TouchableOpacity style={styles.menuRow} onPress={() => setIsDarkMode(!isDarkMode)}>
@@ -44,9 +77,9 @@ export function ProfileScreen() {
               <View style={[styles.toggleThumb, { transform: [{ translateX: isDarkMode ? 18 : 2 }] }]} />
             </View>
           </TouchableOpacity>
-          
+
           <View style={[styles.divider, { backgroundColor: T.border }]} />
-          
+
           <TouchableOpacity style={styles.menuRow} onPress={() => setConsentLocation(!consentLocation)}>
             <View style={[styles.menuIcon, { backgroundColor: T.cardAlt }]}><Ionicons name="location-outline" size={18} color={T.text} /></View>
             <Text style={[styles.menuLabel, { color: T.text }]}>GPS geofence access</Text>
@@ -57,6 +90,15 @@ export function ProfileScreen() {
         </View>
 
         <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border, padding: 4 }]}>
+          <TouchableOpacity style={styles.menuRow} onPress={goToVerify}>
+            <View style={[styles.menuIcon, { backgroundColor: T.cardAlt }]}><Ionicons name="card-outline" size={18} color={T.text} /></View>
+            <Text style={[styles.menuLabel, { color: T.text }]}>Identity verification</Text>
+            <Text style={{ color: badge.textColor, fontSize: 12, fontWeight: '700', marginRight: 8 }}>{statusLabel(status)}</Text>
+            <Ionicons name="chevron-forward" size={18} color={T.textMuted} />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 68, backgroundColor: T.border }} />
+
           {[
             { icon: 'document-text-outline', label: 'Privacy notice (RA 10173)' },
             { icon: 'help-circle-outline', label: 'Help & support' },
@@ -83,13 +125,14 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  profileCard: { padding: 32, borderRadius: 24, alignItems: 'center', marginBottom: 24 },
+  profileCard: { padding: 32, borderRadius: 24, alignItems: 'center', marginBottom: 16 },
   profileAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   profileInitials: { fontSize: 28, fontWeight: '800', color: '#FFF' },
   profileName: { fontSize: 24, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
   profileMeta: { fontSize: 14, fontWeight: '500', color: 'rgba(26,26,26,0.6)', marginBottom: 12 },
-  profileBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.4)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
-  profileBadgeText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', marginLeft: 4 },
+  profileBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
+  profileBadgeText: { fontSize: 12, fontWeight: '700', marginLeft: 4 },
+  rejectionNote: { fontSize: 12, marginTop: 8, textAlign: 'center', paddingHorizontal: 16, lineHeight: 16 },
   menuRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   menuIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   menuLabel: { flex: 1, fontSize: 16, fontWeight: '600' },

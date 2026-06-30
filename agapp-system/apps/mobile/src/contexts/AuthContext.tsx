@@ -10,6 +10,10 @@ type AuthContextType = {
   profile: any | null;
   selectedLgu: any | null;
   setSelectedLgu: (lgu: any) => void;
+  guestLgu: any | null;
+  setGuestLgu: (lgu: any) => Promise<void>;
+  hasCompletedGuestLguChoice: boolean;
+  skipGuestLgu: () => Promise<void>;
   isLoading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,10 +26,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [selectedLgu, setSelectedLguState] = useState<any | null>(null);
+  const [guestLgu, setGuestLguState] = useState<any | null>(null);
+  const [hasCompletedGuestLguChoice, setHasCompletedGuestLguChoice] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Promise wrapper that rejects if the promise does not resolve within timeoutMs
-  const withTimeout = <T,>(promise: PromiseLike<T>, timeoutMs = 2500): Promise<T> => {
+  const withTimeout = <T,>(promise: PromiseLike<T>, timeoutMs = 6000): Promise<T> => {
     return Promise.race([
       Promise.resolve(promise),
       new Promise<never>((_, reject) =>
@@ -38,6 +44,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSelectedLguState(lgu);
     if (lgu) {
       await AsyncStorage.setItem('selectedLguId', lgu.id);
+      // Persist to the user row so server-side RLS / RPCs that read
+      // users.lgu_id (e.g. verification submission) stay in sync with
+      // the client-selected municipality.
+      if (user) {
+        const { error } = await supabase
+          .from('users')
+          .update({ lgu_id: lgu.id })
+          .eq('id', user.id);
+        if (error) {
+          console.warn('[AuthContext] Failed to persist lgu_id to user row:', error.message);
+        }
+      }
     } else {
       await AsyncStorage.removeItem('selectedLguId');
     }
@@ -58,6 +76,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.warn('[AuthContext] Failed to load LGU details from storage/DB:', err);
+    }
+  };
+
+  const setGuestLgu = async (lgu: any) => {
+    setGuestLguState(lgu);
+    setHasCompletedGuestLguChoice(true);
+    if (lgu) {
+      await AsyncStorage.setItem('guestLguId', lgu.id);
+    } else {
+      await AsyncStorage.removeItem('guestLguId');
+    }
+  };
+
+  const skipGuestLgu = async () => {
+    setGuestLguState(null);
+    setHasCompletedGuestLguChoice(true);
+    await AsyncStorage.setItem('guestLguId', 'skipped');
+  };
+
+  const loadGuestLguFromStorage = async () => {
+    try {
+      const savedGuestLguId = await AsyncStorage.getItem('guestLguId');
+      if (savedGuestLguId) {
+        setHasCompletedGuestLguChoice(true);
+        if (savedGuestLguId !== 'skipped') {
+          console.log('[AuthContext] Loading Guest LGU details for saved Guest LGU ID:', savedGuestLguId);
+          const { data } = await withTimeout(
+            supabase.from('lgus').select('*').eq('id', savedGuestLguId).single()
+          );
+          if (data) {
+            console.log('[AuthContext] Loaded guest LGU:', data.name);
+            setGuestLguState(data);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[AuthContext] Failed to load guest LGU details:', err);
     }
   };
 
@@ -89,13 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         console.log('[AuthContext] initializeAuth: fetching session...');
-        const { data: { session: initialSession } } = await withTimeout(supabase.auth.getSession(), 3000);
+        const { data: { session: initialSession } } = await withTimeout(supabase.auth.getSession(), 8000);
         console.log('[AuthContext] initializeAuth: session fetched =', !!initialSession);
         
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         
         await loadLguFromStorage();
+        await loadGuestLguFromStorage();
         
         if (initialSession?.user) {
           console.log('[AuthContext] initializeAuth: fetching profile for user:', initialSession.user.id);
@@ -173,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, selectedLgu, setSelectedLgu, isLoading, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, selectedLgu, setSelectedLgu, guestLgu, setGuestLgu, hasCompletedGuestLguChoice, skipGuestLgu, isLoading, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

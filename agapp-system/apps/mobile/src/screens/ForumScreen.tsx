@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
+import { isVerified } from '../utils/verification';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
@@ -28,7 +29,7 @@ const PRESET_IMAGES = [
   { name: 'Barangay Clean', url: 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=500&auto=format&fit=crop&q=60' }
 ];
 
-export function ForumScreen() {
+export function ForumScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { profile, selectedLgu } = useAuth();
   
@@ -98,6 +99,7 @@ export function ForumScreen() {
   const [replyTarget, setReplyTarget] = useState<any | null>(null);
   const [showPresetsInChat, setShowPresetsInChat] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const verified = isVerified(profile);
   
   const commentScrollViewRef = useRef<ScrollView>(null);
 
@@ -242,6 +244,10 @@ export function ForumScreen() {
   const handleCreateComment = async (customText?: string) => {
     const textToSend = customText ?? newComment;
     if (!textToSend.trim() || !profile || !selectedPost) return;
+    if (!verified) {
+      Alert.alert('Verification Required', 'Please verify your identity before replying in the forum.');
+      return;
+    }
     const contentText = textToSend.trim();
 
     // Auto-moderation profanity checker fallback
@@ -341,6 +347,23 @@ export function ForumScreen() {
           </View>
 
           <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+            {!verified && (
+              <View style={[styles.verificationBanner, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="shield-checkmark-outline" size={22} color="#B45309" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 14 }}>Verification Required</Text>
+                    <Text style={{ color: '#A16207', fontSize: 12, marginTop: 2 }}>Verify your identity to post in the community forum.</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.verifyBtn, { backgroundColor: '#B45309' }]}
+                    onPress={() => navigation.navigate('VerifyIdentity')}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
             <Text style={[styles.fieldLabel, { color: T.textMuted }]}>TITLE</Text>
             <TextInput
               style={[styles.titleInput, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
@@ -413,12 +436,12 @@ export function ForumScreen() {
             </ScrollView>
 
             <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: ACCENT, marginTop: 24 }]}
-              onPress={handleCreatePost}
-              disabled={loading || !newTitle.trim() || !newContent.trim()}
+              style={[globalStyles.primaryButton, { backgroundColor: !verified ? '#D1D5DB' : ACCENT, marginTop: 24 }]}
+              onPress={verified ? handleCreatePost : () => navigation.navigate('VerifyIdentity')}
+              disabled={loading || !verified || !newTitle.trim() || !newContent.trim()}
             >
-              <Text style={[globalStyles.primaryButtonText, { color: '#1A1A1A' }]}>
-                {loading ? 'Publishing...' : 'Create Thread'}
+              <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
+                {!verified ? 'Verify to Post' : loading ? 'Publishing...' : 'Create Thread'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -687,7 +710,13 @@ export function ForumScreen() {
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={[styles.newPostBtn, { backgroundColor: ACCENT }]} onPress={() => setViewState('create')}>
+          <TouchableOpacity style={[styles.newPostBtn, { backgroundColor: ACCENT }]} onPress={() => {
+            if (!verified) {
+              Alert.alert('Verification Required', 'Please verify your identity before creating forum threads.');
+              return;
+            }
+            setViewState('create');
+          }}>
             <Ionicons name="add" size={20} color="#1A1A1A" style={{ marginRight: 4 }} />
             <Text style={styles.newPostBtnText}>New Post</Text>
           </TouchableOpacity>
@@ -809,6 +838,8 @@ export function ForumScreen() {
 }
 
 const styles = StyleSheet.create({
+  verificationBanner: { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
+  verifyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',

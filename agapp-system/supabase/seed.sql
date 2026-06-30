@@ -52,7 +52,10 @@ ON CONFLICT (id) DO NOTHING;
 -- 2. SEED USER PROFILES
 -- UUIDs must match the auth.users IDs from Supabase Dashboard → Authentication → Users
 -- These are the real UUIDs from the live AGAPP project (jrureblhypfdljwflout)
-INSERT INTO users (id, email, name, role, lgu_id, barangay, is_active)
+-- Staff & demo citizens are pre-verified so the demo flow works end-to-end
+-- without manual review. New sign-ups start as 'unverified'.
+INSERT INTO users (id, email, name, role, lgu_id, barangay, is_active,
+                   verification_status, verified_barangay, verified_at, verified_by)
 VALUES
   (
     '42fe0700-7c7c-4e20-bff0-d40adf329a84',
@@ -61,7 +64,8 @@ VALUES
     'SUPER_ADMIN',
     NULL,
     NULL,
-    true
+    true,
+    'verified', NULL, now(), NULL
   ),
   (
     '8ff8bce8-38ae-4e2f-bf42-fd9b7acb71f1',
@@ -70,7 +74,8 @@ VALUES
     'LGU_ADMIN',
     'liliw-laguna',
     NULL,
-    true
+    true,
+    'verified', NULL, now(), NULL
   ),
   (
     'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -79,7 +84,8 @@ VALUES
     'LGU_PERSONNEL',
     'liliw-laguna',
     NULL,
-    true
+    true,
+    'verified', NULL, now(), NULL
   ),
   (
     'f0e69549-aa6b-4448-a133-e70c75d87f7f',
@@ -88,7 +94,8 @@ VALUES
     'CITIZEN',
     'liliw-laguna',
     'Poblacion',
-    true
+    true,
+    'verified', 'Poblacion', now(), '8ff8bce8-38ae-4e2f-bf42-fd9b7acb71f1'
   ),
   (
     '96f56b5a-3f27-480c-b0c2-04de405804e9',
@@ -97,9 +104,13 @@ VALUES
     'CITIZEN',
     'liliw-laguna',
     'Poblacion',
-    true
+    true,
+    'verified', 'Poblacion', now(), '8ff8bce8-38ae-4e2f-bf42-fd9b7acb71f1'
   )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  verification_status = COALESCE(users.verification_status, EXCLUDED.verification_status, 'verified'),
+  verified_barangay   = COALESCE(users.verified_barangay,   EXCLUDED.verified_barangay),
+  verified_at         = COALESCE(users.verified_at,         EXCLUDED.verified_at);
 
 
 -- 3. SAMPLE REPORT (for dashboard testing)

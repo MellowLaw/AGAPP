@@ -9,3 +9,7 @@
 !/Manuscript/
 # !/Wireframes/
 # !/AGAPP-ClEANED/
+
+# Allow the docs vault and project guide to be tracked
+!/Docs/
+!/CLAUDE.md

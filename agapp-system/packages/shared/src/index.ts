@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export * from './theme';
+export { ThemeProvider, useTheme } from './contexts/ThemeContext';
+export { AgappLogo } from './components/AgappLogo';
+
 // Roles
 export type UserRole = 'SUPER_ADMIN' | 'LGU_ADMIN' | 'LGU_PERSONNEL' | 'CITIZEN';
 

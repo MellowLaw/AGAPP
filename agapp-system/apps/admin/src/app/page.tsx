@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from '@phosphor-icons/react';
 import { supabase } from '@/lib/supabase';
+import { lguNameFromId } from '@/lib/lgu';
 
 // Demo users database for quick-fill buttons
 const DEMO_USERS = [
@@ -51,7 +52,7 @@ export default function UnifiedLoginPage() {
       if (profile.role === 'SUPER_ADMIN') {
         router.push('/super');
       } else if (profile.role === 'LGU_ADMIN') {
-        const lguName = profile.lgu_id === 'liliw-laguna' ? 'Liliw, Laguna' : profile.lgu_id === 'nagcarlan-laguna' ? 'Nagcarlan, Laguna' : 'Liliw, Laguna';
+        const lguName = lguNameFromId(profile.lgu_id);
         router.push(`/lgu/dashboard?lguName=${encodeURIComponent(lguName)}`);
       } else if (profile.role === 'LGU_PERSONNEL') {
         router.push('/personnel/dashboard');

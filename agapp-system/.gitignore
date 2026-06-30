@@ -50,3 +50,9 @@ desktop.ini
 # Temporary files
 tmp/
 temp/
+
+# TypeScript build cache (regenerated on every build)
+*.tsbuildinfo
+
+# Expo device cache (machine-specific, auto-generated)
+.expo/

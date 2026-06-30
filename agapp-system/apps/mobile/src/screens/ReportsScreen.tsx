@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
+import { isVerified } from '../utils/verification';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,7 @@ export function ReportsScreen({ navigation }: any) {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [loadingLoc, setLoadingLoc] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const verified = isVerified(profile);
 
   useEffect(() => {
     if (!profile) return;
@@ -261,6 +263,23 @@ export function ReportsScreen({ navigation }: any) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+          {!verified && (
+            <View style={[styles.verificationBanner, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="shield-checkmark-outline" size={22} color="#B45309" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 14 }}>Verification Required</Text>
+                  <Text style={{ color: '#A16207', fontSize: 12, marginTop: 2 }}>Verify your identity to submit community reports.</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.verifyBtn, { backgroundColor: '#B45309' }]}
+                  onPress={() => navigation.navigate('VerifyIdentity')}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border }]}>
             <Text style={[globalStyles.label, { color: T.textMuted }]}>CATEGORY</Text>
             <View style={styles.catGrid}>
@@ -361,12 +380,12 @@ export function ReportsScreen({ navigation }: any) {
             )}
 
             <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: ACCENT, marginTop: 14 }]}
-              onPress={submitReport}
-              disabled={submitting}
+              style={[globalStyles.primaryButton, { backgroundColor: !verified ? '#D1D5DB' : ACCENT, marginTop: 14 }]}
+              onPress={verified ? submitReport : () => navigation.navigate('VerifyIdentity')}
+              disabled={submitting || !verified}
             >
-              <Text style={[globalStyles.primaryButtonText, { color: '#1A1A1A' }]}>
-                {submitting ? 'Submitting...' : 'Submit Report'}
+              <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
+                {!verified ? 'Verify to Submit' : submitting ? 'Submitting...' : 'Submit Report'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -401,6 +420,8 @@ export function ReportsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  verificationBanner: { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
+  verifyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catItem: { flex: 1, minWidth: '45%', padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
   catLabel: { fontSize: 14, fontWeight: '600', marginLeft: 8 },

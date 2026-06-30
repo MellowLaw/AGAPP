@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export function HomeScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
-  const { profile, selectedLgu } = useAuth();
+  const { profile, selectedLgu, guestLgu } = useAuth();
   const [activeTab, setActiveTab] = useState<'for_you' | 'updates' | 'activity'>('for_you');
   const [news, setNews] = useState<any[]>([]);
   const [facilities, setFacilities] = useState<any[]>([]);
@@ -17,31 +17,36 @@ export function HomeScreen({ navigation }: any) {
   const [requests, setRequests] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    if (!selectedLgu || !profile) return;
+  // Guests (no account) can still browse Home. Fall back to guestLgu (detected or selected)
+  // or finally Liliw if not selected/skipped; logged-in users get the LGU they selected.
+  const activeLgu = selectedLgu || guestLgu || { id: 'liliw-laguna', name: 'Liliw, Laguna' };
 
-    const fetchDashboardData = async () => {
-      // Fetch news
+  useEffect(() => {
+    // News & facilities only need an LGU id — fetch for guests too.
+    const fetchPublicData = async () => {
       const { data: newsData } = await supabase
         .from('news_announcements')
         .select('*')
-        .eq('lgu_id', selectedLgu.id)
+        .eq('lgu_id', activeLgu.id)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(5);
-      
+
       if (newsData) setNews(newsData);
 
-      // Fetch landmarks/facilities
       const { data: facilitiesData } = await supabase
         .from('lgu_facilities')
         .select('*')
-        .eq('lgu_id', selectedLgu.id)
+        .eq('lgu_id', activeLgu.id)
         .limit(5);
-      
-      if (facilitiesData) setFacilities(facilitiesData);
 
-      // Fetch reports
+      if (facilitiesData) setFacilities(facilitiesData);
+    };
+
+    // Private data needs a logged-in profile.
+    const fetchPrivateData = async () => {
+      if (!profile) return;
+
       const { data: reportsData } = await supabase
         .from('reports')
         .select('*')
@@ -51,7 +56,6 @@ export function HomeScreen({ navigation }: any) {
 
       if (reportsData) setReports(reportsData);
 
-      // Fetch service requests
       const { data: requestsData } = await supabase
         .from('service_requests')
         .select('*')
@@ -61,25 +65,25 @@ export function HomeScreen({ navigation }: any) {
 
       if (requestsData) setRequests(requestsData);
 
-      // Fetch unread notifications count
       const { count } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .eq('is_read', false);
-      
+
       setUnreadCount(count || 0);
     };
 
-    fetchDashboardData();
-  }, [selectedLgu, profile]);
+    fetchPublicData();
+    fetchPrivateData();
+  }, [activeLgu.id, profile]);
 
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';
-  const lguColor = selectedLgu?.primary_color || selectedLgu?.primaryColor || ACCENT;
+  const lguColor = activeLgu.primary_color || activeLgu.primaryColor || ACCENT;
 
   // Localized mock landmarks fallback based on selected LGU for premium visual feel
   const getMockLandmarks = () => {
-    if (selectedLgu?.name?.toLowerCase().includes('liliw')) {
+    if (activeLgu?.name?.toLowerCase().includes('liliw')) {
       return [
         { id: 'l1', name: 'Liliw Cold Springs', category: 'Nature & Parks', desc: 'Chill in crystal-clear mountain waters.', img: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=400&q=80' },
         { id: 'l2', name: 'St. John the Baptist Parish', category: 'Heritage', desc: 'Historic 16th-century red-brick church.', img: 'https://images.unsplash.com/photo-1548625361-155de0cbb55a?auto=format&fit=crop&w=400&q=80' },
@@ -210,11 +214,11 @@ export function HomeScreen({ navigation }: any) {
                   {firstName}.
                 </Text>
                 <Text style={{ fontSize: 13, color: T.textMuted, marginTop: 4 }}>
-                  Barangay {profile?.barangay || 'Poblacion'} · {selectedLgu?.name.replace('Municipality of ', '')}
+                  {profile?.barangay ? `Barangay ${profile.barangay} · ` : ''}{activeLgu?.name?.replace('Municipality of ', '') || 'Liliw, Laguna'}
                 </Text>
               </View>
-              {selectedLgu?.logo ? (
-                <Image source={{ uri: selectedLgu.logo }} style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: T.border }} />
+              {activeLgu?.logo ? (
+                <Image source={{ uri: activeLgu.logo }} style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: T.border }} />
               ) : (
                 <Ionicons name="location-outline" size={32} color={lguColor} style={{ opacity: 0.8 }} />
               )}

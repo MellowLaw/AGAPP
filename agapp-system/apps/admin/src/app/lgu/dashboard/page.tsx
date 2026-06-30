@@ -20,6 +20,7 @@ const ChatCircle = dynamic(() => import('@phosphor-icons/react').then(m => m.Cha
 const CheckCircle = dynamic(() => import('@phosphor-icons/react').then(m => m.CheckCircle), { ssr: false });
 const ArrowRight = dynamic(() => import('@phosphor-icons/react').then(m => m.ArrowRight), { ssr: false });
 const MapPin = dynamic(() => import('@phosphor-icons/react').then(m => m.MapPin), { ssr: false });
+const IdentificationBadge = dynamic(() => import('@phosphor-icons/react').then(m => m.IdentificationBadge), { ssr: false });
 
 type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
 
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   }, [startMonth]);
   const [reportRows, setReportRows] = useState<any[]>([]);
   const [serviceRows, setServiceRows] = useState<any[]>([]);
+  const [pendingVerifications, setPendingVerifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -77,7 +79,7 @@ export default function DashboardPage() {
       setLoading(true);
       setLoadError(null);
 
-      const [{ data: reportsData, error: reportsError }, { data: servicesData, error: servicesError }] = await Promise.all([
+      const [{ data: reportsData, error: reportsError }, { data: servicesData, error: servicesError }, { data: verifData, error: verifError }] = await Promise.all([
         supabase
           .from('reports')
           .select('id, reference_number, category, status, barangay, created_at')
@@ -86,6 +88,11 @@ export default function DashboardPage() {
           .from('service_requests')
           .select('id, reference_number, status, created_at')
           .eq('lgu_id', lguId),
+        supabase
+          .from('verification_requests')
+          .select('id, status')
+          .eq('lgu_id', lguId)
+          .eq('status', 'pending'),
       ]);
 
       if (reportsError || servicesError) {
@@ -99,6 +106,7 @@ export default function DashboardPage() {
 
       setReportRows(reportsData || []);
       setServiceRows(servicesData || []);
+      if (!verifError) setPendingVerifications(verifData?.length || 0);
       setLoading(false);
     };
 
@@ -114,6 +122,7 @@ export default function DashboardPage() {
     const resolvedThisWeek = reportRows.filter(
       (r) => r.status === 'Resolved' && r.created_at && new Date(r.created_at) >= sevenDaysAgo
     ).length;
+    const verifHref = lguParam ? `/lgu/verifications?lguName=${encodeURIComponent(lguParam)}` : '/lgu/verifications';
 
     return [
       {
@@ -124,10 +133,17 @@ export default function DashboardPage() {
         color: 'text-[#ca8a04]',
       },
       { label: 'Service Requests', value: totalServiceRequests.toString(), change: '', icon: FileText, color: 'text-[#2563eb]' },
-      { label: 'Forum Posts', value: '0', change: 'coming soon', icon: ChatCircle, color: 'text-[#737373]' },
+      {
+        label: 'Pending Verifications',
+        value: pendingVerifications.toString(),
+        change: pendingVerifications > 0 ? 'needs review' : 'all caught up',
+        icon: IdentificationBadge,
+        color: pendingVerifications > 0 ? 'text-[#dc2626]' : 'text-[#16a34a]',
+        href: verifHref,
+      },
       { label: 'Resolved This Week', value: resolvedThisWeek.toString(), change: '', icon: CheckCircle, color: 'text-[#16a34a]' },
     ];
-  }, [reportRows, serviceRows]);
+  }, [reportRows, serviceRows, pendingVerifications, lguParam]);
 
   const categoryChartData = useMemo(() => {
     const counts: Record<string, number> = {
@@ -254,20 +270,23 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
+          const content = (
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold text-[#737373]">{stat.label}</p>
+                <p className="text-2xl font-bold text-[#1a1a1a] mt-1.5">{stat.value}</p>
+                {stat.change && (
+                  <p className="text-[10px] text-[#ca8a04] font-medium mt-1">{stat.change}</p>
+                )}
+              </div>
+              <div className="p-2 bg-[#f5f5f5] rounded-lg">
+                <Icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+            </div>
+          );
           return (
             <Card key={stat.label} padding="sm" className="shadow-sm border border-[#e5e5e5] hover:border-gray-300 transition-all duration-200">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-[#737373]">{stat.label}</p>
-                  <p className="text-2xl font-bold text-[#1a1a1a] mt-1.5">{stat.value}</p>
-                  {stat.change && (
-                    <p className="text-[10px] text-[#ca8a04] font-medium mt-1">{stat.change}</p>
-                  )}
-                </div>
-                <div className="p-2 bg-[#f5f5f5] rounded-lg">
-                  <Icon className={`w-5 h-5 ${stat.color}`} />
-                </div>
-              </div>
+              {stat.href ? <Link href={stat.href}>{content}</Link> : content}
             </Card>
           );
         })}
