@@ -49,9 +49,9 @@ export const Toast: React.FC<ToastProps> = ({
       `}
     >
       {icons[type]}
-      <span className="text-sm font-medium text-[#1a1a1a]">{message}</span>
+      <span className="text-sm font-medium text-text-primary">{message}</span>
       <button onClick={() => setIsVisible(false)} className="ml-2">
-        <X className="w-4 h-4 text-[#737373] hover:text-[#1a1a1a]" />
+        <X className="w-4 h-4 text-text-muted hover:text-text-primary" />
       </button>
     </div>
   );

@@ -1,43 +1,44 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface AgappLogoProps {
   size?: number;
-  textColor?: string;
-  bgColor?: string;
   showText?: boolean;
+  textColor?: string;
+  textClassName?: string;
 }
 
+// Wordmark always renders in Sora (loaded as --font-brand in the root layout)
+// regardless of which page's body font is active, so the brand mark stays
+// consistent across the Plus Jakarta Sans dashboard and the Manrope login page.
 export function AgappLogo({
   size = 32,
-  textColor = '#FFFFFF',
-  bgColor = '#1A1A1A',
   showText = true,
+  textColor,
+  textClassName = '',
 }: AgappLogoProps) {
   return (
     <div className="flex items-center gap-2">
-      <div 
-        className="flex items-center justify-center font-bold"
-        style={{
-          width: size,
-          height: size,
-          backgroundColor: bgColor,
-          color: textColor,
-          borderRadius: size * 0.2,
-          fontSize: size * 0.45,
-        }}
-      >
-        A
+      <div className="shrink-0 relative" style={{ width: size, height: size }}>
+        <Image
+          src="/agapp-icon.png"
+          alt="Agapp"
+          fill
+          priority
+          style={{ borderRadius: size * 0.22 }}
+        />
       </div>
       {showText && (
-        <span 
-          className="font-semibold" 
-          style={{ 
-            fontSize: size * 0.55, 
-            letterSpacing: '0.5px',
-            color: bgColor === '#FFFFFF' ? '#FFFFFF' : '#1A1A1A'
+        <span
+          className={`font-extrabold ${textClassName}`}
+          style={{
+            fontFamily: 'var(--font-brand)',
+            fontSize: size * 0.5,
+            letterSpacing: '-0.02em',
+            color: textColor || 'var(--text-primary)',
           }}
         >
-          AGAPP
+          Agapp<span style={{ color: '#FF758F' }}>.</span>
         </span>
       )}
     </div>

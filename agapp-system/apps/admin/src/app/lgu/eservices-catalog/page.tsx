@@ -176,32 +176,32 @@ export default function EservicesCatalogPage() {
     <DashboardLayout role="lgu-admin" title="eServices Catalog">
       <ToastContainer />
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md animate-pulse">
           Loading catalog…
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
-        <Card className="lg:col-span-1 shadow-sm border border-[#e5e5e5]">
+        <Card className="lg:col-span-1 shadow-sm border border-theme">
           <CardHeader title={selectedId ? 'Edit Service' : 'Add Service'} subtitle="Shown to citizens in the mobile app" />
           <div className="space-y-4">
             <Input label="Office" placeholder="BPLO" value={officeName} onChange={(e: any) => setOfficeName(e.target.value)} />
             <Input label="Document / Service Name" placeholder="New Business Permit" value={name} onChange={(e: any) => setName(e.target.value)} />
 
             <div>
-              <label className="block text-sm text-[#737373] mb-1.5">Description</label>
+              <label className="block text-sm text-text-muted mb-1.5">Description</label>
               <textarea
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Short description shown on the citizen detail card…"
-                className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+                className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-[#737373] mb-1.5">Requirements Checklist</label>
+              <label className="block text-sm text-text-muted mb-1.5">Requirements Checklist</label>
               <div className="flex gap-2 mb-2">
                 <input
                   ref={requirementInputRef}
@@ -210,7 +210,7 @@ export default function EservicesCatalogPage() {
                   onChange={(e) => setNewRequirement(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRequirement(); } }}
                   placeholder="e.g. Valid ID"
-                  className="flex-1 px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+                  className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
                 <Button variant="secondary" size="sm" onClick={addRequirement}>
                   <Plus className="w-4 h-4" />
@@ -218,15 +218,15 @@ export default function EservicesCatalogPage() {
               </div>
               <ul className="space-y-1">
                 {requirements.map((req, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 text-sm bg-[#f5f5f5] rounded-md px-3 py-1.5">
-                    <span className="text-[#1a1a1a]">{req}</span>
-                    <button onClick={() => removeRequirement(i)} className="text-[#a3a3a3] hover:text-[#dc2626]">
+                  <li key={i} className="flex items-center justify-between gap-2 text-sm bg-surface-alt rounded-md px-3 py-1.5">
+                    <span className="text-text-primary">{req}</span>
+                    <button onClick={() => removeRequirement(i)} className="text-text-faint hover:text-red-600 dark:text-red-400">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </li>
                 ))}
                 {requirements.length === 0 && (
-                  <li className="text-xs text-[#a3a3a3] italic">No requirements added yet.</li>
+                  <li className="text-xs text-text-faint italic">No requirements added yet.</li>
                 )}
               </ul>
             </div>
@@ -235,12 +235,12 @@ export default function EservicesCatalogPage() {
             <Input label="Processing Time" placeholder="3-5 working days" value={processingTime} onChange={(e: any) => setProcessingTime(e.target.value)} />
             <Input label="Sort Order" type="number" value={String(sortOrder)} onChange={(e: any) => setSortOrder(parseInt(e.target.value, 10) || 0)} />
 
-            <label className="flex items-center gap-2 text-sm text-[#1a1a1a]">
+            <label className="flex items-center gap-2 text-sm text-text-primary">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               Active (visible to citizens)
             </label>
 
-            <div className="pt-4 border-t border-[#e5e5e5] flex gap-2">
+            <div className="pt-4 border-t border-theme flex gap-2">
               <Button onClick={handleSave} disabled={saving} className="flex-1">
                 {saving ? 'Saving…' : selectedId ? 'Save Changes' : 'Add Service'}
               </Button>
@@ -266,20 +266,20 @@ export default function EservicesCatalogPage() {
         </Card>
 
         {/* List */}
-        <Card className="lg:col-span-2 shadow-sm border border-[#e5e5e5]" padding="sm">
-          <p className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider px-2 pt-1 pb-2">
+        <Card className="lg:col-span-2 shadow-sm border border-theme" padding="sm">
+          <p className="text-xs font-bold text-text-faint uppercase tracking-wider px-2 pt-1 pb-2">
             Catalog ({services.length})
           </p>
-          <div className="divide-y divide-[#f0f0f0]">
+          <div className="divide-y divide-theme">
             {services.map((s) => (
               <div
                 key={s.id}
-                className={`flex items-center justify-between gap-3 px-3 py-3 cursor-pointer ${selectedId === s.id ? 'bg-[#f5f5f5]' : 'hover:bg-[#fafafa]'}`}
+                className={`flex items-center justify-between gap-3 px-3 py-3 cursor-pointer ${selectedId === s.id ? 'bg-surface-alt' : 'hover:bg-surface-alt'}`}
                 onClick={() => handleSelect(s.id)}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[#1a1a1a] truncate">{s.name}</p>
-                  <p className="text-xs text-[#737373]">{s.office_name} · {s.fee_note}</p>
+                  <p className="text-sm font-medium text-text-primary truncate">{s.name}</p>
+                  <p className="text-xs text-text-muted">{s.office_name} · {s.fee_note}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant={s.is_active ? 'success' : 'default'}>{s.is_active ? 'Active' : 'Hidden'}</Badge>
@@ -294,7 +294,7 @@ export default function EservicesCatalogPage() {
               </div>
             ))}
             {services.length === 0 && !loading && (
-              <p className="px-3 py-6 text-sm text-[#737373]">No services yet — add the first one from the form.</p>
+              <p className="px-3 py-6 text-sm text-text-muted">No services yet — add the first one from the form.</p>
             )}
           </div>
         </Card>

@@ -286,11 +286,11 @@ export default function ServicesPage() {
       <ToastContainer />
 
       <Modal isOpen={!!readyModal} onClose={() => setReadyModal(null)} title="Ready for Pickup" size="sm">
-        <p className="text-sm text-[#737373] mb-4">
+        <p className="text-sm text-text-muted mb-4">
           The citizen has been notified. Give them this claim code (or they can show the QR from their app) at the counter:
         </p>
-        <div className="text-center py-4 bg-[#f5f5f5] rounded-lg">
-          <span className="text-2xl font-bold tracking-widest text-[#1a1a1a]">{readyModal?.code}</span>
+        <div className="text-center py-4 bg-surface-alt rounded-lg">
+          <span className="text-2xl font-bold tracking-widest text-text-primary">{readyModal?.code}</span>
         </div>
       </Modal>
 
@@ -306,12 +306,12 @@ export default function ServicesPage() {
           </>
         }
       >
-        <label className="block text-xs uppercase tracking-wide text-[#737373] mb-2">Reason</label>
+        <label className="block text-xs uppercase tracking-wide text-text-muted mb-2">Reason</label>
         <textarea
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
           rows={3}
-          className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+          className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
           placeholder="e.g. Missing DTI registration"
         />
       </Modal>
@@ -323,19 +323,19 @@ export default function ServicesPage() {
           <Card padding="sm">
             <div className="flex gap-3">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="text"
                   placeholder="Search requests..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+                  className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+                className="px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
               >
                 <option value="all">All Status</option>
                 <option value="Submitted">Submitted</option>
@@ -354,33 +354,33 @@ export default function ServicesPage() {
 
           {/* Request List */}
           <Card className="flex-1 overflow-hidden" padding="none">
-            <div className="overflow-y-auto h-full">
+            <div className="overflow-y-auto h-full p-4 space-y-3">
               {loading && (
-                <div className="p-4 text-sm text-[#737373]">Loading service requests…</div>
+                <div className="p-4 text-sm text-text-muted">Loading service requests…</div>
               )}
               {loadError && !loading && (
-                <div className="p-4 text-sm text-[#dc2626]">Error loading requests: {loadError}</div>
+                <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading requests: {loadError}</div>
               )}
               {!loading && !loadError && paginated.length === 0 && (
-                <div className="p-4 text-sm text-[#737373]">No service requests found for this LGU.</div>
+                <div className="p-4 text-sm text-text-muted">No service requests found for this LGU.</div>
               )}
               {!loading && !loadError && paginated.map((request) => (
                 <button
                   key={request.dbId}
                   onClick={() => setSelectedRequest(request)}
-                  className={`w-full text-left p-4 border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa] transition-colors ${
-                    selectedRequest && selectedRequest.id === request.id ? 'bg-[#f5f5f5]' : ''
+                  className={`w-full text-left p-5 border border-theme rounded-md transition-colors ${
+                    selectedRequest && selectedRequest.id === request.id ? 'bg-surface-alt' : 'bg-surface hover:bg-surface-alt/50'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <QrCode className="w-4 h-4 text-[#737373]" />
-                      <span className="font-medium text-[#1a1a1a]">{request.id}</span>
+                      <QrCode className="w-4 h-4 text-text-muted" />
+                      <span className="font-medium text-text-primary">{request.id}</span>
                     </div>
                     <ServiceStatusBadge status={request.status} />
                   </div>
-                  <p className="text-[#1a1a1a] mb-1">{request.serviceType}</p>
-                  <div className="flex items-center gap-1 text-sm text-[#737373]">
+                  <p className="text-text-primary mb-2">{request.serviceType}</p>
+                  <div className="flex items-center gap-1 text-sm text-text-muted">
                     <User className="w-3 h-3" />
                     {request.submittedBy}
                     <span className="mx-1">•</span>
@@ -389,11 +389,11 @@ export default function ServicesPage() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center justify-between px-4 py-2 border-t border-[#e5e5e5]">
-              <span className="text-xs text-[#737373]">{startNum}-{endNum} of {filteredRequests.length}</span>
+            <div className="flex items-center justify-between px-4 py-2 border-t border-theme">
+              <span className="text-xs text-text-muted">{startNum}-{endNum} of {filteredRequests.length}</span>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
-                <span className="text-xs text-[#737373]">Page {safePage} / {pageCount}</span>
+                <span className="text-xs text-text-muted">Page {safePage} / {pageCount}</span>
                 <Button variant="ghost" size="sm" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
               </div>
             </div>
@@ -406,11 +406,11 @@ export default function ServicesPage() {
             {selectedRequest ? (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-[#e5e5e5] pb-4">
+                <div className="flex items-start justify-between border-b border-theme pb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <QrCode className="w-5 h-5 text-[#737373]" />
-                      <h2 className="text-lg font-semibold text-[#1a1a1a]">{selectedRequest.id}</h2>
+                      <QrCode className="w-5 h-5 text-text-muted" />
+                      <h2 className="text-lg font-semibold text-text-primary">{selectedRequest.id}</h2>
                     </div>
                     <ServiceStatusBadge status={selectedRequest.status} />
                   </div>
@@ -423,43 +423,43 @@ export default function ServicesPage() {
                 {/* Service Details */}
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Service Type</p>
-                    <p className="text-lg font-medium text-[#1a1a1a]">{selectedRequest.serviceType}</p>
-                    <p className="text-sm text-[#737373]">{selectedRequest.category}</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Service Type</p>
+                    <p className="text-lg font-medium text-text-primary">{selectedRequest.serviceType}</p>
+                    <p className="text-sm text-text-muted">{selectedRequest.category}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Submitted By</p>
+                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted By</p>
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-[#737373]" />
-                        <span className="text-[#1a1a1a]">{selectedRequest.submittedBy}</span>
+                        <User className="w-4 h-4 text-text-muted" />
+                        <span className="text-text-primary">{selectedRequest.submittedBy}</span>
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Submitted</p>
+                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted</p>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#737373]" />
-                        <span className="text-[#1a1a1a]">{selectedRequest.submittedAt}</span>
+                        <Calendar className="w-4 h-4 text-text-muted" />
+                        <span className="text-text-primary">{selectedRequest.submittedAt}</span>
                       </div>
                     </div>
                   </div>
 
                   {selectedRequest.purpose && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Purpose</p>
-                      <p className="text-[#1a1a1a]">{selectedRequest.purpose}</p>
+                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Purpose</p>
+                      <p className="text-text-primary">{selectedRequest.purpose}</p>
                     </div>
                   )}
 
                   {selectedRequest.requirements.length > 0 && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-2">Requirements Checklist</p>
+                      <p className="text-xs uppercase tracking-wide text-text-muted mb-2">Requirements Checklist</p>
                       <ul className="space-y-1">
                         {selectedRequest.requirements.map((req, i) => (
-                          <li key={i} className="flex items-center gap-2 text-sm text-[#1a1a1a]">
-                            <Check className="w-3.5 h-3.5 text-[#737373]" />
+                          <li key={i} className="flex items-center gap-2 text-sm text-text-primary">
+                            <Check className="w-3.5 h-3.5 text-text-muted" />
                             {req}
                           </li>
                         ))}
@@ -468,41 +468,41 @@ export default function ServicesPage() {
                   )}
 
                   {/* Fee Info */}
-                  <div className="p-4 bg-[#f5f5f5] rounded-md space-y-2">
+                  <div className="p-4 bg-surface-alt rounded-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#737373]">Fee</span>
-                      <span className="font-semibold text-[#1a1a1a]">{selectedRequest.feeNote || 'Pay at the Municipal Hall'}</span>
+                      <span className="text-sm text-text-muted">Fee</span>
+                      <span className="font-semibold text-text-primary">{selectedRequest.feeNote || 'Pay at the Municipal Hall'}</span>
                     </div>
                     {selectedRequest.processingTime && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#737373]">Processing Time</span>
-                        <span className="text-[#1a1a1a]">{selectedRequest.processingTime}</span>
+                        <span className="text-sm text-text-muted">Processing Time</span>
+                        <span className="text-text-primary">{selectedRequest.processingTime}</span>
                       </div>
                     )}
                   </div>
 
                   {selectedRequest.status === 'Ready for Pickup' && selectedRequest.claimCode && (
-                    <div className="p-4 bg-[#eff6ff] border border-[#bfdbfe] rounded-md text-center">
-                      <p className="text-xs uppercase tracking-wide text-[#2563eb] mb-1">Claim Code</p>
-                      <span className="text-xl font-bold tracking-widest text-[#1a1a1a]">{selectedRequest.claimCode}</span>
+                    <div className="p-4 bg-accent-soft rounded-md text-center">
+                      <p className="text-xs uppercase tracking-wide text-accent mb-1">Claim Code</p>
+                      <span className="text-xl font-bold tracking-widest text-text-primary">{selectedRequest.claimCode}</span>
                     </div>
                   )}
 
                   {selectedRequest.status === 'Released' && selectedRequest.releasedAt && (
-                    <div className="p-4 bg-[#f0fdf4] border border-[#bbf7d0] rounded-md text-center text-sm text-[#166534]">
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-md text-center text-sm text-green-600 dark:text-green-400">
                       Released {new Date(selectedRequest.releasedAt).toLocaleString()}
                     </div>
                   )}
 
                   {selectedRequest.status === 'Rejected' && selectedRequest.rejectReason && (
-                    <div className="p-4 bg-[#fef2f2] border border-[#fecaca] rounded-md text-sm text-[#991b1b]">
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-md text-sm text-red-600 dark:text-red-400">
                       <span className="font-medium">Reason: </span>{selectedRequest.rejectReason}
                     </div>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t border-[#e5e5e5]">
+                <div className="flex flex-wrap gap-3 pt-4 border-t border-theme">
                   {selectedRequest.status === 'Submitted' && (
                     <Button onClick={() => updateStatus('Under Review')} disabled={actionBusy}>
                       <Clock className="w-4 h-4 mr-1" />
@@ -545,7 +545,7 @@ export default function ServicesPage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-[#737373]">
+              <div className="h-full flex items-center justify-center text-text-muted">
                 Select a request to view details
               </div>
             )}

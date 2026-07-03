@@ -26,8 +26,8 @@ export const Card: React.FC<CardProps> = ({
     <div
       onClick={onClick}
       className={`
-        bg-white rounded-lg
-        ${noBorder ? '' : 'border border-[#e5e5e5]'}
+        bg-surface rounded-md
+        ${noBorder ? '' : 'border border-theme'}
         ${paddings[padding]}
         ${onClick ? 'cursor-pointer' : ''}
         ${className}
@@ -47,8 +47,8 @@ interface CardHeaderProps {
 export const CardHeader: React.FC<CardHeaderProps> = ({ title, subtitle, action }) => (
   <div className="flex items-start justify-between mb-4">
     <div>
-      <h3 className="text-lg font-semibold text-[#1a1a1a]">{title}</h3>
-      {subtitle && <p className="text-sm text-[#737373] mt-1">{subtitle}</p>}
+      <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
+      {subtitle && <p className="text-sm text-text-muted mt-1">{subtitle}</p>}
     </div>
     {action && <div>{action}</div>}
   </div>

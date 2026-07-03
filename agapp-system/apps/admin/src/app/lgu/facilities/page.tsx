@@ -199,16 +199,16 @@ export default function FacilitiesPage() {
     <DashboardLayout role="lgu-admin" title="Facilities Map">
       <ToastContainer />
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md animate-pulse">
           Loading facilities…
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
-        <Card className="lg:col-span-2 shadow-sm border border-[#e5e5e5]" padding="sm">
+        <Card className="lg:col-span-2 shadow-sm border border-theme" padding="sm">
           <div className="px-2 pt-1 pb-3 flex items-center justify-between">
-            <p className="text-sm text-[#737373]">
+            <p className="text-sm text-text-muted">
               <MapPin className="inline w-4 h-4 mr-1 -mt-0.5" />
               Click the map to place a pin, or click an existing pin to edit it. Drag the dark pin to fine-tune.
             </p>
@@ -238,7 +238,7 @@ export default function FacilitiesPage() {
 
         {/* Form + list */}
         <div className="space-y-6">
-          <Card className="shadow-sm border border-[#e5e5e5]">
+          <Card className="shadow-sm border border-theme">
             <CardHeader
               title={selectedId ? 'Edit Facility' : 'Add Facility'}
               subtitle={
@@ -251,11 +251,11 @@ export default function FacilitiesPage() {
               <Input label="Name" placeholder="Liliw Municipal Hall" value={name} onChange={(e: any) => setName(e.target.value)} />
 
               <div>
-                <label className="block text-sm text-[#737373] mb-1.5">Category</label>
+                <label className="block text-sm text-text-muted mb-1.5">Category</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]"
+                  className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -266,35 +266,35 @@ export default function FacilitiesPage() {
               <Input label="Address" placeholder="Brgy. Poblacion, Liliw, Laguna" value={address} onChange={(e: any) => setAddress(e.target.value)} />
 
               <div>
-                <label className="block text-sm text-[#737373] mb-1.5">Description</label>
+                <label className="block text-sm text-text-muted mb-1.5">Description</label>
                 <textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Office hours, services offered, notes for citizens…"
-                  className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+                  className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
               <Input label="Phone" placeholder="+63 49 563 1234" value={phone} onChange={(e: any) => setPhone(e.target.value)} />
 
               <div>
-                <label className="block text-sm text-[#737373] mb-1.5">Photo</label>
+                <label className="block text-sm text-text-muted mb-1.5">Photo</label>
                 {existingImageUrl && !imageFile && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={existingImageUrl} alt="Facility" className="mb-2 rounded-md max-h-32 w-full object-cover border border-[#e5e5e5]" />
+                  <img src={existingImageUrl} alt="Facility" className="mb-2 rounded-md max-h-32 w-full object-cover border border-theme" />
                 )}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="w-full text-sm text-[#737373] file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-[#e5e5e5] file:bg-white file:text-sm file:text-[#1a1a1a] hover:file:bg-[#f5f5f5]"
+                  className="w-full text-sm text-text-muted file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-theme file:bg-surface file:text-sm file:text-text-primary hover:file:bg-surface-alt"
                 />
-                <p className="text-[11px] text-[#a3a3a3] mt-1">JPEG/PNG/WebP, max 5MB. Shown to citizens in the mobile map.</p>
+                <p className="text-[11px] text-text-faint mt-1">JPEG/PNG/WebP, max 5MB. Shown to citizens in the mobile map.</p>
               </div>
 
-              <div className="pt-4 border-t border-[#e5e5e5] flex gap-2">
+              <div className="pt-4 border-t border-theme flex gap-2">
                 <Button onClick={handleSave} disabled={saving} className="flex-1">
                   {saving ? 'Saving…' : selectedId ? 'Save Changes' : 'Add Facility'}
                 </Button>
@@ -314,8 +314,8 @@ export default function FacilitiesPage() {
             </div>
           </Card>
 
-          <Card className="shadow-sm border border-[#e5e5e5]" padding="sm">
-            <p className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider px-2 pt-1 pb-2">
+          <Card className="shadow-sm border border-theme" padding="sm">
+            <p className="text-xs font-bold text-text-faint uppercase tracking-wider px-2 pt-1 pb-2">
               Existing facilities ({facilities.length})
             </p>
             <div className="max-h-64 overflow-y-auto">
@@ -324,7 +324,7 @@ export default function FacilitiesPage() {
                   key={f.id}
                   onClick={() => handleSelectFacility(f.id)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between gap-2 transition-colors ${
-                    selectedId === f.id ? 'bg-[#1a1a1a] text-white' : 'hover:bg-[#f5f5f5] text-[#1a1a1a]'
+                    selectedId === f.id ? 'bg-text-primary text-bg' : 'hover:bg-surface-alt text-text-primary'
                   }`}
                 >
                   <span className="truncate">{f.name}</span>
@@ -332,7 +332,7 @@ export default function FacilitiesPage() {
                 </button>
               ))}
               {facilities.length === 0 && !loading && (
-                <p className="px-3 py-4 text-sm text-[#737373]">No facilities yet — click the map to add the first one.</p>
+                <p className="px-3 py-4 text-sm text-text-muted">No facilities yet — click the map to add the first one.</p>
               )}
             </div>
           </Card>

@@ -1,11 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+
+// Roles this endpoint is allowed to create. SUPER_ADMIN accounts are never
+// created through this path, and neither is CITIZEN (mobile self-signup owns
+// that). Keeping this list separate from the per-caller authorization below
+// means a forged `role` value can never slip through either check alone.
+const CREATABLE_ROLES = ['LGU_ADMIN', 'LGU_PERSONNEL'] as const;
 
 export async function POST(req: NextRequest) {
   const { email, password, name, role, lguId } = await req.json();
 
   if (!email || !password || !name || !role || !lguId) {
     return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+  }
+
+  if (!CREATABLE_ROLES.includes(role)) {
+    return NextResponse.json({ error: 'Invalid role for this endpoint.' }, { status: 400 });
+  }
+
+  // ── Auth check — runs before anything reveals server config state ───────
+  // This route was previously unauthenticated — anyone who could reach it
+  // (it's not covered by middleware.ts's matcher, which only guards page
+  // routes, not /api/*) could create an LGU_ADMIN or LGU_PERSONNEL account
+  // for any LGU. Same session-cookie pattern as middleware.ts.
+  const supabaseAuth = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => req.cookies.getAll(), setAll: () => {} } }
+  );
+
+  const { data: { user: caller } } = await supabaseAuth.auth.getUser();
+  if (!caller) {
+    return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  }
+
+  const { data: callerProfile } = await supabaseAuth
+    .from('users')
+    .select('role, lgu_id')
+    .eq('id', caller.id)
+    .single();
+
+  const isSuperAdmin = callerProfile?.role === 'SUPER_ADMIN';
+  const isOwnLguAdmin = callerProfile?.role === 'LGU_ADMIN' && callerProfile.lgu_id === lguId;
+
+  if (!isSuperAdmin && !isOwnLguAdmin) {
+    return NextResponse.json({ error: 'Not authorized to create staff for this LGU.' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

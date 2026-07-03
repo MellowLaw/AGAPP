@@ -51,6 +51,115 @@ direction — `pothole` (Pothole / Road Damage), `clogged_drainage` (Drainage / 
 - **`apps/field-officer/.env` didn't exist** — its Supabase client was built with an empty URL, so login and the new QR scanner could never connect. Created `.env` (same project creds as mobile) + committed `.env.example`; fixed the copy-pasted `[mobile/supabase]` warn label.
 - **Facility descriptions never reached citizens** — admin Facilities form edits a description "shown to citizens" but the mobile Map Explorer POI sheet didn't render it. Now shown under the address (3-line clamp).
 
+**Admin visual redesign — "Cosmic Slate & Editorial Modern" (same day, user spec + reference screenshots):**
+Scope: shared chrome (applies to ALL roles) + a full bento rebuild of the LGU
+dashboard specifically (the page shown in the reference screenshots). NOT a
+full-app token migration — see the honest gap noted at the end.
+- **Real, working light/dark theme system added** — the CSS vars + `darkMode:
+  'class'` config already existed in `globals.css`/`tailwind.config.ts` but
+  were completely disconnected (no provider, no toggle, nothing ever added
+  `.dark` to `<html>`). Built `contexts/ThemeContext.tsx` (persists to
+  `localStorage`, respects `prefers-color-scheme` on first load) and wired it
+  into `app/layout.tsx`. New semantic Tailwind tokens (`bg`, `surface`,
+  `surface-alt`, `text-primary/muted/faint`, `theme` → generates the
+  `border-theme` utility, `accent`/`accent-soft`) read the CSS vars so
+  components never hardcode literal hex again.
+- **Brand rose standardized to `#FF758F`** across the new components and the
+  logo's accent dot (was a slightly different pastel pink, `#F27983`/`#F497A2`,
+  in different places).
+- **Fonts:** added `JetBrains Mono` (`--font-mono`) for data/coordinates/clock/
+  IDs; kept the existing EB Garamond italic serif for display headers and
+  Plus Jakarta Sans for body (both already good choices, not generic Inter).
+- **Sidebar rewritten** (`framer-motion` added as a new dependency) — no more
+  solid-fill active pill; active state is +2% scale, bold rose text, and a
+  barely-visible 3%-opacity accent backdrop glow with broad rounded corners;
+  hover is a 2%-opacity wash. Spring transitions on both.
+- **New `StatusRow` component** — SYS_LIVE pulsing-dot indicator (Tailwind
+  `animate-ping`), a real ticking `Asia/Manila` (UTC+8) clock in bold
+  monospace, and a Sun/Moon theme toggle that rotates/scales on switch — all
+  in one `bg-surface/50` + `border-theme` pill, divided by thin verticals.
+  New `DashboardHero` component (kicker + italic serif headline + colored
+  suffix + subtitle + StatusRow) used by the main Dashboard pages only;
+  other pages keep the compact `Header` bar (now themed too).
+- **Dynamic map theming** — `LeafletMap.tsx` swaps tile providers by theme:
+  CartoDB `dark_all` (deep midnight canvas) / `light_all` (soft parchment),
+  both free/no-API-key OSM-data basemaps. Report markers/legend re-theme
+  via the new tokens.
+- **LGU dashboard rebuilt as a 12-col bento grid** (8-col Reports Hotspot Map /
+  4-col "Precise Data Metrics" categorical distribution panel) with real
+  data throughout — category counts/percentages come from actual `reports`
+  rows grouped by our 4 real categories (pothole, drainage, stray pets, poles),
+  animated in with Framer Motion springs. Deliberately did NOT fabricate a
+  historical trend sparkline (no time-series data exists to back one) — used
+  a proportion-based decorative accent bar instead. Verified live in both
+  themes: metrics, map (pins render correctly on both dark and light tiles),
+  and distribution panel all show real Liliw data.
+- **Honest scope gap:** only the LGU dashboard's own content was rebuilt.
+  Every other page (reports, services, forum, settings, super/personnel
+  dashboards, etc.) still hardcodes light-only colors — confirmed live: in
+  dark mode they render as a light-mode island inside the now-dark shared
+  chrome (sidebar/header/map re-theme correctly, page content does not).
+  Extending the token migration to those pages is the natural next step if
+  full dark-mode coverage is wanted.
+
+**Security hole + dead code cleanup (same day, flagged during map work):**
+- **`/api/create-staff` had ZERO auth check** — it's not covered by
+  `middleware.ts`'s matcher (page routes only, not `/api/*`), and the route
+  itself never verified the caller. Anyone who could reach the endpoint
+  (unauthenticated, curl, anything) could create an `LGU_ADMIN` or
+  `LGU_PERSONNEL` account for **any** LGU with attacker-chosen credentials —
+  a full admin-account-creation hole. Fixed: added the same
+  `@supabase/ssr` session-cookie check `middleware.ts` already uses,
+  looks up the caller's role/`lgu_id`, and only allows SUPER_ADMIN (any LGU)
+  or an LGU_ADMIN acting on **their own** `lgu_id`. Also added a
+  `CREATABLE_ROLES` allowlist so a forged `role: 'SUPER_ADMIN'` in the request
+  body is rejected outright regardless of caller, independent of the
+  authorization check. **Verified live** (dev preview, real cookies): no
+  session → 401; LGU_ADMIN targeting a different LGU → 403; forged
+  `role: 'SUPER_ADMIN'` → 400; legitimate own-LGU request → passes
+  authorization cleanly (only stopped by the already-known-missing
+  `SUPABASE_SERVICE_ROLE_KEY` env var in this dev environment).
+- **`components/auth/LoginLayout.tsx` deleted** — dead code with the old
+  logo, zero importers anywhere (its sibling `LGUAdminLogin.tsx`/
+  `SuperAdminLogin.tsx` were already deleted 2026-06-30; this was the last
+  file in that directory, which is now removed too).
+
+**Mobile UI/upload bug fixes (same day):**
+- **Map pins rendered as clipped arcs, then went fully invisible after a first
+  attempted fix** — root cause: the marker view CHANGED SIZE (label
+  bubble mounting on tap/zoom, isSelected-driven resizing), and
+  react-native-maps snapshots the view into a bitmap on every change; a
+  snapshot mid-resize produced the clipped fragments. A first attempt (fixed
+  canvas + fading label) still regressed to pins not rendering at all, so per
+  user direction the whole marker was **rewritten from scratch** rather than
+  patched further: `MapExplorerScreen.tsx`'s `FacilityMarker` is now a plain
+  circle + CSS-triangle tail at ONE constant size always (selection shows only
+  via border color, never a size change), the on-map zoom-driven label and the
+  `zoomLevel` state that drove it were deleted entirely (tapping a pin already
+  opens the bottom sheet with the name — no functionality lost), and
+  `tracksViewChanges` settles to `false` shortly after mount/selection. Colors
+  and icons still match `apps/admin/src/components/map/markers.ts`
+  `FACILITY_COLORS`/`makePinIcon` (same category→color mapping, same
+  rounded-top/pointed-bottom silhouette) — verified in code, not yet confirmed
+  on a real device by the user.
+- **Chatbot input sank under the tab bar after the first message** — removed
+  `tabBarHideOnKeyboard: true` from the mobile tab navigator; it raced with
+  ChatbotScreen's own KeyboardAvoidingView (worst when the Quick Suggestions
+  row appears and changes content height at the same moment).
+- **Image uploads failed with "Network request failed"** — both
+  `ReportsScreen.tsx` and `VerifyIdentityScreen.tsx` uploaded via
+  `fetch(uri).blob()`; React Native's Blob doesn't serialize through
+  supabase-js. Switched both to `arrayBuffer()` (the supported RN/Expo path).
+  Buckets/policies were verified fine — the bug was purely client-side.
+- **Admin forum: comment threads now visible + moderatable** — count was
+  hardcoded 0 and threads were invisible; posts now expand to show comments
+  with Approve/Delete on flagged ones. **Cross-tenant RLS hole fixed in
+  passing:** `forum_comments` policies checked only `role='LGU_ADMIN'` with no
+  LGU scoping (any admin could moderate any LGU's comments) and the INSERT
+  policy's `OR auth.uid() IS NOT NULL` let any user comment as anyone. Both
+  fixed via join to `forum_posts.lgu_id` (migration
+  `fix_forum_comments_cross_tenant_rls`; schema.sql synced).
+
 **Legacy PDF generation removed (same day, user direction):** `src/pdf-generator.ts`
 + `src/generate-sample-pdfs.ts` deleted, `pdf-lib` dep dropped. It server-generated
 printable municipal application forms (birth cert, business permit, etc.) — legacy

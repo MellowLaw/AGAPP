@@ -367,19 +367,19 @@ export default function ReportsPage() {
           <Card padding="sm">
             <div className="flex gap-3">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="text"
                   placeholder="Search reports..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+                  className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+                className="px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
               >
                 <option value="all">All Status</option>
                 <option value="submitted">Submitted</option>
@@ -396,30 +396,30 @@ export default function ReportsPage() {
 
           {/* Report List */}
           <Card className="flex-1 overflow-hidden" padding="none">
-            <div className="overflow-y-auto h-full">
+            <div className="overflow-y-auto h-full p-4 space-y-3">
               {loading && (
-                <div className="p-4 text-sm text-[#737373]">Loading reports…</div>
+                <div className="p-4 text-sm text-text-muted">Loading reports…</div>
               )}
               {loadError && !loading && (
-                <div className="p-4 text-sm text-[#dc2626]">Error loading reports: {loadError}</div>
+                <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading reports: {loadError}</div>
               )}
               {!loading && !loadError && paginated.length === 0 && (
-                <div className="p-4 text-sm text-[#737373]">No reports found for this LGU.</div>
+                <div className="p-4 text-sm text-text-muted">No reports found for this LGU.</div>
               )}
               {!loading && !loadError && paginated.map((report) => (
                 <button
                   key={report.dbId}
                   onClick={() => setSelectedReport(report)}
-                  className={`w-full text-left p-4 border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa] transition-colors ${
-                    selectedReport && selectedReport.id === report.id ? 'bg-[#f5f5f5]' : ''
+                  className={`w-full text-left p-5 border border-theme rounded-md transition-colors ${
+                    selectedReport && selectedReport.id === report.id ? 'bg-surface-alt' : 'bg-surface hover:bg-surface-alt/50'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-medium text-[#1a1a1a]">{report.id}</span>
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="font-medium text-text-primary">{report.id}</span>
                     <ReportStatusBadge status={report.status} />
                   </div>
-                  <p className="text-[#1a1a1a] mb-1">{report.category}{report.subType ? ` - ${report.subType}` : ''}</p>
-                  <div className="flex items-center gap-1 text-sm text-[#737373]">
+                  <p className="text-text-primary mb-2">{report.category}{report.subType ? ` - ${report.subType}` : ''}</p>
+                  <div className="flex items-center gap-1 text-sm text-text-muted">
                     <MapPin className="w-4 h-4" />
                     {report.location}
                     <span className="mx-1">•</span>
@@ -428,11 +428,11 @@ export default function ReportsPage() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center justify-between px-4 py-2 border-t border-[#e5e5e5]">
-              <span className="text-xs text-[#737373]">{startNum}-{endNum} of {filteredReports.length}</span>
+            <div className="flex items-center justify-between px-4 py-2 border-t border-theme">
+              <span className="text-xs text-text-muted">{startNum}-{endNum} of {filteredReports.length}</span>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
-                <span className="text-xs text-[#737373]">Page {safePage} / {pageCount}</span>
+                <span className="text-xs text-text-muted">Page {safePage} / {pageCount}</span>
                 <Button variant="ghost" size="sm" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
               </div>
             </div>
@@ -445,15 +445,15 @@ export default function ReportsPage() {
             {selectedReport ? (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-[#e5e5e5] pb-4">
+                <div className="flex items-start justify-between border-b border-theme pb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-[#1a1a1a]">{selectedReport.id}</h2>
+                    <h2 className="text-lg font-semibold text-text-primary">{selectedReport.id}</h2>
                     <ReportStatusBadge status={selectedReport.status} />
                   </div>
                 </div>
 
                 {/* Photo */}
-                <div className="aspect-video bg-[#f5f5f5] rounded-lg overflow-hidden flex items-center justify-center border border-[#e5e5e5]">
+                <div className="aspect-video bg-surface-alt rounded-lg overflow-hidden flex items-center justify-center border border-theme">
                   {selectedReport.photoUrl ? (
                     <img 
                       src={selectedReport.photoUrl} 
@@ -462,8 +462,8 @@ export default function ReportsPage() {
                     />
                   ) : (
                     <div className="text-center">
-                      <Warning className="w-12 h-12 text-[#737373] mx-auto mb-2" />
-                      <p className="text-[#737373]">No photo proof attached</p>
+                      <Warning className="w-12 h-12 text-text-muted mx-auto mb-2" />
+                      <p className="text-text-muted">No photo proof attached</p>
                     </div>
                   )}
                 </div>
@@ -471,16 +471,16 @@ export default function ReportsPage() {
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Category</p>
-                    <p className="text-[#1a1a1a]">{selectedReport.category}</p>
-                    <p className="text-sm text-[#737373]">{selectedReport.subType}</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Category</p>
+                    <p className="text-text-primary">{selectedReport.category}</p>
+                    <p className="text-sm text-text-muted">{selectedReport.subType}</p>
                   </div>
                   
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Submitted By</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted By</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <User className="w-4 h-4 text-[#737373]" />
-                      <span className="text-[#1a1a1a]">{selectedReport.submittedBy}</span>
+                      <User className="w-4 h-4 text-text-muted" />
+                      <span className="text-text-primary">{selectedReport.submittedBy}</span>
                       {!selectedReport.citizenId ? (
                         <Badge variant="default">Account deleted</Badge>
                       ) : citizenInfo ? (
@@ -498,26 +498,26 @@ export default function ReportsPage() {
                       ) : null}
                     </div>
                     {citizenInfo?.barangay && (
-                      <p className="text-xs text-[#737373] mt-1">Registered barangay: {citizenInfo.barangay}</p>
+                      <p className="text-xs text-text-muted mt-1">Registered barangay: {citizenInfo.barangay}</p>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Location</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Location</p>
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-[#737373] mt-0.5" />
+                      <MapPin className="w-4 h-4 text-text-muted mt-0.5" />
                       <div>
-                        <p className="text-[#1a1a1a]">{selectedReport.location}</p>
-                        <p className="text-xs text-[#737373]">{selectedReport.lat}° N, {selectedReport.lng}° E</p>
+                        <p className="text-text-primary">{selectedReport.location}</p>
+                        <p className="text-xs text-text-muted">{selectedReport.lat}° N, {selectedReport.lng}° E</p>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Submitted</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted</p>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#737373]" />
-                      <span className="text-[#1a1a1a]">{selectedReport.submittedAt}</span>
+                      <Calendar className="w-4 h-4 text-text-muted" />
+                      <span className="text-text-primary">{selectedReport.submittedAt}</span>
                     </div>
                   </div>
                 </div>
@@ -526,7 +526,7 @@ export default function ReportsPage() {
                     captured when the report was submitted. */}
                 {typeof selectedReport.lat === 'number' && typeof selectedReport.lng === 'number' && (
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Location Map</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Location Map</p>
                     <ReportsMap
                       key={selectedReport.dbId}
                       className="h-48"
@@ -549,9 +549,9 @@ export default function ReportsPage() {
 
                 {/* AI Detection Badge */}
                 {selectedReport.aiDetected && (
-                  <div className="flex items-center gap-2 p-3 bg-[#dcfce7] rounded-md">
-                    <Check className="w-4 h-4 text-[#16a34a]" />
-                    <span className="text-sm text-[#16a34a]">
+                  <div className="flex items-center gap-2 p-3 bg-green-500/10 rounded-md">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-green-600 dark:text-green-400">
                       AI Verified ({Math.round(selectedReport.aiConfidence! * 100)}% confidence)
                     </span>
                   </div>
@@ -559,22 +559,22 @@ export default function ReportsPage() {
 
                 {/* Assigned Office */}
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Assigned Office</p>
-                  <p className="text-[#1a1a1a]">{selectedReport.assignedOffice || 'Not assigned'}</p>
+                  <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Assigned Office</p>
+                  <p className="text-text-primary">{selectedReport.assignedOffice || 'Not assigned'}</p>
                 </div>
                 {assignHistory[selectedReport.id]?.length ? (
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Assignment History</p>
+                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Assignment History</p>
                     <div className="space-y-1">
                       {assignHistory[selectedReport.id].slice().reverse().map((h, i) => (
-                        <div key={i} className="text-sm text-[#1a1a1a]">{h.office} • {h.at}</div>
+                        <div key={i} className="text-sm text-text-primary">{h.office} • {h.at}</div>
                       ))}
                     </div>
                   </div>
                 ) : null}
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-4 border-t border-[#e5e5e5]">
+                <div className="flex gap-3 pt-4 border-t border-theme">
                   {selectedReport.status === 'submitted' || selectedReport.status === 'under_review' ? (
                     <>
                       <Button variant="primary" onClick={handleAcknowledge}>
@@ -603,7 +603,7 @@ export default function ReportsPage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-[#737373]">
+              <div className="h-full flex items-center justify-center text-text-muted">
                 Select a report to view details
               </div>
             )}
@@ -612,9 +612,9 @@ export default function ReportsPage() {
       </div>
       {assignOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm bg-white rounded-lg border border-[#e5e5e5] p-5">
+          <div className="w-full max-w-sm bg-surface rounded-lg border border-theme p-5">
             <h3 className="text-base font-semibold mb-3">Assign Office</h3>
-            <select value={assignOffice} onChange={(e) => setAssignOffice(e.target.value)} className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm mb-4">
+            <select value={assignOffice} onChange={(e) => setAssignOffice(e.target.value)} className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm mb-4">
               {offices.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <div className="flex justify-end gap-2">

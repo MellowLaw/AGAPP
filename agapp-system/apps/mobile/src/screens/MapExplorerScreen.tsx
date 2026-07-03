@@ -29,6 +29,65 @@ import { useFocusEffect } from '@react-navigation/native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Fixed pixel size for every pin, always — this is the whole fix. The old
+// marker resized itself (selection state, a fading label) and react-native-
+// maps snapshots the marker view into a bitmap on every change; a snapshot
+// taken mid-resize is what produced the clipped/invisible pins. With a
+// constant-size view there is nothing to mis-snapshot. Tapping a pin already
+// opens the bottom sheet with the facility's name/address (see
+// handleSelectPoi below), so there's no separate on-map label to manage.
+const PIN_CIRCLE = 32;
+const PIN_TAIL_H = 7;
+const PIN_HEIGHT = PIN_CIRCLE + PIN_TAIL_H;
+
+// Circle + CSS-triangle tail (border trick — deterministic box size, no
+// rotation-overflow math) to match the admin Facilities map's pin silhouette
+// (apps/admin/src/components/map/markers.ts `makePinIcon`): same category
+// colors, same rounded-top/pointed-bottom shape.
+function FacilityMarker({
+  poi, isSelected, categoryColor, categoryIcon, onPress,
+}: {
+  poi: any;
+  isSelected: boolean;
+  categoryColor: string;
+  categoryIcon: string;
+  onPress: () => void;
+}) {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+  // Nothing about this marker ever changes size — only the border color/width
+  // on selection — so a brief re-track after mount (and after selection
+  // toggles, so the highlight actually renders) is all that's needed.
+  useEffect(() => {
+    setTracksViewChanges(true);
+    const timer = setTimeout(() => setTracksViewChanges(false), 300);
+    return () => clearTimeout(timer);
+  }, [isSelected]);
+
+  return (
+    <Marker
+      coordinate={{ latitude: poi.latitude, longitude: poi.longitude }}
+      onPress={onPress}
+      anchor={{ x: 0.5, y: 1.0 }} // tip of the tail sits on the coordinate
+      tracksViewChanges={tracksViewChanges}
+    >
+      <View style={styles.pinContainer} collapsable={false}>
+        <View style={[
+          styles.pinCircle,
+          {
+            backgroundColor: categoryColor,
+            borderColor: isSelected ? '#1A1A1A' : '#FFFFFF',
+            borderWidth: isSelected ? 3 : 2,
+          },
+        ]}>
+          <Ionicons name={categoryIcon as any} size={16} color="#FFFFFF" />
+        </View>
+        <View style={[styles.pinTail, { borderTopColor: categoryColor }]} />
+      </View>
+    </Marker>
+  );
+}
+
 const CATEGORIES = [
   { id: 'all',       label: 'All',       icon: 'grid-outline',      color: '#6B7280' },
   { id: 'municipal', label: 'Municipal', icon: 'business-outline',  color: '#D9A05B' },
@@ -56,7 +115,6 @@ export function MapExplorerScreen() {
   const [selectedPoi, setSelectedPoi] = useState<any>(null);
   const [userLocation, setUserLocation] = useState<any>(null);
   const [fetchingUserLoc, setFetchingUserLoc] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(0.022);
 
   // Panel open/closed state
   const [panelOpen, setPanelOpen] = useState(false);
@@ -322,7 +380,6 @@ export function MapExplorerScreen() {
         initialRegion={initialRegion}
         showsUserLocation={false}
         showsMyLocationButton={false}
-        onRegionChangeComplete={(region) => setZoomLevel(region.latitudeDelta)}
       >
         {/* Town boundary polygon */}
         <Polygon
@@ -345,79 +402,16 @@ export function MapExplorerScreen() {
         )}
 
         {/* POI Markers — always visible */}
-        {filteredFacilities.map(poi => {
-          const isSelected   = selectedPoi?.id === poi.id;
-          const markerColor  = getCategoryColor(poi.category);
-          // Show label when selected or when zoomed in closely (prevents overlapping)
-          const showLabel    = isSelected || zoomLevel < 0.007;
-          
-          // Dynamic sizing for Classic Google Maps Pin
-          const outerCircleSize = isSelected ? 46 : 36;
-          const innerCircleSize = isSelected ? 28 : 22;
-          const iconSize        = isSelected ? 18 : 14;
-          const tailWidth       = isSelected ? 7 : 5;
-          const tailHeight      = isSelected ? 8 : 6;
-          
-          return (
-            <Marker
-              key={poi.id}
-              coordinate={{ latitude: poi.latitude, longitude: poi.longitude }}
-              onPress={() => handleSelectPoi(poi)}
-              anchor={{ x: 0.5, y: 1.0 }} // Tip of the tail is on coordinate
-            >
-              <View style={styles.markerWrapper}>
-                {/* 1. Label Bubble (Shown when zoomed in or selected) */}
-                {showLabel && (
-                  <View style={[styles.labelBubble, { backgroundColor: T.card, borderColor: T.border }]}>
-                    <Text style={[styles.labelText, { color: T.text }]} numberOfLines={1}>
-                      {poi.name}
-                    </Text>
-                  </View>
-                )}
-
-                {/* 2. Classic Google Maps Pin (Colored teardrop + white inner circle + colored icon) */}
-                <View style={styles.markerPin}>
-                  <View style={[
-                    styles.markerCircle,
-                    {
-                      width: outerCircleSize,
-                      height: outerCircleSize,
-                      borderRadius: outerCircleSize / 2,
-                      backgroundColor: markerColor,
-                      borderColor: '#FFFFFF', // Thin white border around the outer circle for separation
-                      borderWidth: isSelected ? 2 : 1.5,
-                    },
-                  ]}>
-                    <View style={{
-                      width: innerCircleSize,
-                      height: innerCircleSize,
-                      borderRadius: innerCircleSize / 2,
-                      backgroundColor: '#FFFFFF',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}>
-                      <Ionicons
-                        name={getCategoryIcon(poi.category) as any}
-                        size={iconSize}
-                        color={markerColor}
-                      />
-                    </View>
-                  </View>
-                  <View style={[
-                    styles.markerTail,
-                    {
-                      borderTopColor: markerColor,
-                      borderLeftWidth: tailWidth,
-                      borderRightWidth: tailWidth,
-                      borderTopWidth: tailHeight,
-                      marginTop: -2,
-                    }
-                  ]} />
-                </View>
-              </View>
-            </Marker>
-          );
-        })}
+        {filteredFacilities.map(poi => (
+          <FacilityMarker
+            key={poi.id}
+            poi={poi}
+            isSelected={selectedPoi?.id === poi.id}
+            categoryColor={getCategoryColor(poi.category)}
+            categoryIcon={getCategoryIcon(poi.category)}
+            onPress={() => handleSelectPoi(poi)}
+          />
+        ))}
       </MapView>
 
       {/* ── 2. Top header card ── */}
@@ -664,15 +658,17 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 4,
   },
-  markerWrapper: {
+  pinContainer: {
+    // Fixed bounds, always — never changes with selection state. See the
+    // PIN_CIRCLE/PIN_TAIL_H comment at the top of the file for why that matters.
+    width: PIN_CIRCLE,
+    height: PIN_HEIGHT,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  markerPin: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerCircle: {
+  pinCircle: {
+    width: PIN_CIRCLE,
+    height: PIN_CIRCLE,
+    borderRadius: PIN_CIRCLE / 2,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -681,43 +677,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  markerTail: {
+  pinTail: {
     width: 0,
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: PIN_TAIL_H,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    alignSelf: 'center',
     marginTop: -2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
-  },
-  labelBubble: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2.5,
-    elevation: 2,
-    maxWidth: 110,
-    marginBottom: 4,
-  },
-  labelText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   userDotContainer: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   userDotPulse: {

@@ -332,12 +332,12 @@ export default function NewsPage() {
     >
       <ToastContainer />
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md">
           Loading announcements…
         </div>
       )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-red-500/10 rounded-md">
           Error loading announcements: {loadError}
         </div>
       )}
@@ -345,7 +345,7 @@ export default function NewsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Create Form */}
           <Card>
-            <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">Create Announcement</h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-6">Create Announcement</h2>
             
             <div className="space-y-4">
               <Input
@@ -365,13 +365,13 @@ export default function NewsPage() {
 
               {/* Attachments */}
               <div>
-                <label className="block text-sm text-[#737373] mb-2">Attachments</label>
-                <div className="border border-dashed border-[#e5e5e5] rounded-lg p-6 text-center">
-                  <div className="w-10 h-10 bg-[#f5f5f5] rounded-md flex items-center justify-center mx-auto mb-2">
-                    <Paperclip className="w-5 h-5 text-[#737373]" />
+                <label className="block text-sm text-text-muted mb-2">Attachments</label>
+                <div className="border border-dashed border-theme rounded-lg p-6 text-center">
+                  <div className="w-10 h-10 bg-surface-alt rounded-md flex items-center justify-center mx-auto mb-2">
+                    <Paperclip className="w-5 h-5 text-text-muted" />
                   </div>
-                  <p className="text-sm text-[#737373]">Drop files here or click to upload</p>
-                  <p className="text-xs text-[#a3a3a3] mt-1">Images and PDFs supported</p>
+                  <p className="text-sm text-text-muted">Drop files here or click to upload</p>
+                  <p className="text-xs text-text-faint mt-1">Images and PDFs supported</p>
                 </div>
               </div>
 
@@ -394,13 +394,13 @@ export default function NewsPage() {
 
           {/* Mobile Preview */}
           <Card>
-            <h3 className="text-sm font-medium text-[#737373] uppercase tracking-wide mb-4">Mobile Preview</h3>
+            <h3 className="text-sm font-medium text-text-muted uppercase tracking-wide mb-4">Mobile Preview</h3>
             
             {/* Phone Mockup */}
             <div className="mx-auto w-[280px] h-[500px] bg-[#1a1a1a] rounded-[32px] p-3">
-              <div className="w-full h-full bg-white rounded-[24px] overflow-hidden flex flex-col">
+              <div className="w-full h-full bg-surface rounded-[24px] overflow-hidden flex flex-col">
                 {/* Status Bar */}
-                <div className="h-6 bg-[#f5f5f5] flex items-center justify-center">
+                <div className="h-6 bg-surface-alt flex items-center justify-center">
                   <div className="w-20 h-1 bg-[#1a1a1a] rounded-full"></div>
                 </div>
                 
@@ -412,10 +412,10 @@ export default function NewsPage() {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="mb-4">
-                    <h4 className="font-semibold text-[#1a1a1a] text-sm mb-2">
+                    <h4 className="font-semibold text-text-primary text-sm mb-2">
                       {title || 'Announcement Title'}
                     </h4>
-                    <p className="text-xs text-[#737373] mb-2">
+                    <p className="text-xs text-text-muted mb-2">
                       {content || 'Announcement content will appear here...'}
                     </p>
                     <p className="text-xs text-[#2563eb]">Read more</p>
@@ -432,7 +432,7 @@ export default function NewsPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-[#1a1a1a]">{announcement.title}</h3>
+                    <h3 className="font-semibold text-text-primary">{announcement.title}</h3>
                     <Badge 
                       variant={
                         announcement.status === 'published' ? 'success' :
@@ -444,9 +444,9 @@ export default function NewsPage() {
                     </Badge>
                   </div>
                   
-                  <p className="text-[#737373] text-sm mb-3 line-clamp-2">{announcement.content}</p>
+                  <p className="text-text-muted text-sm mb-3 line-clamp-2">{announcement.content}</p>
                   
-                  <div className="flex items-center gap-4 text-sm text-[#737373]">
+                  <div className="flex items-center gap-4 text-sm text-text-muted">
                     {announcement.status === 'published' && (
                       <>
                         <span className="flex items-center gap-1">
@@ -488,7 +488,7 @@ export default function NewsPage() {
                     size="sm"
                     onClick={() => handleDelete(announcement.id)}
                   >
-                    <Trash className="w-4 h-4 text-[#dc2626]" />
+                    <Trash className="w-4 h-4 text-red-600 dark:text-red-400" />
                   </Button>
                 </div>
               </div>
@@ -498,8 +498,8 @@ export default function NewsPage() {
           {!loading && !loadError && announcementsList.length === 0 && (
             <Card>
               <div className="text-center py-8">
-                <Newspaper className="w-12 h-12 text-[#737373] mx-auto mb-3" />
-                <p className="text-[#737373]">No announcements yet</p>
+                <Newspaper className="w-12 h-12 text-text-muted mx-auto mb-3" />
+                <p className="text-text-muted">No announcements yet</p>
                 <Button className="mt-4" onClick={() => setShowCreateForm(true)}>
                   Create First Announcement
                 </Button>
@@ -512,16 +512,16 @@ export default function NewsPage() {
       {/* Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-lg border border-[#e5e5e5] p-5">
+          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-5">
             <h3 className="text-lg font-semibold mb-3">Schedule Publication</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="block text-xs text-[#737373] mb-1">Date</label>
-                <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm" />
+                <label className="block text-xs text-text-muted mb-1">Date</label>
+                <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm" />
               </div>
               <div>
-                <label className="block text-xs text-[#737373] mb-1">Time</label>
-                <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm" />
+                <label className="block text-xs text-text-muted mb-1">Time</label>
+                <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm" />
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -535,9 +535,9 @@ export default function NewsPage() {
       {/* Delete Confirm Modal */}
       {pendingDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm bg-white rounded-lg border border-[#e5e5e5] p-5">
+          <div className="w-full max-w-sm bg-surface rounded-lg border border-theme p-5">
             <h3 className="text-base font-semibold mb-2">Delete Announcement</h3>
-            <p className="text-sm text-[#737373] mb-4">Are you sure you want to delete {pendingDeleteId}?</p>
+            <p className="text-sm text-text-muted mb-4">Are you sure you want to delete {pendingDeleteId}?</p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={cancelDelete}>Cancel</Button>
               <Button variant="danger" onClick={confirmDelete}>Delete</Button>

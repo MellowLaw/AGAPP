@@ -267,7 +267,7 @@ export default function SettingsPage() {
       <ToastContainer />
       
       {loading && (
-        <div className="mb-4 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-4 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md animate-pulse">
           Loading settings and configuration…
         </div>
       )}
@@ -281,8 +281,8 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab('general')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
                   activeTab === 'general' 
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium' 
-                    : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                    ? 'bg-surface-alt text-text-primary font-medium' 
+                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
                 <Building className="w-4 h-4" />
@@ -292,8 +292,8 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab('staff')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
                   activeTab === 'staff' 
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium' 
-                    : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                    ? 'bg-surface-alt text-text-primary font-medium' 
+                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
                 <User className="w-4 h-4" />
@@ -303,8 +303,8 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab('notifications')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
                   activeTab === 'notifications' 
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium' 
-                    : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                    ? 'bg-surface-alt text-text-primary font-medium' 
+                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
                 <Bell className="w-4 h-4" />
@@ -318,7 +318,7 @@ export default function SettingsPage() {
         <div className="lg:col-span-3">
           {activeTab === 'general' && (
             <Card>
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">Municipality Information</h2>
+              <h2 className="text-lg font-semibold text-text-primary mb-6">Municipality Information</h2>
               
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -348,37 +348,37 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-[#737373] mb-1.5">Office Address</label>
+                  <label className="block text-sm text-text-muted mb-1.5">Office Address</label>
                   <textarea
                     rows={3}
                     value={officeAddress}
                     onChange={(e) => setOfficeAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+                    className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-[#737373] mb-1.5">Latitude</label>
+                    <label className="block text-sm text-text-muted mb-1.5">Latitude</label>
                     <input
                       type="text"
                       value={latitude}
-                      className="w-full px-3 py-2 bg-[#f5f5f5] border border-[#e5e5e5] rounded-md text-sm cursor-not-allowed"
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
                       readOnly
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-[#737373] mb-1.5">Longitude</label>
+                    <label className="block text-sm text-text-muted mb-1.5">Longitude</label>
                     <input
                       type="text"
                       value={longitude}
-                      className="w-full px-3 py-2 bg-[#f5f5f5] border border-[#e5e5e5] rounded-md text-sm cursor-not-allowed"
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
                       readOnly
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-[#e5e5e5]">
+                <div className="pt-4 border-t border-theme">
                   <Button onClick={handleSaveGeneral}>Save Changes</Button>
                 </div>
               </div>
@@ -388,7 +388,7 @@ export default function SettingsPage() {
           {activeTab === 'staff' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-[#1a1a1a]">Staff Members</h2>
+                <h2 className="text-lg font-semibold text-text-primary">Staff Members</h2>
                 <Button onClick={() => {
                   setEditingStaff(null);
                   setStaffName('');
@@ -405,12 +405,12 @@ export default function SettingsPage() {
                 <Card key={member.id}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-[#f5f5f5] rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-[#737373]" />
+                      <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-text-muted" />
                       </div>
                       <div>
-                        <p className="font-medium text-[#1a1a1a]">{member.name}</p>
-                        <p className="text-sm text-[#737373]">{member.email}</p>
+                        <p className="font-medium text-text-primary">{member.name}</p>
+                        <p className="text-sm text-text-muted">{member.email}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant={member.role === 'LGU_ADMIN' ? 'info' : 'default'}>
                             {member.role.replace('_', ' ')}
@@ -429,7 +429,7 @@ export default function SettingsPage() {
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(member.id, member.name)}>
-                        <Trash className="w-4 h-4 text-[#dc2626]" />
+                        <Trash className="w-4 h-4 text-red-600 dark:text-red-400" />
                       </Button>
                     </div>
                   </div>
@@ -438,7 +438,7 @@ export default function SettingsPage() {
 
               {staffList.length === 0 && (
                 <Card>
-                  <p className="text-center py-6 text-[#737373] text-sm">No LGU staff members found.</p>
+                  <p className="text-center py-6 text-text-muted text-sm">No LGU staff members found.</p>
                 </Card>
               )}
             </div>
@@ -446,41 +446,41 @@ export default function SettingsPage() {
 
           {activeTab === 'notifications' && (
             <Card>
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">Notification Preferences</h2>
+              <h2 className="text-lg font-semibold text-text-primary mb-6">Notification Preferences</h2>
               
               <div className="space-y-4">
-                <label className="flex items-center justify-between py-3 border-b border-[#e5e5e5] cursor-pointer">
-                  <span className="text-[#1a1a1a]">Push Notifications (Mobile Alerts)</span>
+                <label className="flex items-center justify-between py-3 border-b border-theme cursor-pointer">
+                  <span className="text-text-primary">Push Notifications (Mobile Alerts)</span>
                   <input 
                     type="checkbox" 
                     checked={notifPush}
                     onChange={(e) => setNotifPush(e.target.checked)}
-                    className="w-4 h-4 accent-[#1a1a1a]"
+                    className="w-4 h-4 accent-accent"
                   />
                 </label>
 
-                <label className="flex items-center justify-between py-3 border-b border-[#e5e5e5] cursor-pointer">
-                  <span className="text-[#1a1a1a]">SMS Alerts (Emergency Broadcasts)</span>
+                <label className="flex items-center justify-between py-3 border-b border-theme cursor-pointer">
+                  <span className="text-text-primary">SMS Alerts (Emergency Broadcasts)</span>
                   <input 
                     type="checkbox" 
                     checked={notifSms}
                     onChange={(e) => setNotifSms(e.target.checked)}
-                    className="w-4 h-4 accent-[#1a1a1a]"
+                    className="w-4 h-4 accent-accent"
                   />
                 </label>
 
-                <label className="flex items-center justify-between py-3 border-b border-[#e5e5e5] cursor-pointer">
-                  <span className="text-[#1a1a1a]">Email Digests (Weekly Reports)</span>
+                <label className="flex items-center justify-between py-3 border-b border-theme cursor-pointer">
+                  <span className="text-text-primary">Email Digests (Weekly Reports)</span>
                   <input 
                     type="checkbox" 
                     checked={notifEmail}
                     onChange={(e) => setNotifEmail(e.target.checked)}
-                    className="w-4 h-4 accent-[#1a1a1a]"
+                    className="w-4 h-4 accent-accent"
                   />
                 </label>
               </div>
 
-              <div className="pt-4 border-t border-[#e5e5e5] mt-6">
+              <div className="pt-4 border-t border-theme mt-6">
                 <Button onClick={handleSaveNotifications}>Save Preferences</Button>
               </div>
             </Card>
@@ -491,12 +491,12 @@ export default function SettingsPage() {
       {/* Add/Edit Staff Modal */}
       {showStaffModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-lg border border-[#e5e5e5] p-6 shadow-xl">
-            <div className="flex justify-between items-center border-b border-[#e5e5e5] pb-3 mb-4">
-              <h3 className="text-base font-semibold text-[#1a1a1a]">
+          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-6 shadow-xl">
+            <div className="flex justify-between items-center border-b border-theme pb-3 mb-4">
+              <h3 className="text-base font-semibold text-text-primary">
                 {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
               </h3>
-              <button onClick={() => setShowStaffModal(false)} className="text-[#a3a3a3] hover:text-[#1a1a1a]">
+              <button onClick={() => setShowStaffModal(false)} className="text-text-faint hover:text-text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -528,11 +528,11 @@ export default function SettingsPage() {
               )}
 
               <div>
-                <label className="block text-sm text-[#737373] mb-1.5">Role</label>
+                <label className="block text-sm text-text-muted mb-1.5">Role</label>
                 <select
                   value={staffRole}
                   onChange={(e) => setStaffRole(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                  className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="LGU_PERSONNEL">LGU Personnel (Field / Desk Staff)</option>
                   <option value="LGU_ADMIN">LGU Administrator</option>
@@ -540,7 +540,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6 border-t border-[#e5e5e5] pt-4">
+            <div className="flex justify-end gap-2 mt-6 border-t border-theme pt-4">
               <Button variant="ghost" onClick={() => setShowStaffModal(false)}>Cancel</Button>
               <Button onClick={handleSaveStaff}>Save Staff Member</Button>
             </div>

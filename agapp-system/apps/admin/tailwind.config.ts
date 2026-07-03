@@ -16,10 +16,25 @@ const config: Config = {
         'warm-sand': '#D9CDB8',
         'off-white': '#f4f3f0',
         'border-subtle': '#dbdad7',
+        // Semantic tokens — read from CSS variables (globals.css) so every
+        // component using these classes re-themes automatically with the
+        // `.dark` class, instead of hardcoding literal hex per component.
+        bg: 'var(--bg-base)',
+        surface: 'var(--surface)',
+        'surface-alt': 'var(--surface-alt)',
+        'text-primary': 'var(--text-base)',
+        'text-muted': 'var(--text-muted)',
+        'text-faint': 'var(--text-faint)',
+        // key is "theme" (not "border-theme") so the generated utility is
+        // exactly `border-theme`, matching this project's design spec.
+        theme: 'var(--border-theme)',
+        accent: 'var(--accent)',
+        'accent-soft': 'var(--accent-soft)',
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
-        serif: ['var(--font-serif)', 'Georgia', 'serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+        serif: ['"EB Garamond"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'Fira Code', 'monospace'],
       },
     },
   },

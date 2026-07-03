@@ -53,15 +53,15 @@ export const Modal: React.FC<ModalProps> = ({
       
       {/* Modal */}
       <div className={`
-        relative bg-white rounded-lg shadow-xl w-full ${sizes[size]} 
+        relative bg-surface rounded-md border border-theme w-full ${sizes[size]} 
         transform transition-all
       `}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e5]">
-          <h3 className="text-lg font-semibold text-[#1a1a1a]">{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-theme">
+          <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 text-[#737373] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] rounded-md transition-colors"
+            className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-alt rounded-md transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -74,7 +74,7 @@ export const Modal: React.FC<ModalProps> = ({
         
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e5e5e5]">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-theme">
             {footer}
           </div>
         )}
@@ -124,7 +124,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </>
       }
     >
-      <p className="text-[#737373]">{message}</p>
+      <p className="text-text-muted">{message}</p>
     </Modal>
   );
 };

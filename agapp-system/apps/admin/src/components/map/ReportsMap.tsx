@@ -50,21 +50,16 @@ export function ReportsMap({ reports, center, className = 'h-96', getDetailHref,
         {reports.map((r) => (
           <Marker key={r.id} position={[r.lat, r.lng]} icon={icons[r.status] || fallbackIcon}>
             <Popup>
-              <div style={{ minWidth: 180 }}>
-                <p style={{ margin: 0, fontWeight: 600 }}>{r.refNumber}</p>
-                <p style={{ margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="min-w-[180px]">
+                <p className="m-0 font-semibold text-text-primary">{r.refNumber}</p>
+                <p className="mt-1 flex items-center gap-1.5 text-text-primary">
                   <span
-                    style={{
-                      display: 'inline-block',
-                      width: 10,
-                      height: 10,
-                      borderRadius: '50%',
-                      backgroundColor: STATUS_COLORS[r.status] || '#6B7280',
-                    }}
+                    className="inline-block w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: STATUS_COLORS[r.status] || '#6B7280' }}
                   />
                   {r.status} · {r.category}
                 </p>
-                <p style={{ margin: '4px 0 0', color: '#737373' }}>
+                <p className="mt-1 text-text-muted">
                   {r.barangay} · {r.date}
                 </p>
                 {r.photoUrl && (
@@ -72,11 +67,11 @@ export function ReportsMap({ reports, center, className = 'h-96', getDetailHref,
                   <img
                     src={r.photoUrl}
                     alt="Report evidence"
-                    style={{ marginTop: 8, borderRadius: 6, maxHeight: 96, width: '100%', objectFit: 'cover' }}
+                    className="mt-2 rounded-md max-h-24 w-full object-cover"
                   />
                 )}
                 {getDetailHref && (
-                  <a href={getDetailHref(r)} style={{ display: 'inline-block', marginTop: 8, fontWeight: 600 }}>
+                  <a href={getDetailHref(r)} className="inline-block mt-2 font-semibold text-text-primary hover:text-accent transition-colors">
                     Open report →
                   </a>
                 )}
@@ -86,9 +81,9 @@ export function ReportsMap({ reports, center, className = 'h-96', getDetailHref,
         ))}
       </LeafletMap>
       {showLegend && (
-        <div className="absolute bottom-3 left-3 z-10 bg-white/95 border border-[#e5e5e5] rounded-md px-3 py-2 shadow-sm">
+        <div className="absolute bottom-3 left-3 z-10 bg-surface border border-theme rounded-xl px-3 py-2">
           {Object.entries(STATUS_COLORS).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-1.5 text-[11px] text-[#525252] leading-4">
+            <div key={status} className="flex items-center gap-1.5 text-[11px] font-mono text-text-muted leading-4">
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
               {status}
             </div>

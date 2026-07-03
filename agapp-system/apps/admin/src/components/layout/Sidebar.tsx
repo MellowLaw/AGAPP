@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import {
   House,
@@ -12,14 +13,26 @@ import {
   ChatCircle,
   Gear,
   Building,
-  Users,
-  ChartBar,
   SignOut,
   IdentificationBadge,
   MapPin,
   ListChecks,
+  Bell,
 } from '@phosphor-icons/react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
+import { useToast } from '@/components/ui/Toast';
+
+const ROLE_LABEL: Record<SidebarProps['role'], string> = {
+  'lgu-admin': 'LGU Admin',
+  'super-admin': 'Super Admin',
+  'lgu-personnel': 'Personnel',
+};
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
 
 interface NavItem {
   label: string;
@@ -56,13 +69,47 @@ const LGU_PERSONNEL_NAV: NavItem[] = [
   { label: 'Settings', href: '/personnel/settings', icon: Gear },
 ];
 
+// Active: soft accent-tinted backdrop (no hard fill), bolded rose text, +2%
+// scale. Hover: a faint 2%-opacity wash, never a hard-edged box. Both are
+// plain divs behind the label rather than a filled pill, so there's no rigid
+// container line at any state.
+function NavLink({ item, active, href }: { item: NavItem; active: boolean; href: string }) {
+  const Icon = item.icon;
+  const [hovering, setHovering] = useState(false);
+
+  return (
+    <Link href={href} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+      <motion.div
+        className="relative flex items-center gap-6 pl-6 pr-4 py-3 text-[15px]"
+        animate={{ scale: active ? 1.01 : 1 }}
+        whileTap={{ scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      >
+        <Icon
+          className={`relative w-6 h-6 shrink-0 transition-colors duration-200 ${
+            active ? 'text-accent' : hovering ? 'text-text-primary' : 'text-text-muted'
+          }`}
+        />
+        <span
+          className={`relative transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100 ${
+            active ? 'text-accent font-semibold' : hovering ? 'text-text-primary font-medium' : 'text-text-muted font-medium'
+          }`}
+        >
+          {item.label}
+        </span>
+      </motion.div>
+    </Link>
+  );
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
   const lguParam = (lguName || params?.get('lguName') || '').toString();
-  
+
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  const { showToast, ToastContainer } = useToast();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -73,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
           .select('name, email')
           .eq('id', authUser.id)
           .single();
-        
+
         setUserProfile({
           name: profile?.name || authUser.user_metadata?.name || 'Admin User',
           email: profile?.email || authUser.email || 'admin@lgu.gov.ph',
@@ -83,12 +130,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
     fetchUser();
   }, []);
 
-  const navItems = role === 'super-admin' 
-    ? SUPER_ADMIN_NAV 
+  const navItems = role === 'super-admin'
+    ? SUPER_ADMIN_NAV
     : role === 'lgu-personnel'
     ? LGU_PERSONNEL_NAV
     : LGU_ADMIN_NAV;
-  
+
   const isActive = (href: string) => {
     if (pathname === href) return true;
     const hasChild = navItems.some(n => n.href !== href && n.href.startsWith(`${href}/`));
@@ -100,65 +147,59 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
     await supabase.auth.signOut();
     router.push('/');
   };
-  
+
   return (
-    <aside className="w-60 h-screen bg-white border-r border-[#e5e5e5] flex flex-col fixed left-0 top-0">
+    <aside className="group w-[72px] hover:w-[512px] transition-all duration-300 ease-in-out h-screen bg-gradient-to-r from-[#f6f4f1] via-[#f6f4f1]/95 via-[#f6f4f1]/75 to-transparent dark:from-[#0d0c0e] dark:via-[#0d0c0e]/95 dark:via-[#0d0c0e]/75 dark:to-transparent flex flex-col fixed left-0 top-0 z-40 overflow-hidden">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-[#e5e5e5]">
-        <AgappLogo size={32} />
+      <div className="flex flex-col justify-center pl-6 pr-4 py-5 border-b border-transparent group-hover:border-theme/50 transition-colors">
+        <AgappLogo size={44} textClassName="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap" />
+        <p className="text-xs font-serif italic text-accent mt-1.5 ml-[1px] pl-[52px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+          {ROLE_LABEL[role]}
+        </p>
       </div>
-      
+
       {/* LGU Name (if applicable) */}
       {(role === 'lgu-admin' || role === 'lgu-personnel') && (lguName || params?.get('lguName')) && (
-        <div className="px-6 py-3 bg-[#f5f5f5]">
-          <p className="text-xs text-[#737373] uppercase tracking-wide">Municipality</p>
-          <p className="text-sm font-medium text-[#1a1a1a] truncate">{lguName || params?.get('lguName') || ''}</p>
+        <div className="pl-[76px] pr-4 py-3 bg-transparent group-hover:bg-surface-alt/50 transition-colors whitespace-nowrap overflow-hidden opacity-0 group-hover:opacity-100 duration-300">
+          <p className="text-[10px] font-mono text-text-faint uppercase tracking-widest">Municipality</p>
+          <p className="text-sm font-medium text-text-primary truncate">{lguName || params?.get('lguName') || ''}</p>
         </div>
       )}
-      
+
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
-          const Icon = item.icon;
           const active = isActive(item.href);
           const href = (role === 'lgu-admin' || role === 'lgu-personnel') && lguParam
             ? `${item.href}?lguName=${encodeURIComponent(lguParam)}`
             : item.href;
-          
-          return (
-            <Link
-              key={item.href}
-              href={href}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-md text-sm
-                transition-colors
-                ${active 
-                  ? 'bg-[#1a1a1a] text-white font-medium' 
-                  : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
-                }
-              `}
-            >
-              <Icon className={`w-5 h-5 ${active ? 'text-white' : ''}`} />
-              {item.label}
-            </Link>
-          );
+
+          return <NavLink key={item.href} item={item} active={active} href={href} />;
         })}
       </nav>
-      
+
       {/* User Section */}
-      <div className="p-3 border-t border-[#e5e5e5]">
-        <div className="px-3 py-2">
-          <p className="text-sm font-semibold text-[#1a1a1a] truncate">{userProfile?.name || 'Loading...'}</p>
-          <p className="text-xs text-[#737373] truncate" title={userProfile?.email || ''}>{userProfile?.email || 'Please wait'}</p>
+      <div className="p-3 mt-auto border-t border-transparent group-hover:border-theme/50 transition-colors">
+        <div className="flex items-center gap-2 pl-6 py-2">
+          <div className="w-8 h-8 shrink-0 rounded-full bg-accent-soft flex items-center justify-center">
+            <span className="text-xs font-bold text-accent">{initials(userProfile?.name || '?')}</span>
+          </div>
+          <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <p className="text-sm font-semibold text-text-primary truncate">{userProfile?.name || 'Loading...'}</p>
+            <p className="text-xs font-mono text-text-muted truncate" title={userProfile?.email || ''}>{userProfile?.email || 'Please wait'}</p>
+          </div>
         </div>
-        <button 
+        <motion.button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] hover:text-[#dc2626] rounded-md transition-colors mt-1"
+          className="w-full flex items-center gap-4 pl-6 py-2 text-sm text-text-muted hover:text-text-primary rounded-none mt-1 transition-colors duration-300"
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
         >
-          <SignOut className="w-5 h-5" />
-          Sign Out
-        </button>
+          <SignOut className="w-6 h-6 shrink-0" />
+          <span className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">Sign Out</span>
+        </motion.button>
       </div>
+      <ToastContainer />
     </aside>
   );
 };

@@ -715,16 +715,30 @@ CREATE POLICY "LGU admins can read their LGU audit logs" ON audit_logs FOR SELEC
 -- 10. Policies and Triggers for Forum Comments
 ALTER TABLE forum_comments ENABLE ROW LEVEL SECURITY;
 
+-- forum_comments has no lgu_id column — scope admin access via a join to
+-- forum_posts.lgu_id, matching the admin's own lgu_id. (Was previously
+-- unscoped: any LGU_ADMIN could read/moderate every LGU's comments — fixed
+-- 2026-07-03, same bug class as the users-table PII leak fixed 2026-07-01.)
 CREATE POLICY "Allow viewing approved forum comments" ON forum_comments FOR SELECT USING (
-  is_approved = true OR citizen_id = auth.uid() OR EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN')
+  is_approved = true
+  OR citizen_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM users u
+    JOIN forum_posts p ON p.id = forum_comments.post_id
+    WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = p.lgu_id
+  )
 );
 
 CREATE POLICY "Allow Citizens to insert comments" ON forum_comments FOR INSERT WITH CHECK (
-  auth.uid() = citizen_id OR auth.uid() IS NOT NULL
+  auth.uid() = citizen_id
 );
 
 CREATE POLICY "Allow LGU Admins to moderate comments" ON forum_comments FOR ALL USING (
-  EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN')
+  EXISTS (
+    SELECT 1 FROM users u
+    JOIN forum_posts p ON p.id = forum_comments.post_id
+    WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = p.lgu_id
+  )
 );
 
 CREATE TRIGGER trg_moderate_forum_comment

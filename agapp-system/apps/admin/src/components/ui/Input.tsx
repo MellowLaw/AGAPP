@@ -11,7 +11,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm text-[#737373] mb-1.5">
+          <label className="block text-sm text-text-muted mb-1.5">
             {label}
           </label>
         )}
@@ -19,20 +19,20 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           className={`
             w-full px-3 py-2
-            bg-white border rounded-md
-            text-[#1a1a1a] placeholder-[#a3a3a3]
-            focus:outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb]
-            disabled:bg-[#f5f5f5] disabled:cursor-not-allowed
-            ${error ? 'border-[#dc2626] focus:border-[#dc2626] focus:ring-[#dc2626]' : 'border-[#e5e5e5]'}
+            bg-surface border rounded-none
+            text-text-primary placeholder-text-faint
+            focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
+            disabled:bg-surface-alt disabled:cursor-not-allowed
+            ${error ? 'border-red-600 focus:border-red-600 focus:ring-red-600' : 'border-theme'}
             ${className}
           `}
           {...props}
         />
         {error && (
-          <p className="mt-1.5 text-xs text-[#dc2626]">{error}</p>
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1.5 text-xs text-[#737373]">{helperText}</p>
+          <p className="mt-1.5 text-xs text-text-muted">{helperText}</p>
         )}
       </div>
     );
@@ -52,7 +52,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm text-[#737373] mb-1.5">
+          <label className="block text-sm text-text-muted mb-1.5">
             {label}
           </label>
         )}
@@ -60,21 +60,21 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           ref={ref}
           className={`
             w-full px-3 py-2
-            bg-white border rounded-md
-            text-[#1a1a1a] placeholder-[#a3a3a3]
-            focus:outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb]
-            disabled:bg-[#f5f5f5] disabled:cursor-not-allowed
+            bg-surface border rounded-none
+            text-text-primary placeholder-text-faint
+            focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
+            disabled:bg-surface-alt disabled:cursor-not-allowed
             resize-none
-            ${error ? 'border-[#dc2626] focus:border-[#dc2626] focus:ring-[#dc2626]' : 'border-[#e5e5e5]'}
+            ${error ? 'border-red-600 focus:border-red-600 focus:ring-red-600' : 'border-theme'}
             ${className}
           `}
           {...props}
         />
         {error && (
-          <p className="mt-1.5 text-xs text-[#dc2626]">{error}</p>
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1.5 text-xs text-[#737373]">{helperText}</p>
+          <p className="mt-1.5 text-xs text-text-muted">{helperText}</p>
         )}
       </div>
     );

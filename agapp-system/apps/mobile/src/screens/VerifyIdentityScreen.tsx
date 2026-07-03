@@ -74,9 +74,12 @@ export function VerifyIdentityScreen({ navigation }: any) {
   };
 
   const uploadPrivate = async (uri: string, kind: 'id' | 'selfie'): Promise<string> => {
+    // ArrayBuffer, NOT blob: React Native's Blob doesn't serialize through
+    // supabase-js's fetch — uploads die with "Network request failed".
+    // ArrayBuffer is the officially supported RN/Expo upload path.
     const response = await fetch(uri);
-    const blob = await response.blob();
-    if (blob.size > 10 * 1024 * 1024) {
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
       throw new Error(`${kind === 'id' ? 'ID' : 'Selfie'} image is larger than 10MB.`);
     }
     const ext = (uri.split('.').pop() || 'jpg').toLowerCase();
@@ -84,7 +87,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
     const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
     const { error } = await supabase.storage
       .from('citizen-ids')
-      .upload(path, blob, { contentType, upsert: false });
+      .upload(path, arrayBuffer, { contentType, upsert: false });
     if (error) throw error;
     return path;
   };

@@ -180,10 +180,13 @@ export function ReportsScreen({ navigation }: any) {
 
     // 6. Upload Photo to storage
     try {
+      // ArrayBuffer, NOT blob: React Native's Blob doesn't serialize through
+      // supabase-js's fetch — uploads die with "Network request failed".
+      // ArrayBuffer is the officially supported RN/Expo upload path.
       const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      if (blob.size > 5 * 1024 * 1024) {
+      const arrayBuffer = await response.arrayBuffer();
+
+      if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
         Alert.alert('File Too Large', 'Selected image must be less than 5MB.');
         setSubmitting(false);
         return;
@@ -194,7 +197,7 @@ export function ReportsScreen({ navigation }: any) {
 
       const { error: uploadError } = await supabase.storage
         .from('report-photos')
-        .upload(fileName, blob, {
+        .upload(fileName, arrayBuffer, {
           contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
         });
 

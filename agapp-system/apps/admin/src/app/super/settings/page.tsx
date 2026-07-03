@@ -160,7 +160,7 @@ export default function SuperSettingsPage() {
       <ToastContainer />
 
       {loading && (
-        <div className="mb-4 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-4 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md animate-pulse">
           Loading system configuration…
         </div>
       )}
@@ -171,21 +171,21 @@ export default function SuperSettingsPage() {
         <Card>
           <CardHeader title="Global Configuration" />
           <div className="space-y-4">
-            <label className="flex items-center justify-between py-2 border-b border-[#e5e5e5] cursor-pointer">
+            <label className="flex items-center justify-between py-2 border-b border-theme cursor-pointer">
               <div>
-                <span className="text-sm font-medium text-[#1a1a1a]">Maintenance Mode</span>
-                <p className="text-xs text-[#737373] mt-0.5">Displays a maintenance notice to all users</p>
+                <span className="text-sm font-medium text-text-primary">Maintenance Mode</span>
+                <p className="text-xs text-text-muted mt-0.5">Displays a maintenance notice to all users</p>
               </div>
               <input
                 type="checkbox"
                 checked={maintenance}
                 onChange={(e) => setMaintenance(e.target.checked)}
-                className="w-4 h-4 accent-[#1a1a1a]"
+                className="w-4 h-4 accent-accent"
               />
             </label>
 
             <div>
-              <label className="block text-sm text-[#737373] mb-1.5">Site-wide Banner (optional)</label>
+              <label className="block text-sm text-text-muted mb-1.5">Site-wide Banner (optional)</label>
               <TextArea
                 value={banner}
                 onChange={(e: any) => setBanner(e.target.value)}
@@ -194,7 +194,7 @@ export default function SuperSettingsPage() {
               />
             </div>
 
-            <div className="pt-2 border-t border-[#e5e5e5]">
+            <div className="pt-2 border-t border-theme">
               <Button onClick={handleSaveGlobal} disabled={saving === 'global'}>
                 {saving === 'global' ? 'Saving…' : 'Save Settings'}
               </Button>
@@ -206,11 +206,11 @@ export default function SuperSettingsPage() {
         <Card>
           <CardHeader title="SLA / Response Target" />
           <div className="space-y-4">
-            <p className="text-xs text-[#737373]">
+            <p className="text-xs text-text-muted">
               The maximum number of days staff have to resolve a submitted issue report before it's considered overdue.
             </p>
             <div>
-              <label className="block text-sm text-[#737373] mb-1.5">Target resolution (days)</label>
+              <label className="block text-sm text-text-muted mb-1.5">Target resolution (days)</label>
               <Input
                 type="number"
                 value={slaDays}
@@ -219,7 +219,7 @@ export default function SuperSettingsPage() {
                 max={60}
               />
             </div>
-            <div className="pt-2 border-t border-[#e5e5e5]">
+            <div className="pt-2 border-t border-theme">
               <Button onClick={handleSaveSla} disabled={saving === 'sla'}>
                 {saving === 'sla' ? 'Saving…' : 'Save SLA'}
               </Button>
@@ -232,11 +232,11 @@ export default function SuperSettingsPage() {
           <CardHeader title="Report Categories" subtitle="Labels visible to LGU admins when filtering reports" />
           <div className="space-y-2 mb-4">
             {categories.map((c, i) => (
-              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-[#e5e5e5] rounded-md">
-                <span className="text-sm text-[#1a1a1a]">{c}</span>
+              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-theme rounded-md">
+                <span className="text-sm text-text-primary">{c}</span>
                 <button
                   onClick={() => removeCategory(i)}
-                  className="text-[#dc2626] hover:text-red-800 transition-colors p-1 rounded"
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 transition-colors p-1 rounded"
                   title="Remove category"
                 >
                   <Trash className="w-4 h-4" />
@@ -244,17 +244,17 @@ export default function SuperSettingsPage() {
               </div>
             ))}
             {categories.length === 0 && (
-              <p className="text-sm text-[#737373] px-1">No categories defined.</p>
+              <p className="text-sm text-text-muted px-1">No categories defined.</p>
             )}
           </div>
-          <div className="flex gap-2 pt-3 border-t border-[#e5e5e5]">
+          <div className="flex gap-2 pt-3 border-t border-theme">
             <input
               type="text"
               placeholder="New category name…"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCategory()}
-              className="flex-1 px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+              className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
             />
             <Button onClick={addCategory} disabled={saving === 'categories'}>
               <Plus className="w-4 h-4" />
@@ -267,11 +267,11 @@ export default function SuperSettingsPage() {
           <CardHeader title="Service Types" subtitle="Document/service types available for citizen e-service requests" />
           <div className="space-y-2 mb-4">
             {serviceTypes.map((c, i) => (
-              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-[#e5e5e5] rounded-md">
-                <span className="text-sm text-[#1a1a1a]">{c}</span>
+              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-theme rounded-md">
+                <span className="text-sm text-text-primary">{c}</span>
                 <button
                   onClick={() => removeServiceType(i)}
-                  className="text-[#dc2626] hover:text-red-800 transition-colors p-1 rounded"
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 transition-colors p-1 rounded"
                   title="Remove service type"
                 >
                   <Trash className="w-4 h-4" />
@@ -279,17 +279,17 @@ export default function SuperSettingsPage() {
               </div>
             ))}
             {serviceTypes.length === 0 && (
-              <p className="text-sm text-[#737373] px-1">No service types defined.</p>
+              <p className="text-sm text-text-muted px-1">No service types defined.</p>
             )}
           </div>
-          <div className="flex gap-2 pt-3 border-t border-[#e5e5e5]">
+          <div className="flex gap-2 pt-3 border-t border-theme">
             <input
               type="text"
               placeholder="New service type…"
               value={newServiceType}
               onChange={(e) => setNewServiceType(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addServiceType()}
-              className="flex-1 px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+              className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
             />
             <Button onClick={addServiceType} disabled={saving === 'serviceTypes'}>
               <Plus className="w-4 h-4" />

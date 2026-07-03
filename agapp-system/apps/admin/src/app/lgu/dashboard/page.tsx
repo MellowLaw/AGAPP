@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -45,6 +46,16 @@ const mapDbCategoryToLabel = (category: string): string => {
     default:
       return category || 'Other';
   }
+};
+
+// Distinct hues per category so the distribution panel reads at a glance —
+// same idea as STATUS_COLORS in components/map/markers.ts, separate palette
+// since this tracks category, not status.
+const CATEGORY_COLORS: Record<string, string> = {
+  'Pothole / Road Damage': '#ff758f',
+  'Drainage / Canal': '#5b8def',
+  'Stray Pets': '#f5a623',
+  'Damaged Pole': '#8b7cf6',
 };
 
 // True Liliw poblacion (PhilAtlas) — only used until the LGU row loads.
@@ -113,6 +124,7 @@ export default function DashboardPage() {
     const submittedCount = reportRows.filter((r) => r.status === 'Submitted').length;
     const underReviewCount = reportRows.filter((r) => r.status === 'Under Review').length;
     const totalServiceRequests = serviceRows.length;
+    const activeBarangays = new Set(reportRows.map((r) => r.barangay).filter(Boolean)).size;
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const resolvedThisWeek = reportRows.filter(
@@ -124,22 +136,44 @@ export default function DashboardPage() {
       {
         label: 'Pending Reports',
         value: submittedCount.toString(),
-        change: underReviewCount > 0 ? `${underReviewCount} under review` : '',
+        change: underReviewCount > 0 ? `${underReviewCount} under review` : 'none under review',
         icon: Warning,
-        color: 'text-[#ca8a04]',
       },
-      { label: 'Service Requests', value: totalServiceRequests.toString(), change: '', icon: FileText, color: 'text-[#2563eb]' },
+      {
+        label: 'Service Requests',
+        value: totalServiceRequests.toString(),
+        change: activeBarangays > 0 ? `${activeBarangays} barangays active` : '',
+        icon: FileText,
+      },
       {
         label: 'Pending Verifications',
         value: pendingVerifications.toString(),
-        change: pendingVerifications > 0 ? 'needs review' : 'all caught up',
+        change: pendingVerifications > 0 ? 'field agents dispatched' : 'all caught up',
         icon: IdentificationBadge,
-        color: pendingVerifications > 0 ? 'text-[#dc2626]' : 'text-[#16a34a]',
         href: verifHref,
       },
-      { label: 'Resolved This Week', value: resolvedThisWeek.toString(), change: '', icon: CheckCircle, color: 'text-[#16a34a]' },
+      { label: 'Resolved This Week', value: resolvedThisWeek.toString(), change: '', icon: CheckCircle },
     ];
   }, [reportRows, serviceRows, pendingVerifications, lguParam]);
+
+  // Real live category breakdown — no fabricated trend data, just today's
+  // actual counts and their share of the total.
+  const categoryDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of reportRows) {
+      const label = mapDbCategoryToLabel(r.category);
+      counts[label] = (counts[label] || 0) + 1;
+    }
+    const total = reportRows.length || 1;
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({
+        label,
+        count,
+        pct: Math.round((count / total) * 100),
+        color: CATEGORY_COLORS[label] || '#8a8a8a',
+      }));
+  }, [reportRows]);
 
   // Report pins for the interactive map — every report carries the citizen's
   // real GPS coordinates captured at submission time.
@@ -181,116 +215,155 @@ export default function DashboardPage() {
     <DashboardLayout
       role="lgu-admin"
       title="Dashboard Overview"
+      heroKicker={`${lguParam.toUpperCase()} — MUNICIPAL CONTROL CENTER`}
+      heroTitleAccent="Agapp Portal"
+      heroSubtitle="Real-time visual reports tracking system for municipal hazard logging, business licensing, and citizen service requests."
     >
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-3 px-4 py-2 text-sm font-mono text-text-muted bg-surface-alt rounded-xl animate-pulse">
           Loading dashboard metrics…
         </div>
       )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
           Failed to load dashboard metrics: {loadError}
         </div>
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        {stats.map((stat) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        {stats.map((stat, i) => {
           const Icon = stat.icon;
           const content = (
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold text-[#737373]">{stat.label}</p>
-                <p className="text-2xl font-bold text-[#1a1a1a] mt-1.5">{stat.value}</p>
+            <>
+              <div className="flex items-start justify-between">
+                <p className="text-sm font-bold text-text-primary">{stat.label}</p>
+                <div className="p-1.5 rounded-lg bg-surface-alt border border-theme">
+                  <Icon className="w-4 h-4 text-accent" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
                 {stat.change && (
-                  <p className="text-[10px] text-[#ca8a04] font-medium mt-1">{stat.change}</p>
+                  <p className="text-xs font-serif italic text-accent mt-1">{stat.change}</p>
                 )}
               </div>
-              <div className="p-2 bg-[#f5f5f5] rounded-lg">
-                <Icon className={`w-5 h-5 ${stat.color}`} />
-              </div>
-            </div>
+            </>
           );
           return (
-            <Card key={stat.label} padding="sm" className="shadow-sm border border-[#e5e5e5] hover:border-gray-300 transition-all duration-200">
-              {stat.href ? <Link href={stat.href}>{content}</Link> : content}
+            <Card key={stat.label} noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
+              {stat.href ? <Link href={stat.href} className="w-full h-full flex flex-col justify-between">{content}</Link> : content}
             </Card>
           );
         })}
       </div>
 
-      {/* Reports Map — replaces the old category/status/trend charts with the
-          actual geography of citizen reports for this municipality. */}
-      <Card className="mb-6 shadow-sm border border-[#e5e5e5]">
-        <CardHeader
-          title="Reports Map"
-          subtitle="Live locations of citizen reports — click a pin for details"
-          action={
+      {/* Bento: 8-col map / 4-col categorical distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        <div className="lg:col-span-8">
+          <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-text-primary">Reports Hotspot Map</h3>
+              <p className="text-sm font-serif italic text-accent mt-1">
+                {lguParam} · Live locations of citizen reports
+              </p>
+            </div>
             <Link href={reportsHref}>
-              <Button variant="ghost" size="sm">
+              <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90">
                 View All
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
-          }
-        />
-        {!loading && reportPins.length === 0 ? (
-          <div className="h-40 flex items-center justify-center text-sm text-[#737373]">
-            No reports with location data yet.
           </div>
-        ) : (
-          <ReportsMap
-            className="h-[28rem]"
-            reports={reportPins}
-            center={mapCenter}
-            getDetailHref={(r) =>
-              `/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(r.refNumber)}`
-            }
-          />
-        )}
-      </Card>
+          {!loading && reportPins.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-sm text-text-primary bg-surface-alt/30 rounded-2xl">
+              No reports with location data yet.
+            </div>
+          ) : (
+            <ReportsMap
+              className="h-[26rem] rounded-[20px] overflow-hidden"
+              reports={reportPins}
+              center={mapCenter}
+              getDetailHref={(r) =>
+                `/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(r.refNumber)}`
+              }
+            />
+          )}
+        </div>
+
+        <Card className="lg:col-span-4 rounded-[20px]" noBorder>
+          <p className="text-[11px] font-mono font-semibold tracking-widest text-accent uppercase mb-1">Distribution</p>
+          <p className="text-sm text-text-primary mb-6">
+            Live categorical distribution of citizen reports active in the municipality system.
+          </p>
+
+          {categoryDistribution.length === 0 ? (
+            <p className="text-sm text-text-primary italic">No reports logged yet.</p>
+          ) : (
+            <div className="space-y-5">
+              {categoryDistribution.map((cat, i) => (
+                <div key={cat.label}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-text-primary">{cat.label}</span>
+                    <span className="text-xs font-mono font-bold text-text-primary">{cat.count} item{cat.count === 1 ? '' : 's'}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-theme overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${cat.pct}%` }}
+                      transition={{ type: 'spring', stiffness: 60, damping: 18, delay: i * 0.1 }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Recent Submissions */}
-      <Card className="shadow-sm border border-[#e5e5e5]">
-        <CardHeader
-          title="Recent Submissions"
-          action={
-            <Link href={reportsHref}>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          }
-        />
+      <Card noBorder className="rounded-[20px]">
+        <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h3 className="text-2xl font-bold text-text-primary">Recent Submissions</h3>
+          </div>
+          <Link href={reportsHref}>
+            <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90">
+              View All
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
+        </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
-              <tr className="border-b border-[#e5e5e5] text-left">
-                <th className="py-3 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider">ID</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider">Category</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider">Location</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider">Status</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#737373] uppercase tracking-wider">Time</th>
+              <tr>
+                <th className="pb-2 pl-10 pr-4 text-xs font-bold text-text-primary uppercase tracking-wider">ID</th>
+                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Category</th>
+                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Location</th>
+                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Status</th>
+                <th className="pb-2 pl-4 pr-10 text-xs font-bold text-text-primary uppercase tracking-wider text-right">Time</th>
               </tr>
             </thead>
             <tbody>
               {recentReports.map((report) => (
                 <tr
                   key={report.id}
-                  className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa] transition-all cursor-pointer"
+                  className="bg-surface-alt hover:bg-accent-soft transition-colors cursor-pointer group"
                   onClick={() => router.push(`/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(report.id)}`)}
                 >
-                  <td className="py-4 px-4 text-sm font-semibold text-[#1a1a1a]">{report.id}</td>
-                  <td className="py-4 px-4 text-sm text-[#525252] font-medium">{report.category}</td>
-                  <td className="py-4 px-4 text-sm text-[#737373]">
+                  <td className="py-5 pl-10 pr-4 rounded-l-xl text-sm font-mono font-bold text-text-primary">{report.id}</td>
+                  <td className="py-5 px-4 text-sm text-text-primary font-semibold">{report.category}</td>
+                  <td className="py-5 px-4 text-sm text-text-primary">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-[#a3a3a3]" />
+                      <MapPin className="w-4 h-4 text-accent" />
                       {report.location}
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-5 px-4">
                     <Badge
                       variant={
                         report.status === 'resolved' ? 'success' :
@@ -302,7 +375,7 @@ export default function DashboardPage() {
                       {report.status.replace('_', ' ')}
                     </Badge>
                   </td>
-                  <td className="py-4 px-4 text-xs text-[#737373] font-medium">{report.time}</td>
+                  <td className="py-5 pl-4 pr-10 rounded-r-xl text-xs font-mono text-text-primary text-right">{report.time}</td>
                 </tr>
               ))}
             </tbody>

@@ -234,14 +234,8 @@ export default function VerificationsPage() {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab
-                ? tab === 'pending'
-                  ? 'bg-[#ca8a04] text-white'
-                  : tab === 'approved'
-                  ? 'bg-[#16a34a] text-white'
-                  : tab === 'rejected'
-                  ? 'bg-[#dc2626] text-white'
-                  : 'bg-[#1a1a1a] text-white'
-                : 'bg-white border border-[#e5e5e5] text-[#737373] hover:bg-[#f5f5f5]'
+                ? 'bg-text-primary text-bg'
+                : 'bg-surface border border-theme text-text-muted hover:bg-surface-alt hover:text-text-primary'
             }`}
           >
             {tab === 'all' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1)} ({tabCounts[tab]})
@@ -252,13 +246,13 @@ export default function VerificationsPage() {
       {/* Search */}
       <Card padding="sm" className="mb-6">
         <div className="relative">
-          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
             placeholder="Search by name, email, barangay, or ID type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+            className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
           />
         </div>
       </Card>
@@ -269,12 +263,12 @@ export default function VerificationsPage() {
           <Card key={req.id}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#f5f5f5] rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-[#737373]" />
+                <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-text-muted" />
                 </div>
                 <div>
-                  <p className="font-medium text-[#1a1a1a]">{req.citizen_name || 'Unknown Citizen'}</p>
-                  <div className="flex items-center gap-2 text-sm text-[#737373]">
+                  <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
+                  <div className="flex items-center gap-2 text-sm text-text-muted">
                     <Envelope className="w-3 h-3" />
                     {req.citizen_email || 'No email'}
                   </div>
@@ -284,40 +278,40 @@ export default function VerificationsPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
-              <div className="flex items-center gap-2 text-[#737373]">
+              <div className="flex items-center gap-2 text-text-muted">
                 <FileText className="w-4 h-4 flex-shrink-0" />
                 <div>
-                  <p className="text-[#a3a3a3] text-xs">ID Type</p>
-                  <p className="text-[#1a1a1a] font-medium">{req.id_type || 'N/A'}</p>
+                  <p className="text-text-faint text-xs">ID Type</p>
+                  <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[#737373]">
+              <div className="flex items-center gap-2 text-text-muted">
                 <MapPin className="w-4 h-4 flex-shrink-0" />
                 <div>
-                  <p className="text-[#a3a3a3] text-xs">Barangay</p>
-                  <p className="text-[#1a1a1a] font-medium">{req.declared_barangay || 'N/A'}</p>
+                  <p className="text-text-faint text-xs">Barangay</p>
+                  <p className="text-text-primary font-medium">{req.declared_barangay || 'N/A'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[#737373]">
+              <div className="flex items-center gap-2 text-text-muted">
                 <Clock className="w-4 h-4 flex-shrink-0" />
                 <div>
-                  <p className="text-[#a3a3a3] text-xs">Submitted</p>
-                  <p className="text-[#1a1a1a] font-medium">{formatDate(req.created_at)}</p>
+                  <p className="text-text-faint text-xs">Submitted</p>
+                  <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
                 </div>
               </div>
               {req.rejection_reason && (
                 <div className="flex items-center gap-2">
-                  <Warning className="w-4 h-4 text-[#dc2626] flex-shrink-0" />
+                  <Warning className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
                   <div>
-                    <p className="text-[#a3a3a3] text-xs">Rejection Reason</p>
-                    <p className="text-[#dc2626] font-medium text-xs">{req.rejection_reason}</p>
+                    <p className="text-text-faint text-xs">Rejection Reason</p>
+                    <p className="text-red-600 dark:text-red-400 font-medium text-xs">{req.rejection_reason}</p>
                   </div>
                 </div>
               )}
             </div>
 
             {req.status === 'pending' && (
-              <div className="flex gap-3 pt-3 border-t border-[#e5e5e5]">
+              <div className="flex gap-3 pt-3 border-t border-theme">
                 <Button variant="primary" onClick={() => handleViewDetails(req)}>
                   <Eye className="w-4 h-4 mr-1" />
                   Review &amp; Approve
@@ -336,7 +330,7 @@ export default function VerificationsPage() {
             )}
 
             {(req.status === 'approved' || req.status === 'rejected') && (
-              <div className="flex gap-3 pt-3 border-t border-[#e5e5e5]">
+              <div className="flex gap-3 pt-3 border-t border-theme">
                 <Button variant="ghost" onClick={() => handleViewDetails(req)}>
                   <Eye className="w-4 h-4 mr-1" />
                   View Documents
@@ -348,7 +342,7 @@ export default function VerificationsPage() {
 
         {filteredRequests.length === 0 && (
           <Card>
-            <div className="text-center py-8 text-[#737373]">
+            <div className="text-center py-8 text-text-muted">
               <IdentificationBadge className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No verification requests found</p>
               {activeTab === 'pending' && (
@@ -362,15 +356,15 @@ export default function VerificationsPage() {
       {/* ── Review / Detail Modal ── */}
       {selectedRequest && !showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-[#1a1a1a]">
+                <h2 className="text-lg font-bold text-text-primary">
                   Review Verification
                 </h2>
                 <button
                   onClick={handleCloseModal}
-                  className="text-[#737373] hover:text-[#1a1a1a] transition-colors"
+                  className="text-text-muted hover:text-text-primary transition-colors"
                 >
                   ✕
                 </button>
@@ -379,32 +373,32 @@ export default function VerificationsPage() {
               {/* Citizen Info */}
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-[#f5f5f5] rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-[#737373]" />
+                  <div className="w-12 h-12 bg-surface-alt rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6 text-text-muted" />
                   </div>
                   <div>
-                    <p className="font-semibold text-[#1a1a1a]">{selectedRequest.citizen_name}</p>
-                    <p className="text-sm text-[#737373]">{selectedRequest.citizen_email}</p>
+                    <p className="font-semibold text-text-primary">{selectedRequest.citizen_name}</p>
+                    <p className="text-sm text-text-muted">{selectedRequest.citizen_email}</p>
                   </div>
                   <div className="ml-auto">{statusBadge(selectedRequest.status)}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-[#a3a3a3]">ID Type</p>
-                    <p className="font-medium text-[#1a1a1a]">{selectedRequest.id_type}</p>
+                    <p className="text-text-faint">ID Type</p>
+                    <p className="font-medium text-text-primary">{selectedRequest.id_type}</p>
                   </div>
                   <div>
-                    <p className="text-[#a3a3a3]">Declared Barangay</p>
-                    <p className="font-medium text-[#1a1a1a]">{selectedRequest.declared_barangay}</p>
+                    <p className="text-text-faint">Declared Barangay</p>
+                    <p className="font-medium text-text-primary">{selectedRequest.declared_barangay}</p>
                   </div>
                   <div>
-                    <p className="text-[#a3a3a3]">Submitted</p>
-                    <p className="font-medium text-[#1a1a1a]">{formatDate(selectedRequest.created_at)}</p>
+                    <p className="text-text-faint">Submitted</p>
+                    <p className="font-medium text-text-primary">{formatDate(selectedRequest.created_at)}</p>
                   </div>
                   {selectedRequest.reviewed_at && (
                     <div>
-                      <p className="text-[#a3a3a3]">Reviewed</p>
-                      <p className="font-medium text-[#1a1a1a]">{formatDate(selectedRequest.reviewed_at)}</p>
+                      <p className="text-text-faint">Reviewed</p>
+                      <p className="font-medium text-text-primary">{formatDate(selectedRequest.reviewed_at)}</p>
                     </div>
                   )}
                 </div>
@@ -412,60 +406,60 @@ export default function VerificationsPage() {
 
               {/* ID Document Image */}
               <div className="mb-6">
-                <p className="text-sm font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
+                <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Government ID
                 </p>
                 {imageLoading ? (
-                  <div className="h-48 bg-[#f5f5f5] rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-[#737373]">Loading secure image...</p>
+                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-text-muted">Loading secure image...</p>
                   </div>
                 ) : idImageUrl ? (
                   <img
                     src={idImageUrl}
                     alt="Government ID"
-                    className="w-full max-h-72 object-contain rounded-lg border border-[#e5e5e5] bg-[#f9f9f9]"
+                    className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
                   />
                 ) : (
-                  <div className="h-48 bg-[#fee2e2] rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-[#dc2626]">Failed to load image</p>
+                  <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>
                   </div>
                 )}
               </div>
 
               {/* Selfie with ID */}
               <div className="mb-6">
-                <p className="text-sm font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
+                <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
                   <Camera className="w-4 h-4" />
                   Selfie with ID
                 </p>
                 {imageLoading ? (
-                  <div className="h-48 bg-[#f5f5f5] rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-[#737373]">Loading secure image...</p>
+                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-text-muted">Loading secure image...</p>
                   </div>
                 ) : selfieUrl ? (
                   <img
                     src={selfieUrl}
                     alt="Selfie with ID"
-                    className="w-full max-h-72 object-contain rounded-lg border border-[#e5e5e5] bg-[#f9f9f9]"
+                    className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
                   />
                 ) : (
-                  <div className="h-48 bg-[#fee2e2] rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-[#dc2626]">Failed to load image</p>
+                  <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>
                   </div>
                 )}
               </div>
 
               {selectedRequest.rejection_reason && (
-                <div className="p-3 bg-[#fee2e2] rounded-lg mb-4">
-                  <p className="text-sm font-medium text-[#dc2626]">Rejection Reason:</p>
-                  <p className="text-sm text-[#dc2626]">{selectedRequest.rejection_reason}</p>
+                <div className="p-3 bg-red-500/10 rounded-lg mb-4">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Rejection Reason:</p>
+                  <p className="text-sm text-red-600 dark:text-red-400">{selectedRequest.rejection_reason}</p>
                 </div>
               )}
 
               {/* Actions */}
               {selectedRequest.status === 'pending' && (
-                <div className="flex gap-3 pt-4 border-t border-[#e5e5e5]">
+                <div className="flex gap-3 pt-4 border-t border-theme">
                   <Button
                     variant="primary"
                     onClick={handleApprove}
@@ -492,9 +486,9 @@ export default function VerificationsPage() {
       {/* ── Reject Reason Modal ── */}
       {selectedRequest && showRejectModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-bold text-[#1a1a1a] mb-2">Reject Verification</h3>
-            <p className="text-sm text-[#737373] mb-4">
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-lg font-bold text-text-primary mb-2">Reject Verification</h3>
+            <p className="text-sm text-text-muted mb-4">
               Rejecting verification for <strong>{selectedRequest.citizen_name}</strong>.
               Please provide a reason so the citizen can understand what to correct.
             </p>

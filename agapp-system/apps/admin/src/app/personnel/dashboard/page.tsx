@@ -239,38 +239,38 @@ export default function PersonnelDashboard() {
       <ToastContainer />
 
       <Modal isOpen={!!readyCode} onClose={() => setReadyCode(null)} title="Ready for Pickup" size="sm">
-        <p className="text-sm text-[#737373] mb-4">
+        <p className="text-sm text-text-muted mb-4">
           The citizen has been notified. Give them this claim code (or they can show the QR from their app) at the counter:
         </p>
-        <div className="text-center py-4 bg-[#f5f5f5] rounded-lg">
-          <span className="text-2xl font-bold tracking-widest text-[#1a1a1a]">{readyCode}</span>
+        <div className="text-center py-4 bg-surface-alt rounded-xl">
+          <span className="text-2xl font-mono font-bold tracking-widest text-text-primary">{readyCode}</span>
         </div>
       </Modal>
 
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl animate-pulse">
           Loading your queue…
         </div>
       )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
           Failed to load queue: {loadError}
         </div>
       )}
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - My Queue */}
         <div className="lg:col-span-2 space-y-5">
           {/* Search */}
-          <Card padding="sm" className="shadow-sm border border-[#e5e5e5]">
+          <Card padding="sm">
             <div className="relative">
-              <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+              <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-faint" />
               <input
                 type="text"
                 placeholder="Search queue by reference, type, or citizen name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e5e5e5] rounded-lg text-sm focus:outline-none focus:border-[#1a1a1a] transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
               />
             </div>
           </Card>
@@ -278,29 +278,29 @@ export default function PersonnelDashboard() {
           {/* Queue Items */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredQueue.length === 0 ? (
-              <div className="col-span-full py-16 text-center bg-white border border-[#e5e5e5] rounded-xl shadow-sm">
-                <FileText className="w-12 h-12 text-[#d4d4d4] mx-auto mb-3.5" />
-                <p className="text-sm font-bold text-[#1a1a1a]">No requests in queue</p>
-                <p className="text-xs text-[#737373] mt-1.5 px-6">There are no pending document applications in your active work queue.</p>
+              <div className="col-span-full py-16 text-center bg-surface border border-theme rounded-2xl">
+                <FileText className="w-12 h-12 text-text-faint mx-auto mb-3.5" />
+                <p className="text-sm font-bold text-text-primary">No requests in queue</p>
+                <p className="text-xs text-text-muted mt-1.5 px-6">There are no pending document applications in your active work queue.</p>
               </div>
             ) : (
               filteredQueue.map((request) => (
-                <Card 
+                <Card
                   key={request.id}
-                  className={`cursor-pointer transition-all border shadow-sm hover:border-gray-400 ${
-                    selectedRequest && selectedRequest.id === request.id ? 'border-[#1a1a1a] bg-[#fafafa]' : 'border-[#e5e5e5] bg-white'
+                  className={`cursor-pointer transition-colors ${
+                    selectedRequest && selectedRequest.id === request.id ? 'bg-accent-soft' : ''
                   }`}
                   onClick={() => setSelectedRequest(request)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-1.5">
-                      <QrCode className="w-4 h-4 text-[#737373]" />
-                      <span className="font-semibold text-[#1a1a1a] text-xs font-mono">{request.id}</span>
+                      <QrCode className="w-4 h-4 text-text-faint" />
+                      <span className="font-semibold text-text-primary text-xs font-mono">{request.id}</span>
                     </div>
                     <ServiceStatusBadge status={request.status} />
                   </div>
-                  <p className="text-[#1a1a1a] text-sm font-semibold mb-2.5 line-clamp-1">{request.serviceType}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-[#737373] font-medium">
+                  <p className="text-text-primary text-sm font-semibold mb-2.5 line-clamp-1">{request.serviceType}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-text-muted font-medium">
                     <User className="w-3.5 h-3.5" />
                     {request.citizen}
                   </div>
@@ -310,24 +310,24 @@ export default function PersonnelDashboard() {
           </div>
 
           {/* Recent Reports (Read-only for personnel) */}
-          <Card className="shadow-sm border border-[#e5e5e5]">
+          <Card>
             <div className="flex items-center gap-2 mb-4">
-              <Warning className="w-5 h-5 text-[#ca8a04]" />
-              <h3 className="font-bold text-sm text-[#1a1a1a]">Recent Town Issue Reports</h3>
+              <Warning className="w-5 h-5 text-accent" />
+              <h3 className="font-bold text-sm text-text-primary">Recent Town Issue Reports</h3>
             </div>
             <div className="space-y-1">
               {recentReports.length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#737373] font-medium">
+                <div className="py-8 text-center text-xs text-text-muted font-medium">
                   No issues logged for Liliw.
                 </div>
               ) : (
                 recentReports.map((report) => (
-                  <div key={report.id} className="flex items-center justify-between py-3 border-b border-[#f0f0f0] last:border-0 hover:bg-[#fafafa] transition-all px-2 rounded-lg">
+                  <div key={report.id} className="flex items-center justify-between py-3 hover:bg-surface-alt transition-colors px-2 rounded-xl">
                     <div>
-                      <p className="text-sm font-semibold text-[#1a1a1a]">{report.category}</p>
-                      <p className="text-xs text-[#737373] font-medium mt-0.5">{report.location} • {report.time}</p>
+                      <p className="text-sm font-semibold text-text-primary">{report.category}</p>
+                      <p className="text-xs text-text-muted font-medium mt-0.5">{report.location} • {report.time}</p>
                     </div>
-                    <Badge 
+                    <Badge
                       variant={
                         report.status === 'resolved' ? 'success' :
                         report.status === 'in_progress' ? 'info' :
@@ -345,52 +345,52 @@ export default function PersonnelDashboard() {
 
         {/* Right Panel - Request Details */}
         <div>
-          <Card className="sticky top-20 shadow-sm border border-[#e5e5e5]">
+          <Card className="sticky top-20">
             {selectedRequest ? (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="border-b border-[#f0f0f0] pb-4.5">
+                <div className="border-b border-theme pb-4.5">
                   <div className="flex items-center gap-1.5 mb-2.5">
-                    <QrCode className="w-5 h-5 text-[#737373]" />
-                    <h2 className="text-base font-bold text-[#1a1a1a] font-mono">{selectedRequest.id}</h2>
+                    <QrCode className="w-5 h-5 text-text-faint" />
+                    <h2 className="text-base font-bold text-text-primary font-mono">{selectedRequest.id}</h2>
                   </div>
                   <ServiceStatusBadge status={selectedRequest.status} />
                 </div>
 
                 {/* Service Info */}
                 <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-[#a3a3a3] mb-1">Service Type</p>
-                  <p className="text-base font-bold text-[#1a1a1a]">{selectedRequest.serviceType}</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-1">Service Type</p>
+                  <p className="text-base font-bold text-text-primary">{selectedRequest.serviceType}</p>
                 </div>
 
                 {/* Citizen Info */}
                 <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-[#a3a3a3] mb-1">Citizen</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-1">Citizen</p>
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-[#737373]" />
-                    <span className="text-sm font-semibold text-[#1a1a1a]">{selectedRequest.citizen}</span>
+                    <User className="w-4 h-4 text-text-faint" />
+                    <span className="text-sm font-semibold text-text-primary">{selectedRequest.citizen}</span>
                   </div>
                 </div>
 
                 {/* Submitted */}
                 <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-[#a3a3a3] mb-1">Submitted</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-1">Submitted</p>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#737373]" />
-                    <span className="text-sm font-medium text-[#1a1a1a]">{selectedRequest.submittedAt}</span>
+                    <Calendar className="w-4 h-4 text-text-faint" />
+                    <span className="text-sm font-mono text-text-primary">{selectedRequest.submittedAt}</span>
                   </div>
                 </div>
 
                 {/* Documents */}
                 <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-[#a3a3a3] mb-2">Submitted Documents</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-2">Submitted Documents</p>
                   {selectedRequest.documents.length === 0 ? (
-                    <p className="text-xs text-[#a3a3a3] italic">No document attachments uploaded.</p>
+                    <p className="text-xs text-text-faint italic">No document attachments uploaded.</p>
                   ) : (
                     <ul className="space-y-1.5">
                       {selectedRequest.documents.map((doc: string, i: number) => (
-                        <li key={i} className="flex items-center gap-2 text-xs font-semibold text-[#525252] bg-gray-50 border border-gray-100 p-2 rounded-lg">
-                          <FileText className="w-4 h-4 text-[#737373]" />
+                        <li key={i} className="flex items-center gap-2 text-xs font-semibold text-text-muted bg-surface-alt p-2 rounded-lg">
+                          <FileText className="w-4 h-4 text-text-faint" />
                           {doc}
                         </li>
                       ))}
@@ -399,14 +399,14 @@ export default function PersonnelDashboard() {
                 </div>
 
                 {selectedRequest.status === 'Ready for Pickup' && selectedRequest.claimCode && (
-                  <div className="p-3 bg-[#eff6ff] border border-[#bfdbfe] rounded-lg text-center">
-                    <p className="text-[10px] uppercase font-bold tracking-wider text-[#2563eb] mb-1">Claim Code</p>
-                    <span className="text-lg font-bold tracking-widest text-[#1a1a1a]">{selectedRequest.claimCode}</span>
+                  <div className="p-3 bg-accent-soft rounded-xl text-center">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-accent mb-1">Claim Code</p>
+                    <span className="text-lg font-mono font-bold tracking-widest text-text-primary">{selectedRequest.claimCode}</span>
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="flex flex-col gap-2.5 pt-4.5 border-t border-[#f0f0f0]">
+                <div className="flex flex-col gap-2.5 pt-4.5 border-t border-theme">
                   {selectedRequest.status === 'Under Review' && (
                     <Button onClick={() => updateStatus('In Progress')} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
                       <Clock className="w-4 h-4" />
@@ -428,10 +428,10 @@ export default function PersonnelDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="py-16 text-center text-sm text-[#737373]">
-                <QrCode className="w-10 h-10 text-[#d4d4d4] mx-auto mb-3.5" />
-                <p className="font-semibold text-[#1a1a1a]">Select a request</p>
-                <p className="text-xs text-[#737373] mt-1">Select a request from the queue to view details</p>
+              <div className="py-16 text-center text-sm text-text-muted">
+                <QrCode className="w-10 h-10 text-text-faint mx-auto mb-3.5" />
+                <p className="font-semibold text-text-primary">Select a request</p>
+                <p className="text-xs text-text-muted mt-1">Select a request from the queue to view details</p>
               </div>
             )}
           </Card>

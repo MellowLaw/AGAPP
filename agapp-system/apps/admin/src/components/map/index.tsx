@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 
 function MapSkeleton() {
-  return <div className="w-full h-full min-h-[16rem] rounded-lg bg-[#f5f5f5] animate-pulse" />;
+  return <div className="w-full h-full min-h-[16rem] rounded-md bg-surface-alt animate-pulse" />;
 }
 
 // Leaflet touches `window` at import time, so every map component must load

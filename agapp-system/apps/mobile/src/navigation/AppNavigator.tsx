@@ -71,7 +71,14 @@ function MainTabNavigator() {
           paddingBottom: 25,
           paddingTop: 10,
         },
-        tabBarHideOnKeyboard: true,
+        // Deliberately NOT tabBarHideOnKeyboard: true — a hiding/reappearing tab
+        // bar fights with screens that manage their own KeyboardAvoidingView
+        // (Chatbot, Reports). When the keyboard dismisses after the chat content
+        // grows (Quick Suggestions row appears after the first message), the
+        // bar's reappear animation and the screen's reflow fall out of sync and
+        // the input sinks behind the bar. Keeping the bar's height constant
+        // removes that race entirely; each screen already handles the keyboard
+        // itself.
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: any = 'home';
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';

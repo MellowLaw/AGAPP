@@ -18,7 +18,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <svg
-        className={`animate-spin ${sizes[size]} text-[#1a1a1a]`}
+        className={`animate-spin ${sizes[size]} text-text-primary`}
         fill="none"
         viewBox="0 0 24 24"
       >
@@ -41,13 +41,13 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 };
 
 export const LoadingPage: React.FC = () => (
-  <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+  <div className="min-h-screen bg-bg flex items-center justify-center">
     <LoadingSpinner size="lg" />
   </div>
 );
 
 export const LoadingCard: React.FC = () => (
-  <div className="bg-white border border-[#e5e5e5] rounded-lg p-8">
+  <div className="bg-surface border border-theme rounded-md p-8">
     <LoadingSpinner size="md" />
   </div>
 );

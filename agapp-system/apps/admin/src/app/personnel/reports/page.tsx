@@ -162,12 +162,12 @@ export default function PersonnelReportsPage() {
     <DashboardLayout role="lgu-personnel" lguName="Liliw, Laguna" title="Issue Reports">
       <ToastContainer />
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md">
           Loading reports…
         </div>
       )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-red-500/10 rounded-md">
           Failed to load reports: {loadError}
         </div>
       )}
@@ -176,15 +176,15 @@ export default function PersonnelReportsPage() {
           <Card>
             <CardHeader title="Reports" action={<Search value={q} onChange={setQ} className="w-64" />} />
             <div className="flex items-center gap-2 px-2 mb-3">
-              <button onClick={() => setTab('assigned')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='assigned'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>Assigned to me</button>
-              <button onClick={() => setTab('office')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='office'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>My office</button>
-              <button onClick={() => setTab('all')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='all'?'bg-[#1a1a1a] text-white':'bg-white border border-[#e5e5e5] text-[#1a1a1a]'}`}>All</button>
+              <button onClick={() => setTab('assigned')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='assigned'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>Assigned to me</button>
+              <button onClick={() => setTab('office')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='office'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>My office</button>
+              <button onClick={() => setTab('all')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='all'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>All</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-2">
               {filtered.map(r => (
-                <button key={r.id} onClick={() => setActive(r)} className={`text-left p-3 rounded-md border ${active?.id===r.id?'border-[#1a1a1a]':'border-[#e5e5e5]'} hover:bg-[#fafafa]`}>
-                  <p className="text-sm font-medium text-[#1a1a1a]">{r.id}</p>
-                  <p className="text-xs text-[#737373]">{r.category} • {r.location}</p>
+                <button key={r.id} onClick={() => setActive(r)} className={`text-left p-3 rounded-md border ${active?.id===r.id?'border-accent':'border-theme'} hover:bg-surface-alt`}>
+                  <p className="text-sm font-medium text-text-primary">{r.id}</p>
+                  <p className="text-xs text-text-muted">{r.category} • {r.location}</p>
                   <div className="mt-2">
                     <Badge variant={r.status==='resolved'?'success':r.status==='in_progress'?'default':r.status==='acknowledged'?'info':'warning'}>
                       {r.status.replace('_',' ')}
@@ -201,12 +201,12 @@ export default function PersonnelReportsPage() {
             <CardHeader title={active ? active.id : 'Select a report'} />
             {active && (
               <div className="space-y-3">
-                <div className="text-sm text-[#1a1a1a]">
-                  <p><span className="text-[#737373]">Category:</span> {active.category}</p>
-                  <p><span className="text-[#737373]">Location:</span> {active.location}</p>
-                  <p><span className="text-[#737373]">Status:</span> {active.status.replace('_',' ')}</p>
+                <div className="text-sm text-text-primary">
+                  <p><span className="text-text-muted">Category:</span> {active.category}</p>
+                  <p><span className="text-text-muted">Location:</span> {active.location}</p>
+                  <p><span className="text-text-muted">Status:</span> {active.status.replace('_',' ')}</p>
                 </div>
-                <div className="flex gap-2 pt-3 border-t border-[#e5e5e5]">
+                <div className="flex gap-2 pt-3 border-t border-theme">
                   {(active.status==='pending' || active.status==='acknowledged') && (
                     <>
                       <Button variant="primary" onClick={() => update('acknowledged')}>

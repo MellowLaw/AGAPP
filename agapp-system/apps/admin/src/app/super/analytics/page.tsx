@@ -133,28 +133,28 @@ export default function SuperAnalyticsPage() {
         />
 
         {loading && (
-          <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">Loading analytics…</div>
+          <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl">Loading analytics…</div>
         )}
         {loadError && !loading && (
-          <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">Failed to load analytics: {loadError}</div>
+          <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">Failed to load analytics: {loadError}</div>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
             <thead>
-              <tr className="border-b border-[#e5e5e5]">
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">LGU</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Month</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Reports</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Requests</th>
+              <tr>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Month</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
               </tr>
             </thead>
             <tbody>
               {paged.map((r, i) => (
-                <tr key={i} className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa]">
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.lgu}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.month}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.reports}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{r.requests}</td>
+                <tr key={i} className="bg-surface-alt hover:bg-accent-soft transition-colors">
+                  <td className="py-3 px-4 rounded-l-xl text-sm text-text-primary">{r.lgu}</td>
+                  <td className="py-3 px-4 text-sm text-text-muted">{r.month}</td>
+                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{r.reports}</td>
+                  <td className="py-3 px-4 rounded-r-xl text-sm font-mono text-text-muted">{r.requests}</td>
                 </tr>
               ))}
             </tbody>

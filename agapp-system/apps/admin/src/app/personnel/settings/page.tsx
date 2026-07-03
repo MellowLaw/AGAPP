@@ -152,7 +152,7 @@ export default function PersonnelSettingsPage() {
     >
       <ToastContainer />
       {loading && (
-        <div className="mb-4 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+        <div className="mb-4 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md animate-pulse">
           Loading your profile…
         </div>
       )}
@@ -165,8 +165,8 @@ export default function PersonnelSettingsPage() {
                 onClick={() => setActiveTab('profile')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
                   activeTab === 'profile'
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium'
-                    : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                    ? 'bg-surface-alt text-text-primary font-medium'
+                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
                 <User className="w-4 h-4" />
@@ -176,8 +176,8 @@ export default function PersonnelSettingsPage() {
                 onClick={() => setActiveTab('notifications')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
                   activeTab === 'notifications'
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium'
-                    : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                    ? 'bg-surface-alt text-text-primary font-medium'
+                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
                 <Bell className="w-4 h-4" />
@@ -191,16 +191,16 @@ export default function PersonnelSettingsPage() {
         <div className="lg:col-span-3">
           {activeTab === 'profile' && (
             <Card>
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">My Profile</h2>
+              <h2 className="text-lg font-semibold text-text-primary mb-6">My Profile</h2>
 
               <div className="space-y-6">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 bg-[#f5f5f5] rounded-full flex items-center justify-center">
-                    <User className="w-8 h-8 text-[#737373]" />
+                  <div className="w-16 h-16 bg-surface-alt rounded-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-text-muted" />
                   </div>
                   <div>
-                    <p className="font-medium text-[#1a1a1a]">{name || 'Loading...'}</p>
-                    <p className="text-sm text-[#737373]">{role.replace('_', ' ')}</p>
+                    <p className="font-medium text-text-primary">{name || 'Loading...'}</p>
+                    <p className="text-sm text-text-muted">{role.replace('_', ' ')}</p>
                   </div>
                 </div>
 
@@ -217,12 +217,12 @@ export default function PersonnelSettingsPage() {
                   />
                 </div>
 
-                <div className="pt-4 border-t border-[#e5e5e5]">
+                <div className="pt-4 border-t border-theme">
                   <Button onClick={handleSaveProfile}>Save Changes</Button>
                 </div>
 
-                <div className="pt-4 border-t border-[#e5e5e5]">
-                  <h3 className="font-medium text-[#1a1a1a] mb-4">Change Password</h3>
+                <div className="pt-4 border-t border-theme">
+                  <h3 className="font-medium text-text-primary mb-4">Change Password</h3>
                   <div className="space-y-4">
                     <Input
                       label="Current Password"
@@ -258,27 +258,27 @@ export default function PersonnelSettingsPage() {
 
           {activeTab === 'notifications' && (
             <Card>
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">Notification Preferences</h2>
+              <h2 className="text-lg font-semibold text-text-primary mb-6">Notification Preferences</h2>
 
               <div className="space-y-4">
                 {NOTIF_ITEMS.map((item) => {
                   const checked = item.key === 'push' ? notifPush : item.key === 'sms' ? notifSms : notifEmail;
                   const setChecked = item.key === 'push' ? setNotifPush : item.key === 'sms' ? setNotifSms : setNotifEmail;
                   return (
-                    <label key={item.key} className="flex items-center justify-between py-3 border-b border-[#e5e5e5] last:border-0 cursor-pointer">
-                      <span className="text-[#1a1a1a]">{item.label}</span>
+                    <label key={item.key} className="flex items-center justify-between py-3 border-b border-theme last:border-0 cursor-pointer">
+                      <span className="text-text-primary">{item.label}</span>
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={(e) => setChecked(e.target.checked)}
-                        className="w-4 h-4 accent-[#1a1a1a]"
+                        className="w-4 h-4 accent-accent"
                       />
                     </label>
                   );
                 })}
               </div>
 
-              <div className="pt-4 border-t border-[#e5e5e5] mt-6">
+              <div className="pt-4 border-t border-theme mt-6">
                 <Button onClick={handleSaveNotifications}>Save Preferences</Button>
               </div>
             </Card>

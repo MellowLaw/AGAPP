@@ -222,18 +222,18 @@ export default function SuperLgusPage() {
     <DashboardLayout role="super-admin" title="LGU Directory">
       <ToastContainer />
       {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl">
           Loading LGUs…
         </div>
       )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-[#dc2626] bg-[#fef2f2] rounded-md">
+        <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
           Failed to load LGUs: {loadError}
         </div>
       )}
       <Card>
-        <CardHeader 
-          title="Municipalities" 
+        <CardHeader
+          title="Municipalities"
           action={
             <div className="relative">
               <Button onClick={() => setAddOpen(v => !v)}>
@@ -241,14 +241,14 @@ export default function SuperLgusPage() {
                 Add LGU
               </Button>
               {addOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white border border-[#e5e5e5] rounded-md shadow-md p-2 z-10">
+                <div className="absolute right-0 mt-2 w-64 bg-surface border border-theme rounded-xl p-2 z-10">
                   {addable.length === 0 ? (
-                    <p className="text-sm text-[#737373] px-2 py-1">All sample LGUs added</p>
+                    <p className="text-sm text-text-muted px-2 py-1">All sample LGUs added</p>
                   ) : addable.map(opt => (
                     <button
                       key={opt}
                       onClick={() => handleAdd(opt)}
-                      className="w-full text-left px-2 py-2 text-sm rounded hover:bg-[#f5f5f5]"
+                      className="w-full text-left px-2 py-2 text-sm rounded-lg text-text-primary hover:bg-accent-soft"
                     >
                       {opt}
                     </button>
@@ -261,7 +261,7 @@ export default function SuperLgusPage() {
 
         <div className="flex items-center justify-between mb-4">
           <Search value={search} onChange={setSearch} className="max-w-md" placeholder="Search municipality..." />
-          <Button 
+          <Button
             variant="secondary"
             onClick={handleExportCsv}
           >
@@ -270,32 +270,32 @@ export default function SuperLgusPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
             <thead>
-              <tr className="border-b border-[#e5e5e5]">
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">LGU</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Users</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Reports</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Requests</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Avg Response</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#737373]">Status</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-[#737373]">Actions</th>
+              <tr>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Users</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Avg Response</th>
+                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Status</th>
+                <th className="text-right pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((lgu) => (
-                <tr key={lgu.id} className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa]">
-                  <td className="py-3 px-4 font-medium text-[#1a1a1a]">{lgu.name}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{lgu.users.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{lgu.reports}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{lgu.requests}</td>
-                  <td className="py-3 px-4 text-sm text-[#1a1a1a]">{lgu.responseTime}</td>
+                <tr key={lgu.id} className="bg-surface-alt hover:bg-surface transition-colors">
+                  <td className="py-3 px-4 rounded-l-md font-medium text-text-primary">{lgu.name}</td>
+                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.reports}</td>
+                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.requests}</td>
+                  <td className="py-3 px-4 text-sm text-text-muted">{lgu.responseTime}</td>
                   <td className="py-3 px-4">
                     <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
                       {lgu.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 rounded-r-md">
                     <div className="flex items-center justify-end gap-2">
                       <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
                         <Eye className="w-4 h-4 mr-1" /> Configure
@@ -318,33 +318,33 @@ export default function SuperLgusPage() {
       {/* LGU Settings Modal */}
       {selectedLguForEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg bg-white rounded-lg border border-[#e5e5e5] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-start border-b border-[#e5e5e5] pb-3 mb-4">
-              <h3 className="text-lg font-bold text-[#1a1a1a]">Configure LGU: {selectedLguForEdit.name}</h3>
-              <button onClick={() => setSelectedLguForEdit(null)} className="text-[#a3a3a3] hover:text-[#1a1a1a] font-bold">✕</button>
+          <div className="w-full max-w-lg bg-surface rounded-2xl border border-theme p-6 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-start border-b border-theme pb-3 mb-4">
+              <h3 className="text-lg font-bold text-text-primary">Configure LGU: {selectedLguForEdit.name}</h3>
+              <button onClick={() => setSelectedLguForEdit(null)} className="text-text-faint hover:text-accent font-bold">✕</button>
             </div>
-            
+
             <div className="space-y-5">
               {/* Latitude and Longitude */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#737373] uppercase mb-1.5">Latitude</label>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Latitude</label>
                   <input
                     type="number"
                     step="0.000001"
                     value={selectedLguForEdit.latitude || 0}
                     onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, latitude: parseFloat(e.target.value || '0') })}
-                    className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+                    className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#737373] uppercase mb-1.5">Longitude</label>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Longitude</label>
                   <input
                     type="number"
                     step="0.000001"
                     value={selectedLguForEdit.longitude || 0}
                     onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, longitude: parseFloat(e.target.value || '0') })}
-                    className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#1a1a1a]"
+                    className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -352,55 +352,55 @@ export default function SuperLgusPage() {
               {/* Colors */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#737373] uppercase mb-1.5">Primary Color</label>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Primary Color</label>
                   <div className="flex gap-2">
                     <input
                       type="color"
                       value={selectedLguForEdit.primary_color || '#ffffff'}
                       onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                      className="w-10 h-10 border border-[#e5e5e5] rounded-md p-1 cursor-pointer"
+                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
                     />
                     <input
                       type="text"
                       value={selectedLguForEdit.primary_color || ''}
                       onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm font-mono focus:outline-none focus:border-[#1a1a1a]"
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#737373] uppercase mb-1.5">Secondary Color</label>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Secondary Color</label>
                   <div className="flex gap-2">
                     <input
                       type="color"
                       value={selectedLguForEdit.secondary_color || '#ffffff'}
                       onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                      className="w-10 h-10 border border-[#e5e5e5] rounded-md p-1 cursor-pointer"
+                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
                     />
                     <input
                       type="text"
                       value={selectedLguForEdit.secondary_color || ''}
                       onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm font-mono focus:outline-none focus:border-[#1a1a1a]"
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Onboarding payment status */}
-              <label className="flex items-center gap-2.5 py-2 border-b border-[#e5e5e5] cursor-pointer">
+              <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selectedLguForEdit.onboarding_fee_paid || false}
                   onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, onboarding_fee_paid: e.target.checked })}
-                  className="rounded text-[#1a1a1a] focus:ring-[#1a1a1a] w-4 h-4"
+                  className="rounded text-accent focus:ring-accent w-4 h-4"
                 />
-                <span className="text-sm font-semibold text-[#1a1a1a]">Onboarding Fee Paid (Active License)</span>
+                <span className="text-sm font-semibold text-text-primary">Onboarding Fee Paid (Active License)</span>
               </label>
 
               {/* Feature Flags */}
               <div className="space-y-3">
-                <p className="text-xs font-bold text-[#737373] uppercase tracking-wider">Feature Flags</p>
+                <p className="text-xs font-bold text-text-faint uppercase tracking-wider">Feature Flags</p>
                 <div className="grid grid-cols-3 gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -410,11 +410,11 @@ export default function SuperLgusPage() {
                         ...selectedLguForEdit,
                         feature_flags: { ...selectedLguForEdit.feature_flags!, chatbot: e.target.checked }
                       })}
-                      className="rounded text-[#1a1a1a] focus:ring-[#1a1a1a] w-4 h-4"
+                      className="rounded text-accent focus:ring-accent w-4 h-4"
                     />
-                    <span className="text-sm font-semibold text-[#1a1a1a]">Chatbot</span>
+                    <span className="text-sm font-semibold text-text-primary">Chatbot</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -423,9 +423,9 @@ export default function SuperLgusPage() {
                         ...selectedLguForEdit,
                         feature_flags: { ...selectedLguForEdit.feature_flags!, potholeDetection: e.target.checked }
                       })}
-                      className="rounded text-[#1a1a1a] focus:ring-[#1a1a1a] w-4 h-4"
+                      className="rounded text-accent focus:ring-accent w-4 h-4"
                     />
-                    <span className="text-sm font-semibold text-[#1a1a1a]">AI Pothole</span>
+                    <span className="text-sm font-semibold text-text-primary">AI Pothole</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -436,15 +436,15 @@ export default function SuperLgusPage() {
                         ...selectedLguForEdit,
                         feature_flags: { ...selectedLguForEdit.feature_flags!, forum: e.target.checked }
                       })}
-                      className="rounded text-[#1a1a1a] focus:ring-[#1a1a1a] w-4 h-4"
+                      className="rounded text-accent focus:ring-accent w-4 h-4"
                     />
-                    <span className="text-sm font-semibold text-[#1a1a1a]">Forum</span>
+                    <span className="text-sm font-semibold text-text-primary">Forum</span>
                   </label>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6 border-t border-[#e5e5e5] pt-4 justify-end">
+            <div className="flex gap-3 mt-6 border-t border-theme pt-4 justify-end">
               <Button variant="secondary" onClick={() => setSelectedLguForEdit(null)}>Cancel</Button>
               <Button onClick={handleSaveLgu}>Save Changes</Button>
             </div>

@@ -48,8 +48,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e5e5]">
-      <div className="text-sm text-[#737373]">
+    <div className="flex items-center justify-between px-4 py-3 border-t border-theme">
+      <div className="text-sm text-text-muted">
         {totalItems && itemsPerPage && (
           <span>
             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
@@ -70,7 +70,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         {getPageNumbers().map((page, index) => (
           <React.Fragment key={index}>
             {page === '...' ? (
-              <span className="px-2 text-[#737373]">...</span>
+              <span className="px-2 text-text-muted">...</span>
             ) : (
               <Button
                 variant={currentPage === page ? 'primary' : 'ghost'}

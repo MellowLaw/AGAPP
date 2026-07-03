@@ -37,7 +37,7 @@ export const Search: React.FC<SearchProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className={`relative ${className}`}>
-      <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+      <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
       
       <input
         type="text"
@@ -48,7 +48,7 @@ export const Search: React.FC<SearchProps> = ({
         }}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="w-full pl-9 pr-9 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm text-[#1a1a1a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb]"
+        className="w-full pl-9 pr-9 py-2 bg-surface border border-theme rounded-md text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
       />
       
       {internalValue && (
@@ -57,7 +57,7 @@ export const Search: React.FC<SearchProps> = ({
           onClick={handleClear}
           className="absolute right-3 top-1/2 -translate-y-1/2"
         >
-          <X className="w-4 h-4 text-[#737373] hover:text-[#1a1a1a]" />
+          <X className="w-4 h-4 text-text-muted hover:text-text-primary" />
         </button>
       )}
     </form>

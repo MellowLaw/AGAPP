@@ -141,16 +141,18 @@ export default function SuperAdminDashboard() {
   return (
     <DashboardLayout
       role="super-admin"
-      title="Cross-LGU Analytics"
+      title="Dashboard Overview"
+      heroKicker="MUNICIPAL CONTROL CENTER — SUPER ADMIN"
+      heroTitleAccent="Agapp Portal"
     >
       {/* LGU Filter Tabs */}
-      <div className="flex items-center gap-2.5 mb-6 flex-wrap">
+      <div className="flex items-center gap-2.5 mb-8 flex-wrap">
         <button
           onClick={() => setSelectedLgu(null)}
-          className={`px-4.5 py-2 rounded-full text-xs font-semibold shadow-sm transition-all ${
+          className={`px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors ${
             selectedLgu === null
-              ? 'bg-[#1a1a1a] text-white'
-              : 'bg-white border border-[#e5e5e5] text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+              ? 'bg-text-primary text-bg'
+              : 'bg-transparent border border-theme text-text-muted hover:border-text-muted hover:text-text-primary'
           }`}
         >
           All LGUs
@@ -159,10 +161,10 @@ export default function SuperAdminDashboard() {
           <button
             key={lgu.id}
             onClick={() => setSelectedLgu(lgu.id)}
-            className={`px-4.5 py-2 rounded-full text-xs font-semibold shadow-sm transition-all ${
+            className={`px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors ${
               selectedLgu === lgu.id
-                ? 'bg-[#1a1a1a] text-white'
-                : 'bg-white border border-[#e5e5e5] text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
+                ? 'bg-text-primary text-bg'
+                : 'bg-transparent border border-theme text-text-muted hover:border-text-muted hover:text-text-primary'
             }`}
           >
             {lgu.name}
@@ -170,67 +172,67 @@ export default function SuperAdminDashboard() {
         ))}
         <Link href="/super/lgus">
           <button
-            className="px-4 py-2 bg-white border border-[#e5e5e5] rounded-full text-xs font-semibold text-[#1a1a1a] hover:bg-[#f5f5f5] flex items-center gap-1.5 shadow-sm"
+            className="px-5 py-2.5 bg-transparent border border-theme rounded-full text-[13px] font-semibold text-text-primary hover:border-text-muted flex items-center gap-1.5 transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             Add LGU
           </button>
         </Link>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.label} padding="sm" className="shadow-sm border border-[#e5e5e5] hover:border-gray-300 transition-all duration-200">
+            <Card key={stat.label} noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-[#a3a3a3] uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl font-bold text-[#1a1a1a] mt-1.5">{stat.value}</p>
+                <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
+                <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
+                  <Icon className="w-4 h-4 text-accent" />
                 </div>
-                <div className="p-2 bg-[#f5f5f5] rounded-lg">
-                  <Icon className="w-5 h-5 text-[#737373]" />
-                </div>
+              </div>
+              <div className="mt-4">
+                <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
               </div>
             </Card>
           );
         })}
       </div>
 
-      {/* Cross-LGU Reports Map — replaces the old bar/line/pie charts with the
-          actual geography of citizen reports. View-only by design: the super
-          admin monitors, only the owning LGU acts on a report. */}
-      <Card className="mb-6 shadow-sm border border-[#e5e5e5]">
-        <CardHeader
-          title="Reports Map"
-          subtitle={selectedLgu
-            ? `Report locations for ${lgus.find(l => l.id === selectedLgu)?.name || 'selected LGU'}`
-            : 'Report locations across all LGUs — click a pin for details'}
-          action={
-            <Badge variant="default" className="bg-blue-50 text-blue-700 font-semibold px-2.5 py-1">
-              View only
-            </Badge>
-          }
-        />
+      {/* Cross-LGU Reports Map */}
+      <div className="mb-8">
+        <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
+          <div>
+            <h3 className="text-2xl font-bold text-text-primary">Reports Hotspot Map</h3>
+            <p className="text-sm font-serif italic text-accent mt-1">
+              {selectedLgu
+                ? `Report locations for ${lgus.find(l => l.id === selectedLgu)?.name || 'selected LGU'}`
+                : 'Interactive Reports Map across all LGUs'}
+            </p>
+          </div>
+          <Badge variant="default" className="!bg-accent !text-white font-semibold px-2.5 py-1 border-0">
+            View only
+          </Badge>
+        </div>
         {!loading && reportPins.length === 0 ? (
-          <div className="h-40 flex items-center justify-center text-sm text-[#737373]">
+          <div className="h-40 flex items-center justify-center text-sm text-text-muted bg-surface-alt/30 rounded-2xl">
             No reports with location data{selectedLgu ? ' for this LGU' : ''} yet.
           </div>
         ) : (
-          <ReportsMap className="h-[28rem]" reports={reportPins} center={mapCenter} />
+          <ReportsMap className="h-[28rem] rounded-[20px] overflow-hidden" reports={reportPins} center={mapCenter} />
         )}
-      </Card>
+      </div>
 
       {/* LGU Performance Leaderboard */}
-      <Card className="shadow-sm border border-[#e5e5e5]">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+      <div className="mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <h3 className="text-lg font-bold text-[#1a1a1a]">LGU Performance Leaderboard</h3>
-            <p className="text-xs text-[#a3a3a3] mt-0.5">Summary of reporting workloads per active tenant</p>
+            <h3 className="text-2xl font-bold text-text-primary">LGU Performance Leaderboard</h3>
+            <p className="text-sm font-serif italic text-accent mt-1">Summary of reporting workloads per active tenant</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => {
+            <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90" onClick={() => {
               const rows = (selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map(l => [l.name, l.users, l.reports, l.requests, l.responseTime, 'Active'].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
               const csv = ['LGU,Users,Reports,Requests,Avg Response,Status', ...rows].join('\n');
               const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -246,33 +248,30 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto pb-4">
+          <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
-              <tr className="border-b border-[#e5e5e5] text-left">
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">LGU</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">Users</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">Reports</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">Requests</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">Avg Response</th>
-                <th className="py-3 px-4 text-xs font-semibold text-[#a3a3a3] uppercase tracking-wider">Status</th>
+              <tr>
+                <th className="pb-3 pl-10 pr-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">LGU</th>
+                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Users</th>
+                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Reports</th>
+                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Requests</th>
+                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Avg Response</th>
+                <th className="pb-3 pl-6 pr-10 text-[11px] font-bold text-text-primary uppercase tracking-wider text-right">Status</th>
               </tr>
             </thead>
             <tbody>
               {(selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map((lgu) => (
-                <tr
-                  key={lgu.id}
-                  className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa] transition-all"
-                >
-                  <td className="py-4.5 px-4">
-                    <span className="font-semibold text-sm text-[#1a1a1a]">{lgu.name}</span>
+                <tr key={lgu.id} className="bg-surface hover:bg-surface-alt transition-colors group">
+                  <td className="py-5 pl-10 pr-6 rounded-l-full">
+                    <span className="font-semibold text-[15px] text-text-primary">{lgu.name}</span>
                   </td>
-                  <td className="py-4.5 px-4 text-sm text-[#525252] font-medium">{lgu.users.toLocaleString()}</td>
-                  <td className="py-4.5 px-4 text-sm text-[#525252] font-semibold">{lgu.reports}</td>
-                  <td className="py-4.5 px-4 text-sm text-[#525252] font-semibold">{lgu.requests}</td>
-                  <td className="py-4.5 px-4 text-sm text-[#525252] font-medium">{lgu.responseTime}</td>
-                  <td className="py-4.5 px-4">
-                    <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
+                  <td className="py-5 px-6 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
+                  <td className="py-5 px-6 text-sm font-mono font-semibold text-text-muted">{lgu.reports}</td>
+                  <td className="py-5 px-6 text-sm font-mono font-semibold text-text-muted">{lgu.requests}</td>
+                  <td className="py-5 px-6 text-sm text-text-muted">{lgu.responseTime}</td>
+                  <td className="py-5 pl-6 pr-10 rounded-r-full text-right">
+                    <Badge variant={lgu.status === 'active' ? 'success' : 'default'} className="rounded-full px-3 py-1">
                       {lgu.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
@@ -281,7 +280,7 @@ export default function SuperAdminDashboard() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
     </DashboardLayout>
   );
 }

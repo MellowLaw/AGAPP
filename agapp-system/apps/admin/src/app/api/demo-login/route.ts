@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 // Demo accounts only (seeded, never real citizen/staff data). Emails are
 // already shown in plaintext in the login page UI; passwords are read from
@@ -20,6 +21,23 @@ const DEMO_ACCOUNTS: Record<string, { email: string; passwordEnvVar: string }> =
 };
 
 export async function POST(req: NextRequest) {
+  // Lightweight CSRF defense-in-depth: reject cross-origin POSTs. The demo
+  // accounts' credentials are already public (shown in the UI), so this
+  // isn't guarding a secret — it just stops this endpoint being driven from
+  // an arbitrary third-party page.
+  const origin = req.headers.get('origin');
+  if (origin && new URL(origin).host !== req.headers.get('host')) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  }
+
+  const { ok, retryAfterSeconds } = rateLimit(`demo-login:${clientIp(req)}`, 10, 10 * 60 * 1000);
+  if (!ok) {
+    return NextResponse.json(
+      { error: 'Too many login attempts. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+    );
+  }
+
   const { role } = await req.json();
 
   const account = DEMO_ACCOUNTS[role];
