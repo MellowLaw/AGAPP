@@ -3,23 +3,10 @@
   "version": "1.0.0",
   "description": "AGAPP - Automated Governance and Public Service Platform",
   "private": true,
-  "workspaces": {
-    "packages": [
-      "apps/*",
-      "packages/*"
-    ],
-    "nohoist": [
-      "**/expo",
-      "**/expo/**",
-      "**/react-native",
-      "**/react-native/**",
-      "**/react",
-      "**/react/**",
-      "**/@expo/**",
-      "**/@react-native/**",
-      "**/@react-native-community/**"
-    ]
-  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/admin\"",
     "dev:api": "npm run dev --workspace=apps/api",
@@ -30,10 +17,16 @@
     "build:shared": "npm run build --workspace=packages/shared"
   },
   "devDependencies": {
+    "@types/react": "~19.1.0",
+    "@types/react-dom": "~19.1.0",
     "concurrently": "^8.2.2"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.1.1"
+    "@expo/vector-icons": "^15.1.1",
+    "next": "file:stubs/next",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "styled-jsx": "file:stubs/styled-jsx"
   },
   "overrides": {
     "react-native-safe-area-context": "5.6.2",

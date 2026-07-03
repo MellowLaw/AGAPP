@@ -7,7 +7,6 @@ import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { AgappLogo } from '../components/AgappLogo';
 import { useNavigation } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 const ThinkingIndicator = ({ T }: { T: any }) => {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -60,13 +59,6 @@ export function ChatbotScreen() {
   ]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  let tabBarHeight = 0;
-  try {
-    tabBarHeight = useBottomTabBarHeight();
-  } catch (e) {
-    tabBarHeight = 85;
-  }
 
   // Scroll to bottom when messages list or loading state updates
   useEffect(() => {
@@ -202,10 +194,10 @@ export function ChatbotScreen() {
                   <View style={styles.suggestionsGrid}>
                     {[
                       { title: 'How do I apply for a business permit?' },
-                      { title: 'Where is the Municipal Hall located?' },
-                      { title: 'Report a pothole on the main road' },
-                      { title: "Break down today's top local news for me" },
-                      { title: 'Surprise me with a fact about my city' }
+                      { title: 'How much is a cedula?' },
+                      { title: 'How do I get a barangay clearance?' },
+                      { title: 'How do I report a pothole?' },
+                      { title: 'What are the office hours of the Municipal Hall?' }
                     ].map((item, idx) => (
                       <TouchableOpacity
                         key={idx}

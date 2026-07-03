@@ -113,7 +113,10 @@ export default function NewsPage() {
     };
 
     fetchAnnouncements();
-  }, [lguId, showToast]);
+    // showToast is deliberately excluded — useToast() returns a new function
+    // reference on every render, so including it here would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lguId]);
 
   useEffect(() => {
     const loadUser = async () => {

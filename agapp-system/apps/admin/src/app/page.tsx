@@ -6,12 +6,9 @@ import { ArrowRight } from '@phosphor-icons/react';
 import { supabase } from '@/lib/supabase';
 import { lguNameFromId } from '@/lib/lgu';
 
-// Demo users database for quick-fill buttons
-const DEMO_USERS = [
-  { email: 'superadmin@agapp.gov.ph', password: '24z8Dmm;{E<l', role: 'SUPER_ADMIN', redirect: '/super' },
-  { email: 'admin@liliw.gov.ph', password: 'hQt00bB5[1$C', role: 'LGU_ADMIN', redirect: '/lgu/dashboard', lgu: 'Liliw, Laguna' },
-  { email: 'personnel@liliw.gov.ph', password: 'password123', role: 'LGU_PERSONNEL', redirect: '/personnel/dashboard', lgu: 'Liliw, Laguna' },
-];
+// Demo quick-login buttons call POST /api/demo-login, which signs in
+// server-side using non-public env vars — passwords never reach this client.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function UnifiedLoginPage() {
   const [email, setEmail] = useState('');
@@ -20,14 +17,61 @@ export default function UnifiedLoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // Shared by both the real login form and the demo quick-login buttons —
+  // looks up the just-authenticated user's role/LGU and routes them to the
+  // right dashboard. Returns an error message on failure, or null on success.
+  const redirectByRole = async (userId: string): Promise<string | null> => {
+    const { data: profile, error: dbError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (dbError || !profile) {
+      return 'User profile not found. Please contact your LGU administrator.';
+    }
+
+    if (profile.role === 'SUPER_ADMIN') {
+      router.push('/super');
+    } else if (profile.role === 'LGU_ADMIN') {
+      const lguName = lguNameFromId(profile.lgu_id);
+      router.push(`/lgu/dashboard?lguName=${encodeURIComponent(lguName)}`);
+    } else if (profile.role === 'LGU_PERSONNEL') {
+      router.push('/personnel/dashboard');
+    } else {
+      await supabase.auth.signOut();
+      return 'Access denied: Citizens must use the mobile application.';
+    }
+    return null;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Frontend validation — catches obviously malformed input before making a
+    // network call. This is a UX nicety, not the security boundary: the real
+    // credential check happens server-side in Supabase Auth below, which is
+    // the only place that can actually verify a password.
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // Server-side validation: Supabase Auth verifies the email/password
+      // against the real password hash — this call is the actual security
+      // boundary, not anything on the client. A wrong password always fails
+      // here regardless of what the frontend checks let through.
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       });
 
@@ -37,28 +81,9 @@ export default function UnifiedLoginPage() {
         return;
       }
 
-      const { data: profile, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (dbError || !profile) {
-        setError('User profile not found. Please contact your LGU administrator.');
-        setIsLoading(false);
-        return;
-      }
-
-      if (profile.role === 'SUPER_ADMIN') {
-        router.push('/super');
-      } else if (profile.role === 'LGU_ADMIN') {
-        const lguName = lguNameFromId(profile.lgu_id);
-        router.push(`/lgu/dashboard?lguName=${encodeURIComponent(lguName)}`);
-      } else if (profile.role === 'LGU_PERSONNEL') {
-        router.push('/personnel/dashboard');
-      } else {
-        setError('Access denied: Citizens must use the mobile application.');
-        await supabase.auth.signOut();
+      const redirectError = await redirectByRole(authData.user.id);
+      if (redirectError) {
+        setError(redirectError);
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -67,11 +92,42 @@ export default function UnifiedLoginPage() {
     }
   };
 
-  const handleDemoLogin = (demoEmail: string) => {
-    const user = DEMO_USERS.find(u => u.email === demoEmail);
-    if (user) {
-      setEmail(user.email);
-      setPassword(user.password);
+  const handleDemoLogin = async (role: string) => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      // Server-side validation happens here too: /api/demo-login signs in
+      // with supabase.auth.signInWithPassword on the server, same as the
+      // manual form — the password never reaches this client code.
+      const res = await fetch('/api/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error || 'Demo login failed.');
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('Demo login failed: no session returned.');
+        setIsLoading(false);
+        return;
+      }
+
+      const redirectError = await redirectByRole(user.id);
+      if (redirectError) {
+        setError(redirectError);
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected error occurred.');
+      setIsLoading(false);
     }
   };
 
@@ -154,24 +210,27 @@ export default function UnifiedLoginPage() {
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemoLogin('superadmin@agapp.gov.ph')}
-                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin('SUPER_ADMIN')}
+                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="font-medium text-[#1a1a1a]">Super Admin</span>
                 <span className="text-xs block">superadmin@agapp.gov.ph</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleDemoLogin('admin@liliw.gov.ph')}
-                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin('LGU_ADMIN')}
+                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="font-medium text-[#1a1a1a]">LGU Admin</span>
                 <span className="text-xs block">admin@liliw.gov.ph</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleDemoLogin('personnel@liliw.gov.ph')}
-                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin('LGU_PERSONNEL')}
+                className="text-left px-3 py-2 text-sm text-[#737373] hover:bg-[#f5f5f5] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="font-medium text-[#1a1a1a]">LGU Personnel</span>
                 <span className="text-xs block">personnel@liliw.gov.ph</span>

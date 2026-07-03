@@ -507,6 +507,11 @@ export function MapExplorerScreen() {
                   </View>
                   <Text style={[styles.detailTitle,   { color: T.text }]}      numberOfLines={1}>{selectedPoi.name}</Text>
                   <Text style={[styles.detailAddress, { color: T.textMuted }]} numberOfLines={1}>{selectedPoi.address}</Text>
+                  {!!selectedPoi.description && (
+                    <Text style={[styles.detailAddress, { color: T.textMuted, marginTop: 6 }]} numberOfLines={3}>
+                      {selectedPoi.description}
+                    </Text>
+                  )}
                 </View>
               </View>
 

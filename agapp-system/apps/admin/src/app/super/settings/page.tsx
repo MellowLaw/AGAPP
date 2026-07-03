@@ -52,7 +52,11 @@ export default function SuperSettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+    // showToast (from useToast()) is a new function reference on every render,
+    // so it's deliberately excluded here — including it would make loadConfig
+    // itself unstable and cause the effect below to refetch in an infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 

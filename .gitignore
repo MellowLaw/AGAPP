@@ -13,3 +13,8 @@
 # Allow the docs vault and project guide to be tracked
 !/Docs/
 !/CLAUDE.md
+
+# Ignore Obsidian workspace files (which contain local layout, tabs, and history state)
+/Docs/.obsidian/workspace.json
+/Docs/.obsidian/workspace-mobile.json
+

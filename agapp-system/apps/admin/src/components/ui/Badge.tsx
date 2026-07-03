@@ -35,32 +35,35 @@ export const Badge: React.FC<BadgeProps> = ({
   );
 };
 
-// Status badge mappings for reports
+// Status badge mappings for reports — covers both UI vocabularies in use:
+// lgu/reports uses submitted/under_review, personnel pages use pending/acknowledged.
 export const ReportStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const statusMap: Record<string, { variant: BadgeVariant; label: string }> = {
     pending: { variant: 'warning', label: 'Pending' },
+    submitted: { variant: 'warning', label: 'Submitted' },
     acknowledged: { variant: 'info', label: 'Acknowledged' },
+    under_review: { variant: 'info', label: 'Under Review' },
     in_progress: { variant: 'default', label: 'In Progress' },
     resolved: { variant: 'success', label: 'Resolved' },
     rejected: { variant: 'error', label: 'Rejected' },
   };
-  
+
   const { variant, label } = statusMap[status] || { variant: 'default', label: status };
   return <Badge variant={variant}>{label}</Badge>;
 };
 
-// Status badge mappings for service requests
+// Status badge mappings for service requests — keys are the literal DB
+// `service_requests.status` values (see supabase/schema.sql CHECK constraint).
 export const ServiceStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const statusMap: Record<string, { variant: BadgeVariant; label: string }> = {
-    pending: { variant: 'warning', label: 'Pending' },
-    under_review: { variant: 'info', label: 'Under Review' },
-    awaiting_payment: { variant: 'warning', label: 'Awaiting Payment' },
-    processing: { variant: 'default', label: 'Processing' },
-    ready_for_pickup: { variant: 'info', label: 'Ready for Pickup' },
-    completed: { variant: 'success', label: 'Completed' },
-    rejected: { variant: 'error', label: 'Rejected' },
+    'Submitted': { variant: 'warning', label: 'Submitted' },
+    'Under Review': { variant: 'info', label: 'Under Review' },
+    'In Progress': { variant: 'default', label: 'In Progress' },
+    'Ready for Pickup': { variant: 'info', label: 'Ready for Pickup' },
+    'Released': { variant: 'success', label: 'Released' },
+    'Rejected': { variant: 'error', label: 'Rejected' },
   };
-  
+
   const { variant, label } = statusMap[status] || { variant: 'default', label: status };
   return <Badge variant={variant}>{label}</Badge>;
 };

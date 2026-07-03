@@ -10,6 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TasksScreen } from '../screens/TasksScreen';
 import { TaskDetailsScreen } from '../screens/TaskDetailsScreen';
+import { ScanPickupScreen } from '../screens/ScanPickupScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -26,6 +27,8 @@ function MainTabs() {
           
           if (route.name === 'Tasks') {
             iconName = focused ? 'list' : 'list-outline';
+          } else if (route.name === 'Scan') {
+            iconName = focused ? 'qr-code' : 'qr-code-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -44,6 +47,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Tasks" component={TasksScreen} />
+      <Tab.Screen name="Scan" component={ScanPickupScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

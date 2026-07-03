@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS chatbot_faqs CASCADE;
 DROP TABLE IF EXISTS news_announcements CASCADE;
 DROP TABLE IF EXISTS forum_posts CASCADE;
 DROP TABLE IF EXISTS service_requests CASCADE;
+DROP TABLE IF EXISTS lgu_services CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS offices CASCADE;
 DROP TABLE IF EXISTS audit_logs CASCADE;
@@ -60,6 +61,22 @@ CREATE TABLE offices (
 
 CREATE UNIQUE INDEX offices_lgu_slug_idx ON offices(lgu_id, slug);
 
+-- 3.5 LGU SERVICES CATALOG (admin-editable per-LGU document catalog, eServices)
+CREATE TABLE lgu_services (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,
+    office_name text NOT NULL,
+    name text NOT NULL,
+    description text,
+    requirements jsonb DEFAULT '[]'::jsonb NOT NULL,
+    fee_note text DEFAULT 'Pay at the Municipal Hall' NOT NULL,
+    processing_time text,
+    is_active boolean DEFAULT true NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 4. CITIZEN CONCERN REPORTS TABLE
 CREATE TABLE reports (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,8 +84,9 @@ CREATE TABLE reports (
     lgu_id text REFERENCES lgus(id) ON DELETE CASCADE NOT NULL,
     citizen_id uuid REFERENCES users(id) ON DELETE SET NULL,
     citizen_name text NOT NULL,
-    -- MVP: limit to 3 core categories; extend via offices/config tables if needed
-    category text NOT NULL CHECK (category IN ('pothole', 'clogged_drainage', 'stray_animal')),
+    -- Final category set (client direction): stray pets, drainage/canal,
+    -- pothole/road damage, damaged poles.
+    category text NOT NULL CHECK (category IN ('pothole', 'clogged_drainage', 'stray_animal', 'damaged_pole')),
     description text,
     photo_url text NOT NULL,
     latitude double precision NOT NULL,
@@ -79,13 +97,17 @@ CREATE TABLE reports (
     assigned_office_id uuid REFERENCES offices(id) ON DELETE SET NULL,
     sla_tier text CHECK (sla_tier IN ('simple', 'complex', 'highly_technical')),
     sla_due_date timestamp with time zone,
-    ml_confidence double precision DEFAULT 1.0,
-    ml_verified boolean DEFAULT true,
+    -- NULL = not analyzed. ML is not implemented yet; the pothole model will
+    -- write real values later through one boundary (mobile utils/mlAnalysis.ts).
+    -- Never default these to truthy values — that fakes an AI verification.
+    ml_confidence double precision,
+    ml_verified boolean,
     is_low_credibility boolean DEFAULT false,
     rating integer CHECK (rating BETWEEN 1 AND 5),
     feedback text,
     status_history jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 5. CITIZEN DOCUMENT SERVICE REQUESTS
@@ -98,15 +120,263 @@ CREATE TABLE service_requests (
     service_type text NOT NULL, -- e.g. "Birth Certificate Request"
     office_name text NOT NULL, -- e.g. "Civil Registrar"
     office_id uuid REFERENCES offices(id) ON DELETE SET NULL,
-    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Released', 'Rejected')),
+    lgu_service_id uuid REFERENCES lgu_services(id) ON DELETE SET NULL,
+    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released', 'Rejected')),
     form_details jsonb NOT NULL,
-    qr_code_url text NOT NULL,
+    qr_code_url text, -- deprecated: QR is now rendered client-side from claim_code, not a stored URL
     attachment_url text,
     assigned_personnel text,
     reject_reason text,
+    claim_code text UNIQUE, -- opaque single-use pickup code (e.g. 'ABC-1234'), set by mark_service_ready()
+    claim_code_used_at timestamp with time zone,
+    released_at timestamp with time zone,
+    released_by uuid REFERENCES users(id) ON DELETE SET NULL,
     status_history jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- ── updated_at auto-tracking ────────────────────────────────────────────────
+-- Auto-stamped on every UPDATE so real turnaround time (updated_at -
+-- created_at, for Resolved/Released rows) can be computed instead of a fake
+-- static number.
+CREATE OR REPLACE FUNCTION touch_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at := timezone('utc'::text, now());
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_reports_touch_updated_at
+  BEFORE UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_service_requests_touch_updated_at
+  BEFORE UPDATE ON service_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_lgu_services_touch_updated_at
+  BEFORE UPDATE ON lgu_services FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+-- ──────────────────────────────────────────────────────────────────────────
+
+-- ── Citizen status-change notifications ───────────────────────────────────
+-- Fires on every status transition and inserts a row into `notifications`,
+-- which Realtime + apps/api/src/push/push.service.ts turn into an Expo push.
+-- NOTE: `notifications.type` is NOT NULL with no default — both functions
+-- below must always set it, or the insert fails with 23502 (this was a
+-- real, previously-silent bug fixed on 2026-07-02: every citizen status
+-- notification had been failing since these triggers were first created).
+CREATE OR REPLACE FUNCTION notify_report_status_change()
+RETURNS trigger AS $$
+DECLARE
+  v_label text;
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    v_label := CASE NEW.category
+      WHEN 'pothole'          THEN 'Pothole / Road Damage'
+      WHEN 'clogged_drainage' THEN 'Drainage / Canal'
+      WHEN 'stray_animal'     THEN 'Stray Pets'
+      WHEN 'damaged_pole'     THEN 'Damaged Pole'
+      ELSE NEW.category
+    END;
+
+    INSERT INTO notifications (user_id, type, title, body, payload, is_read, lgu_id)
+    VALUES (
+      NEW.citizen_id,
+      'report_status',
+      'Report Status Updated',
+      'Your ' || v_label || ' report ' || NEW.reference_number || ' is now ' || NEW.status || '.',
+      jsonb_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number),
+      false,
+      NEW.lgu_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE FUNCTION notify_service_status_change()
+RETURNS trigger AS $$
+DECLARE
+  v_body text;
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    v_body := CASE NEW.status
+      WHEN 'Under Review'     THEN 'Your ' || NEW.service_type || ' request ' || NEW.reference_number || ' is now under review.'
+      WHEN 'In Progress'      THEN NEW.service_type || ' ' || NEW.reference_number || ' is being prepared.'
+      WHEN 'Ready for Pickup' THEN NEW.service_type || ' ' || NEW.reference_number || ' is ready! Pay the fee and show your QR code at ' || NEW.office_name || '.'
+      WHEN 'Released'         THEN NEW.service_type || ' ' || NEW.reference_number || ' has been released. Thank you!'
+      WHEN 'Rejected'         THEN NEW.service_type || ' ' || NEW.reference_number || ' was rejected' || COALESCE(': ' || NEW.reject_reason, '.')
+      ELSE 'Your request for ' || NEW.service_type || ' is now ' || NEW.status || '.'
+    END;
+
+    INSERT INTO notifications (user_id, type, title, body, payload, is_read, lgu_id)
+    VALUES (
+      NEW.citizen_id,
+      'service_status',
+      'Service Request Updated',
+      v_body,
+      jsonb_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number),
+      false,
+      NEW.lgu_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE TRIGGER trigger_notify_report_status
+  AFTER UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION notify_report_status_change();
+
+CREATE OR REPLACE TRIGGER trigger_notify_service_status
+  AFTER UPDATE ON service_requests FOR EACH ROW EXECUTE FUNCTION notify_service_status_change();
+
+-- Realtime: postgres_changes only delivers events for tables in this
+-- publication. Without these, EVERY realtime subscriber is silently dead —
+-- the API push service (notifications INSERT), mobile NotificationsScreen,
+-- ForumScreen, and TrackingDetailScreen. (Found empty on 2026-07-03; that
+-- plus the notifications.type bug meant push never worked end-to-end.)
+ALTER PUBLICATION supabase_realtime ADD TABLE
+  notifications,
+  reports,
+  service_requests,
+  forum_posts,
+  forum_comments;
+-- ──────────────────────────────────────────────────────────────────────────
+
+-- ── eServices QR pickup RPCs ───────────────────────────────────────────────
+-- Trust model: the QR only ever encodes this opaque claim_code, never the
+-- reference_number. Scanning is NOT the security boundary — these RPCs are.
+-- Each is SECURITY DEFINER + search_path pinned + internally re-verifies the
+-- caller's role/LGU (mirrors verify_citizen in verification_setup.sql).
+-- KNOWN GOTCHA: `REVOKE ... FROM PUBLIC` alone leaves an implicit grant to
+-- `anon` that Supabase sets by default — always revoke from anon explicitly too.
+CREATE OR REPLACE FUNCTION mark_service_ready(p_request_id uuid)
+RETURNS text AS $$
+DECLARE
+  v_caller users%ROWTYPE;
+  v_request service_requests%ROWTYPE;
+  v_code text;
+BEGIN
+  SELECT * INTO v_caller FROM users WHERE id = auth.uid();
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Caller not found.';
+  END IF;
+
+  SELECT * INTO v_request FROM service_requests WHERE id = p_request_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Request not found.';
+  END IF;
+
+  IF NOT (v_caller.role IN ('LGU_ADMIN', 'LGU_PERSONNEL') AND v_caller.lgu_id = v_request.lgu_id) THEN
+    RAISE EXCEPTION 'Not authorized to update this request.';
+  END IF;
+
+  IF v_request.status NOT IN ('Under Review', 'In Progress') THEN
+    RAISE EXCEPTION 'Request must be Under Review or In Progress to mark ready.';
+  END IF;
+
+  -- floor(random()*32)::int + 1 (NOT ::int alone, which rounds and can hit 33 out of range)
+  v_code :=
+    (SELECT string_agg(substr('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', floor(random() * 32)::int + 1, 1), '')
+     FROM generate_series(1, 3)) || '-' ||
+    (SELECT string_agg(substr('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', floor(random() * 32)::int + 1, 1), '')
+     FROM generate_series(1, 4));
+
+  UPDATE service_requests
+    SET status = 'Ready for Pickup', claim_code = v_code
+    WHERE id = p_request_id;
+
+  RETURN v_code;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION lookup_claim_code(p_code text)
+RETURNS TABLE(request_id uuid, reference_number text, citizen_name text, service_type text, office_name text, status text, released_at timestamptz) AS $$
+DECLARE
+  v_caller users%ROWTYPE;
+  v_norm text;
+BEGIN
+  SELECT * INTO v_caller FROM users WHERE id = auth.uid();
+  IF NOT FOUND OR v_caller.role NOT IN ('LGU_ADMIN', 'LGU_PERSONNEL') THEN
+    RAISE EXCEPTION 'Not authorized.';
+  END IF;
+
+  v_norm := upper(regexp_replace(p_code, '[^A-Za-z0-9]', '', 'g'));
+
+  RETURN QUERY
+    SELECT sr.id, sr.reference_number, sr.citizen_name, sr.service_type, sr.office_name, sr.status, sr.released_at
+    FROM service_requests sr
+    WHERE upper(regexp_replace(sr.claim_code, '[^A-Za-z0-9]', '', 'g')) = v_norm
+      AND sr.lgu_id = v_caller.lgu_id; -- wrong-LGU codes fall through to NOT FOUND below, never leaking cross-LGU existence
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Code not found.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION release_service_request(p_code text)
+RETURNS void AS $$
+DECLARE
+  v_caller users%ROWTYPE;
+  v_norm text;
+  v_updated_id uuid;
+BEGIN
+  SELECT * INTO v_caller FROM users WHERE id = auth.uid();
+  IF NOT FOUND OR v_caller.role NOT IN ('LGU_ADMIN', 'LGU_PERSONNEL') THEN
+    RAISE EXCEPTION 'Not authorized.';
+  END IF;
+
+  v_norm := upper(regexp_replace(p_code, '[^A-Za-z0-9]', '', 'g'));
+
+  -- Atomic conditional UPDATE makes release single-use by construction:
+  -- a second call finds status already 'Released' and matches zero rows.
+  UPDATE service_requests
+    SET status = 'Released', released_at = now(), released_by = v_caller.id, claim_code_used_at = now()
+    WHERE upper(regexp_replace(claim_code, '[^A-Za-z0-9]', '', 'g')) = v_norm
+      AND lgu_id = v_caller.lgu_id
+      AND status = 'Ready for Pickup'
+    RETURNING id INTO v_updated_id;
+
+  IF v_updated_id IS NULL THEN
+    RAISE EXCEPTION 'Code not found or already released.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE EXECUTE ON FUNCTION mark_service_ready(uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION lookup_claim_code(text) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION release_service_request(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION mark_service_ready(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION lookup_claim_code(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION release_service_request(text) TO authenticated;
+-- ──────────────────────────────────────────────────────────────────────────
+
+-- ── Reference number auto-generation ──────────────────────────────────────
+-- Sequences produce sequential numbers that survive server restarts and
+-- concurrent inserts. The BEFORE INSERT trigger sets reference_number
+-- automatically, so clients never need to generate it client-side.
+CREATE SEQUENCE IF NOT EXISTS reports_ref_seq START 1000;
+CREATE SEQUENCE IF NOT EXISTS service_requests_ref_seq START 1000;
+
+CREATE OR REPLACE FUNCTION generate_reference_number()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'reports' AND (NEW.reference_number IS NULL OR NEW.reference_number = '') THEN
+    NEW.reference_number := 'REP-' || EXTRACT(YEAR FROM NOW())::TEXT || '-' || LPAD(nextval('reports_ref_seq')::TEXT, 4, '0');
+  ELSIF TG_TABLE_NAME = 'service_requests' AND (NEW.reference_number IS NULL OR NEW.reference_number = '') THEN
+    NEW.reference_number := 'REQ-' || EXTRACT(YEAR FROM NOW())::TEXT || '-' || LPAD(nextval('service_requests_ref_seq')::TEXT, 4, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_reports_ref
+  BEFORE INSERT ON reports FOR EACH ROW EXECUTE FUNCTION generate_reference_number();
+
+CREATE OR REPLACE TRIGGER trg_service_requests_ref
+  BEFORE INSERT ON service_requests FOR EACH ROW EXECUTE FUNCTION generate_reference_number();
+-- ──────────────────────────────────────────────────────────────────────────
 
 -- 5. COMMUNITY FORUM POSTS
 CREATE TABLE forum_posts (
@@ -201,6 +471,7 @@ CREATE TABLE lgu_facilities (
     name text NOT NULL,
     category text NOT NULL CHECK (category IN ('municipal', 'police', 'fire', 'hospital', 'other')),
     address text NOT NULL,
+    description text,
     latitude double precision NOT NULL,
     longitude double precision NOT NULL,
     phone text,
@@ -208,29 +479,31 @@ CREATE TABLE lgu_facilities (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 14. FAQ EMBEDDINGS (pgvector semantic chatbot, requires vector extension)
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE faq_embeddings (
-    id bigserial PRIMARY KEY,
-    lgu_id text REFERENCES lgus(id) ON DELETE CASCADE,
-    question text NOT NULL,
-    answer text NOT NULL,
-    source text NOT NULL,
-    embedding vector(1536), -- OpenAI text-embedding-3-small dimension
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-ALTER TABLE faq_embeddings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all users to read faq embeddings" ON faq_embeddings FOR SELECT USING (true);
-CREATE POLICY "Allow LGU Admins to manage faq embeddings" ON faq_embeddings FOR ALL USING (
-  EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = faq_embeddings.lgu_id)
-);
+-- NOTE: The chatbot uses keyword-matched FAQs (chatbot_faqs) + Gemini API fallback
+-- by design. The original RAG plan (pgvector `faq_embeddings` table + `match_faqs`
+-- semantic-search RPC) was deliberately NOT adopted and was dropped from the live DB
+-- on 2026-06-30. Do not re-add pgvector unless the chatbot architecture changes.
 
 -- CREATE SPATIAL INDEXES FOR LOCATION-BASED QUERIES
 CREATE INDEX idx_reports_location ON reports USING gist (st_geographyfromtext('SRID=4326;POINT(' || longitude || ' ' || latitude || ')'));
 
 -- --- DATABASE HELPER FUNCTIONS ---
+
+-- Used by lgu_services RLS policies (avoids repeating the users-table EXISTS
+-- subquery pattern used elsewhere in this file).
+CREATE OR REPLACE FUNCTION get_current_user_role()
+RETURNS text AS $$
+BEGIN
+  RETURN (SELECT role FROM users WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION get_current_user_lgu()
+RETURNS text AS $$
+BEGIN
+  RETURN (SELECT lgu_id FROM users WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Geofencing Check Function: Verifies that coordinate coordinates fall within 20km of LGU municipal hall
 CREATE OR REPLACE FUNCTION verify_geofence(
@@ -298,6 +571,7 @@ ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE forum_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE offices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lgu_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chatbot_faqs ENABLE ROW LEVEL SECURITY;
@@ -306,8 +580,12 @@ ALTER TABLE chatbot_faqs ENABLE ROW LEVEL SECURITY;
 -- NOTE: We use a simple auth.uid() IS NOT NULL check to avoid infinite recursion.
 -- Recursive policies (e.g., SELECT FROM users WHERE uid = auth.uid() AND role = ...)
 -- cause PostgREST 500 errors. Role-based access is enforced at the app layer.
-CREATE POLICY "Authenticated users can read all users" ON users
-  FOR SELECT USING (auth.uid() IS NOT NULL);
+-- Deliberately narrow: a citizen can only read their own row. LGU admins read
+-- their own LGU's users and super admins read everyone via the ALL-command
+-- management policies below. (Replaced the old blanket "authenticated can read
+-- all users" policy on 2026-07-01 — it leaked every user's PII to any login.)
+CREATE POLICY "Users can read their own record" ON users
+  FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "Users can update their own record" ON users
   FOR UPDATE USING (auth.uid() = id);
@@ -341,6 +619,23 @@ CREATE POLICY "Allow citizens to apply for documents" ON service_requests FOR IN
 );
 CREATE POLICY "Allow LGU admins/personnel to view and modify service requests" ON service_requests FOR ALL USING (
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL') AND u.lgu_id = service_requests.lgu_id)
+);
+
+-- 3.5 Policies for LGU Services Catalog (admin-editable, citizens browse active rows only)
+CREATE POLICY "Allow all authenticated to read active services" ON lgu_services FOR SELECT USING (
+  is_active = true OR get_current_user_role() = ANY (ARRAY['LGU_ADMIN', 'LGU_PERSONNEL', 'SUPER_ADMIN'])
+);
+
+CREATE POLICY "Allow LGU_ADMIN to manage own LGU services" ON lgu_services FOR ALL USING (
+  get_current_user_role() = 'LGU_ADMIN' AND lgu_id = get_current_user_lgu()
+) WITH CHECK (
+  get_current_user_role() = 'LGU_ADMIN' AND lgu_id = get_current_user_lgu()
+);
+
+CREATE POLICY "Allow SUPER_ADMIN to manage all services" ON lgu_services FOR ALL USING (
+  get_current_user_role() = 'SUPER_ADMIN'
+) WITH CHECK (
+  get_current_user_role() = 'SUPER_ADMIN'
 );
 
 -- 4. Policies for Forum Posts

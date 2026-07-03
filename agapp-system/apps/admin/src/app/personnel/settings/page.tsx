@@ -1,31 +1,161 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
-import { 
+import { supabase } from '@/lib/supabase';
+import {
   User,
   Bell,
-  Shield,
-  Envelope,
-  Phone,
-  Building
 } from '@phosphor-icons/react';
+
+const NOTIF_ITEMS: { key: 'push' | 'sms' | 'email'; label: string }[] = [
+  { key: 'push', label: 'Push notifications for new assignments' },
+  { key: 'sms', label: 'SMS alerts for urgent status changes' },
+  { key: 'email', label: 'Email weekly summary reports' },
+];
 
 export default function PersonnelSettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications'>('profile');
   const { showToast, ToastContainer } = useToast();
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const [notifPush, setNotifPush] = useState(true);
+  const [notifSms, setNotifSms] = useState(true);
+  const [notifEmail, setNotifEmail] = useState(true);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoading(true);
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('id, name, email, role, notification_preferences')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error || !profile) {
+        showToast(error?.message || 'Failed to load profile', 'error');
+        setLoading(false);
+        return;
+      }
+
+      setUserId(profile.id);
+      setName(profile.name || '');
+      setEmail(profile.email || '');
+      setRole(profile.role || '');
+      if (profile.notification_preferences) {
+        const prefs = profile.notification_preferences as any;
+        setNotifPush(prefs.push !== false);
+        setNotifSms(prefs.sms !== false);
+        setNotifEmail(prefs.email !== false);
+      }
+      setLoading(false);
+    };
+
+    loadProfile();
+    // Deliberately run once on mount only — showToast is a new function
+    // reference on every render (useToast doesn't memoize it), so including
+    // it here would refetch in a loop and keep resetting typed input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveProfile = async () => {
+    if (!userId) return;
+    const { error } = await supabase
+      .from('users')
+      .update({ name, email })
+      .eq('id', userId);
+
+    if (error) {
+      showToast(error.message || 'Failed to save profile', 'error');
+      return;
+    }
+    showToast('Profile saved successfully!', 'success');
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 8) {
+      showToast('New password must be at least 8 characters.', 'info');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New password and confirmation do not match.', 'info');
+      return;
+    }
+
+    setSavingPassword(true);
+    // Re-authenticate with the current password before changing it.
+    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (reauthError) {
+      showToast('Current password is incorrect.', 'error');
+      setSavingPassword(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSavingPassword(false);
+    if (error) {
+      showToast(error.message || 'Failed to change password', 'error');
+      return;
+    }
+
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    showToast('Password changed successfully!', 'success');
+  };
+
+  const handleSaveNotifications = async () => {
+    if (!userId) {
+      showToast('You must be logged in to update preferences.', 'error');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({
+        notification_preferences: { push: notifPush, sms: notifSms, email: notifEmail },
+      })
+      .eq('id', userId);
+
+    if (error) {
+      showToast(error.message || 'Failed to save preferences', 'error');
+      return;
+    }
+    showToast('Preferences saved successfully!', 'success');
+  };
+
   return (
-    <DashboardLayout 
-      role="lgu-personnel" 
+    <DashboardLayout
+      role="lgu-personnel"
       lguName="Liliw, Laguna"
       title="Settings"
     >
       <ToastContainer />
+      {loading && (
+        <div className="mb-4 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
+          Loading your profile…
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar Tabs */}
         <div className="lg:col-span-1">
@@ -34,8 +164,8 @@ export default function PersonnelSettingsPage() {
               <button
                 onClick={() => setActiveTab('profile')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
-                  activeTab === 'profile' 
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium' 
+                  activeTab === 'profile'
+                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium'
                     : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
                 }`}
               >
@@ -45,8 +175,8 @@ export default function PersonnelSettingsPage() {
               <button
                 onClick={() => setActiveTab('notifications')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
-                  activeTab === 'notifications' 
-                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium' 
+                  activeTab === 'notifications'
+                    ? 'bg-[#f5f5f5] text-[#1a1a1a] font-medium'
                     : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#1a1a1a]'
                 }`}
               >
@@ -62,41 +192,33 @@ export default function PersonnelSettingsPage() {
           {activeTab === 'profile' && (
             <Card>
               <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">My Profile</h2>
-              
+
               <div className="space-y-6">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 bg-[#f5f5f5] rounded-full flex items-center justify-center">
                     <User className="w-8 h-8 text-[#737373]" />
                   </div>
                   <div>
-                    <p className="font-medium text-[#1a1a1a]">Staff Member</p>
-                    <p className="text-sm text-[#737373]">LGU Personnel - Civil Registry Office</p>
+                    <p className="font-medium text-[#1a1a1a]">{name || 'Loading...'}</p>
+                    <p className="text-sm text-[#737373]">{role.replace('_', ' ')}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="Full Name"
-                    defaultValue="Ana Reyes"
+                    value={name}
+                    onChange={(e: any) => setName(e.target.value)}
                   />
                   <Input
                     label="Email Address"
-                    defaultValue="ana.reyes@liliw.gov.ph"
+                    value={email}
+                    onChange={(e: any) => setEmail(e.target.value)}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Phone Number"
-                    defaultValue="(049) 123-4567"
-                  />
-                  <div>
-                    <label className="block text-sm text-[#737373] mb-1.5">Office Assignment</label>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[#f5f5f5] border border-[#e5e5e5] rounded-md text-sm text-[#1a1a1a]">
-                      <Building className="w-4 h-4 text-[#737373]" />
-                      Civil Registry Office
-                    </div>
-                  </div>
+                <div className="pt-4 border-t border-[#e5e5e5]">
+                  <Button onClick={handleSaveProfile}>Save Changes</Button>
                 </div>
 
                 <div className="pt-4 border-t border-[#e5e5e5]">
@@ -106,22 +228,29 @@ export default function PersonnelSettingsPage() {
                       label="Current Password"
                       type="password"
                       placeholder="••••••••"
+                      value={currentPassword}
+                      onChange={(e: any) => setCurrentPassword(e.target.value)}
                     />
                     <Input
                       label="New Password"
                       type="password"
                       placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e: any) => setNewPassword(e.target.value)}
                     />
                     <Input
                       label="Confirm New Password"
                       type="password"
                       placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e: any) => setConfirmPassword(e.target.value)}
                     />
                   </div>
-                </div>
-
-                <div className="pt-4 border-t border-[#e5e5e5]">
-                  <Button onClick={() => showToast('Profile saved successfully!', 'success')}>Save Changes</Button>
+                  <div className="pt-4">
+                    <Button onClick={handleChangePassword} disabled={savingPassword}>
+                      {savingPassword ? 'Changing...' : 'Change Password'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -130,27 +259,27 @@ export default function PersonnelSettingsPage() {
           {activeTab === 'notifications' && (
             <Card>
               <h2 className="text-lg font-semibold text-[#1a1a1a] mb-6">Notification Preferences</h2>
-              
+
               <div className="space-y-4">
-                {[
-                  { label: 'New service requests assigned to me', checked: true },
-                  { label: 'Status updates on my queue', checked: true },
-                  { label: 'System maintenance alerts', checked: true },
-                  { label: 'Weekly summary reports', checked: false },
-                ].map((item, i) => (
-                  <label key={i} className="flex items-center justify-between py-3 border-b border-[#e5e5e5] last:border-0 cursor-pointer">
-                    <span className="text-[#1a1a1a]">{item.label}</span>
-                    <input 
-                      type="checkbox" 
-                      defaultChecked={item.checked}
-                      className="w-4 h-4 accent-[#1a1a1a]"
-                    />
-                  </label>
-                ))}
+                {NOTIF_ITEMS.map((item) => {
+                  const checked = item.key === 'push' ? notifPush : item.key === 'sms' ? notifSms : notifEmail;
+                  const setChecked = item.key === 'push' ? setNotifPush : item.key === 'sms' ? setNotifSms : setNotifEmail;
+                  return (
+                    <label key={item.key} className="flex items-center justify-between py-3 border-b border-[#e5e5e5] last:border-0 cursor-pointer">
+                      <span className="text-[#1a1a1a]">{item.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => setChecked(e.target.checked)}
+                        className="w-4 h-4 accent-[#1a1a1a]"
+                      />
+                    </label>
+                  );
+                })}
               </div>
 
               <div className="pt-4 border-t border-[#e5e5e5] mt-6">
-                <Button onClick={() => showToast('Preferences saved successfully!', 'success')}>Save Preferences</Button>
+                <Button onClick={handleSaveNotifications}>Save Preferences</Button>
               </div>
             </Card>
           )}

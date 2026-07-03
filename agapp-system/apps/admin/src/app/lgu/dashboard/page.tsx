@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -9,18 +8,8 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-
-const BarChart = dynamic(() => import('@/components/ui/Chart').then(m => m.BarChart), { ssr: false });
-const LineChart = dynamic(() => import('@/components/ui/Chart').then(m => m.LineChart), { ssr: false });
-const PieChart = dynamic(() => import('@/components/ui/Chart').then(m => m.PieChart), { ssr: false });
-
-const Warning = dynamic(() => import('@phosphor-icons/react').then(m => m.Warning), { ssr: false });
-const FileText = dynamic(() => import('@phosphor-icons/react').then(m => m.FileText), { ssr: false });
-const ChatCircle = dynamic(() => import('@phosphor-icons/react').then(m => m.ChatCircle), { ssr: false });
-const CheckCircle = dynamic(() => import('@phosphor-icons/react').then(m => m.CheckCircle), { ssr: false });
-const ArrowRight = dynamic(() => import('@phosphor-icons/react').then(m => m.ArrowRight), { ssr: false });
-const MapPin = dynamic(() => import('@phosphor-icons/react').then(m => m.MapPin), { ssr: false });
-const IdentificationBadge = dynamic(() => import('@phosphor-icons/react').then(m => m.IdentificationBadge), { ssr: false });
+import { ReportsMap, type ReportPin } from '@/components/map';
+import { Warning, FileText, CheckCircle, ArrowRight, MapPin, IdentificationBadge } from '@phosphor-icons/react';
 
 type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
 
@@ -46,15 +35,20 @@ const mapDbStatusToDashboard = (status: string): DashboardReportStatus => {
 const mapDbCategoryToLabel = (category: string): string => {
   switch (category) {
     case 'pothole':
-      return 'Pothole';
+      return 'Pothole / Road Damage';
     case 'clogged_drainage':
-      return 'Drainage';
+      return 'Drainage / Canal';
     case 'stray_animal':
-      return 'Stray Animal';
+      return 'Stray Pets';
+    case 'damaged_pole':
+      return 'Damaged Pole';
     default:
       return category || 'Other';
   }
 };
+
+// True Liliw poblacion (PhilAtlas) — only used until the LGU row loads.
+const LILIW_FALLBACK: [number, number] = [14.131, 121.4365];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -62,15 +56,10 @@ export default function DashboardPage() {
   const lguParam = params?.get('lguName') || 'Liliw, Laguna';
   const reportsHref = lguParam ? `/lgu/reports?lguName=${encodeURIComponent(lguParam)}` : '/lgu/reports';
   const lguId = lguParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const [startMonth, setStartMonth] = useState('Jan');
-  const months = useMemo(() => {
-    const startIdx = MONTHS.indexOf(startMonth);
-    return Array.from({ length: 6 }, (_, i) => MONTHS[(startIdx + i) % 12]);
-  }, [startMonth]);
   const [reportRows, setReportRows] = useState<any[]>([]);
   const [serviceRows, setServiceRows] = useState<any[]>([]);
   const [pendingVerifications, setPendingVerifications] = useState(0);
+  const [mapCenter, setMapCenter] = useState<[number, number]>(LILIW_FALLBACK);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -79,10 +68,15 @@ export default function DashboardPage() {
       setLoading(true);
       setLoadError(null);
 
-      const [{ data: reportsData, error: reportsError }, { data: servicesData, error: servicesError }, { data: verifData, error: verifError }] = await Promise.all([
+      const [
+        { data: reportsData, error: reportsError },
+        { data: servicesData, error: servicesError },
+        { data: verifData, error: verifError },
+        { data: lguRow },
+      ] = await Promise.all([
         supabase
           .from('reports')
-          .select('id, reference_number, category, status, barangay, created_at')
+          .select('id, reference_number, category, status, barangay, created_at, latitude, longitude, photo_url')
           .eq('lgu_id', lguId),
         supabase
           .from('service_requests')
@@ -93,6 +87,7 @@ export default function DashboardPage() {
           .select('id, status')
           .eq('lgu_id', lguId)
           .eq('status', 'pending'),
+        supabase.from('lgus').select('latitude, longitude').eq('id', lguId).single(),
       ]);
 
       if (reportsError || servicesError) {
@@ -107,6 +102,7 @@ export default function DashboardPage() {
       setReportRows(reportsData || []);
       setServiceRows(servicesData || []);
       if (!verifError) setPendingVerifications(verifData?.length || 0);
+      if (lguRow?.latitude && lguRow?.longitude) setMapCenter([lguRow.latitude, lguRow.longitude]);
       setLoading(false);
     };
 
@@ -145,94 +141,25 @@ export default function DashboardPage() {
     ];
   }, [reportRows, serviceRows, pendingVerifications, lguParam]);
 
-  const categoryChartData = useMemo(() => {
-    const counts: Record<string, number> = {
-      pothole: 0,
-      clogged_drainage: 0,
-      stray_animal: 0,
-      other: 0,
-    };
-
-    reportRows.forEach((r) => {
-      const key = r.category || 'other';
-      if (key in counts) {
-        counts[key]++;
-      } else {
-        counts.other++;
-      }
-    });
-
-    return [
-      { label: 'Potholes', value: counts.pothole, color: '#ca8a04' },
-      { label: 'Drainage', value: counts.clogged_drainage, color: '#2563eb' },
-      { label: 'Stray Animals', value: counts.stray_animal, color: '#7c3aed' },
-      { label: 'Others', value: counts.other, color: '#dc2626' },
-    ];
-  }, [reportRows]);
-
-  const statusChartData = useMemo(() => {
-    const counts = {
-      submitted: 0,
-      under_review: 0,
-      in_progress: 0,
-      resolved: 0,
-      rejected: 0,
-    };
-
-    reportRows.forEach((r) => {
-      switch (r.status as DbReportStatus | null) {
-        case 'Submitted':
-          counts.submitted++;
-          break;
-        case 'Under Review':
-          counts.under_review++;
-          break;
-        case 'In Progress':
-          counts.in_progress++;
-          break;
-        case 'Resolved':
-          counts.resolved++;
-          break;
-        case 'Rejected':
-          counts.rejected++;
-          break;
-        default:
-          break;
-      }
-    });
-
-    return [
-      { label: 'Submitted',    value: counts.submitted,    color: '#ca8a04' },
-      { label: 'Under Review', value: counts.under_review, color: '#2563eb' },
-      { label: 'In Progress',  value: counts.in_progress,  color: '#7c3aed' },
-      { label: 'Resolved',     value: counts.resolved,     color: '#16a34a' },
-      { label: 'Rejected',     value: counts.rejected,     color: '#dc2626' },
-    ];
-  }, [reportRows]);
-
-  const trends = useMemo(() => {
-    const buckets = months.map((m) => ({ month: m, reports: 0, requests: 0 }));
-
-    const monthFromDate = (d: Date) => MONTHS[d.getMonth()];
-
-    reportRows.forEach((r) => {
-      if (!r.created_at) return;
-      const d = new Date(r.created_at);
-      const m = monthFromDate(d);
-      const idx = months.indexOf(m);
-      if (idx !== -1) buckets[idx].reports++;
-    });
-
-    serviceRows.forEach((s) => {
-      if (!s.created_at) return;
-      const d = new Date(s.created_at);
-      const m = monthFromDate(d);
-      const idx = months.indexOf(m);
-      if (idx !== -1) buckets[idx].requests++;
-    });
-
-    return buckets;
-  }, [months, MONTHS, reportRows, serviceRows]);
+  // Report pins for the interactive map — every report carries the citizen's
+  // real GPS coordinates captured at submission time.
+  const reportPins = useMemo<ReportPin[]>(
+    () =>
+      reportRows
+        .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
+        .map((r) => ({
+          id: r.id,
+          refNumber: r.reference_number || r.id,
+          lat: r.latitude,
+          lng: r.longitude,
+          status: r.status || 'Submitted',
+          category: mapDbCategoryToLabel(r.category),
+          barangay: r.barangay || '',
+          date: r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
+          photoUrl: r.photo_url,
+        })),
+    [reportRows]
+  );
 
   const recentReports = useMemo(() => {
     const sorted = [...reportRows].sort((a, b) => {
@@ -251,8 +178,8 @@ export default function DashboardPage() {
   }, [reportRows]);
 
   return (
-    <DashboardLayout 
-      role="lgu-admin" 
+    <DashboardLayout
+      role="lgu-admin"
       title="Dashboard Overview"
     >
       {loading && (
@@ -292,94 +219,40 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Report Volume */}
-        <Card className="shadow-sm border border-[#e5e5e5]">
-          <CardHeader 
-            title="Report Volume by Category" 
-            action={
-              <Link href={reportsHref}>
-                <Button variant="ghost" size="sm">View All</Button>
-              </Link>
+      {/* Reports Map — replaces the old category/status/trend charts with the
+          actual geography of citizen reports for this municipality. */}
+      <Card className="mb-6 shadow-sm border border-[#e5e5e5]">
+        <CardHeader
+          title="Reports Map"
+          subtitle="Live locations of citizen reports — click a pin for details"
+          action={
+            <Link href={reportsHref}>
+              <Button variant="ghost" size="sm">
+                View All
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          }
+        />
+        {!loading && reportPins.length === 0 ? (
+          <div className="h-40 flex items-center justify-center text-sm text-[#737373]">
+            No reports with location data yet.
+          </div>
+        ) : (
+          <ReportsMap
+            className="h-[28rem]"
+            reports={reportPins}
+            center={mapCenter}
+            getDetailHref={(r) =>
+              `/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(r.refNumber)}`
             }
           />
-          <div className="pt-2">
-            <BarChart 
-              data={categoryChartData}
-              labelPosition="top" // shows category above bars to prevent squishing
-            />
-          </div>
-        </Card>
-
-        {/* Report Status Distribution */}
-        <Card className="shadow-sm border border-[#e5e5e5]">
-          <CardHeader 
-            title="Report Status Distribution"
-            action={
-              <Link href={reportsHref}>
-                <Button variant="ghost" size="sm">View Details</Button>
-              </Link>
-            }
-          />
-          <div className="flex items-center justify-center pt-4">
-            <PieChart 
-              size={180}
-              data={statusChartData}
-            />
-          </div>
-        </Card>
-      </div>
-
-      {/* Trends Section */}
-      <Card className="mb-6 shadow-sm border border-[#e5e5e5]" padding="none">
-        <div className="p-6">
-          <CardHeader 
-            title="Service Request & Issue Trends" 
-            action={
-              <Badge variant="default" className="bg-blue-50 text-blue-700 font-semibold px-2.5 py-1">Synced</Badge>
-            }
-          />
-        </div>
-        {/* Timeframe Control Bar - Prevents Bleeding */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-5 border-b border-[#f0f0f0] text-xs px-6">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setStartMonth('Jan')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${startMonth==='Jan' ? 'bg-[#1a1a1a] text-white' : 'bg-white border border-[#e5e5e5] text-[#737373] hover:bg-gray-50'}`}
-            >
-              Jan–Jun
-            </button>
-            <button
-              onClick={() => setStartMonth('Jul')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${startMonth==='Jul' ? 'bg-[#1a1a1a] text-white' : 'bg-white border border-[#e5e5e5] text-[#737373] hover:bg-gray-50'}`}
-            >
-              Jul–Dec
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#737373] font-medium">Start Month:</span>
-            <select
-              value={startMonth}
-              onChange={(e) => setStartMonth(e.target.value)}
-              className="px-2.5 py-1.5 bg-white border border-[#e5e5e5] rounded-md font-semibold text-[#1a1a1a] focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]"
-              title="Start month"
-            >
-              {MONTHS.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="px-6 pb-6">
-          <LineChart data={trends} height={240} />
-        </div>
+        )}
       </Card>
 
       {/* Recent Submissions */}
       <Card className="shadow-sm border border-[#e5e5e5]">
-        <CardHeader 
+        <CardHeader
           title="Recent Submissions"
           action={
             <Link href={reportsHref}>
@@ -390,7 +263,7 @@ export default function DashboardPage() {
             </Link>
           }
         />
-        
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -404,8 +277,8 @@ export default function DashboardPage() {
             </thead>
             <tbody>
               {recentReports.map((report) => (
-                <tr 
-                  key={report.id} 
+                <tr
+                  key={report.id}
                   className="border-b border-[#e5e5e5] last:border-0 hover:bg-[#fafafa] transition-all cursor-pointer"
                   onClick={() => router.push(`/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(report.id)}`)}
                 >
@@ -418,7 +291,7 @@ export default function DashboardPage() {
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    <Badge 
+                    <Badge
                       variant={
                         report.status === 'resolved' ? 'success' :
                         report.status === 'in_progress' ? 'info' :

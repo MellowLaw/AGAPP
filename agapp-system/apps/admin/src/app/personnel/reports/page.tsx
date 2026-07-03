@@ -41,11 +41,13 @@ const mapDbStatusToUi = (status: string): Report['status'] => {
 const mapDbCategoryToLabel = (category: string): string => {
   switch (category) {
     case 'pothole':
-      return 'Pothole';
+      return 'Pothole / Road Damage';
     case 'clogged_drainage':
-      return 'Drainage';
+      return 'Drainage / Canal';
     case 'stray_animal':
-      return 'Stray Animal';
+      return 'Stray Pets';
+    case 'damaged_pole':
+      return 'Damaged Pole';
     default:
       return category || 'Other';
   }

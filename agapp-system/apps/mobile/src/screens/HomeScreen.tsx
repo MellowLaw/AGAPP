@@ -5,6 +5,7 @@ import { supabase } from '../../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
+import { reportCategoryLabel } from '@agapp/shared';
 import { Ionicons } from '@expo/vector-icons';
 
 export function HomeScreen({ navigation }: any) {
@@ -376,7 +377,7 @@ export function HomeScreen({ navigation }: any) {
                     <View style={styles.activityHeader}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Ionicons name="camera-outline" size={16} color={lguColor} />
-                        <Text style={[styles.activityCategory, { color: T.text }]}>{rep.category?.toUpperCase() || 'Incident Report'}</Text>
+                        <Text style={[styles.activityCategory, { color: T.text }]}>{rep.category ? reportCategoryLabel(rep.category).toUpperCase() : 'Incident Report'}</Text>
                       </View>
                       {getStatusBadge(rep.status)}
                     </View>

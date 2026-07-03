@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { User, SignOut, Gear, Bell } from '@phosphor-icons/react';
 import { useToast } from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
 
 interface UserMenuProps {
   role: 'lgu-admin' | 'super-admin' | 'lgu-personnel';
@@ -11,11 +12,32 @@ interface UserMenuProps {
 
 export const UserMenu: React.FC<UserMenuProps> = ({ role }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
   const router = useRouter();
   const params = useSearchParams();
   const { showToast, ToastContainer } = useToast();
 
-  const handleSignOut = () => {
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', authUser.id)
+          .single();
+
+        setUserProfile({
+          name: profile?.name || authUser.user_metadata?.name || 'Admin User',
+          email: profile?.email || authUser.email || '',
+        });
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
     router.push('/');
   };
 
@@ -44,10 +66,10 @@ export const UserMenu: React.FC<UserMenuProps> = ({ role }) => {
           />
           <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#e5e5e5] rounded-lg shadow-lg z-50 py-2">
             <div className="px-4 py-3 border-b border-[#e5e5e5]">
-              <p className="font-medium text-[#1a1a1a]">Admin User</p>
+              <p className="font-medium text-[#1a1a1a]">{userProfile?.name || 'Loading...'}</p>
               <p className="text-sm text-[#737373]">
-                {role === 'super-admin' ? 'Super Admin' : 
-                 role === 'lgu-admin' ? 'LGU Admin' : 'LGU Personnel'}
+                {userProfile?.email || (role === 'super-admin' ? 'Super Admin' :
+                 role === 'lgu-admin' ? 'LGU Admin' : 'LGU Personnel')}
               </p>
             </div>
 

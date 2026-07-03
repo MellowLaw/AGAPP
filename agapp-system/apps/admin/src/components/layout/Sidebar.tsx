@@ -16,6 +16,8 @@ import {
   ChartBar,
   SignOut,
   IdentificationBadge,
+  MapPin,
+  ListChecks,
 } from '@phosphor-icons/react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 
@@ -33,9 +35,11 @@ interface SidebarProps {
 const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/lgu/dashboard', icon: House },
   { label: 'Service Requests', href: '/lgu/services', icon: FileText },
+  { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: ListChecks },
   { label: 'Issue Reports', href: '/lgu/reports', icon: Warning },
   { label: 'News', href: '/lgu/news', icon: Newspaper },
   { label: 'Forum', href: '/lgu/forum', icon: ChatCircle },
+  { label: 'Facilities', href: '/lgu/facilities', icon: MapPin },
   { label: 'Verifications', href: '/lgu/verifications', icon: IdentificationBadge },
   { label: 'Settings', href: '/lgu/settings', icon: Gear },
 ];

@@ -8,52 +8,52 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
 
+const OFFICE_ICONS: Record<string, string> = {
+  'BPLO': 'briefcase-outline',
+  "Treasurer's Office": 'cash-outline',
+  'Civil Registrar': 'document-text-outline',
+  'MSWDO': 'heart-outline',
+  "Mayor's Office": 'ribbon-outline',
+  'Health Office': 'medkit-outline',
+  'Municipal Planning and Development Office': 'map-outline',
+};
+
 export function ServicesScreen({ navigation }: any) {
   const { T } = useTheme();
   const { selectedLgu, profile } = useAuth();
-  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
+  const [catalog, setCatalog] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
-  const [activeForm, setActiveForm] = useState<any>(null);
-  
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [showForm, setShowForm] = useState(false);
+
   // Form state
   const [fullName, setFullName] = useState(profile?.name || '');
   const [purpose, setPurpose] = useState('');
   const [copies, setCopies] = useState('1');
   const verified = isVerified(profile);
 
+  const refreshRequests = async () => {
+    if (!profile) return;
+    const { data } = await supabase.from('service_requests').select('*').eq('citizen_id', profile.id).order('created_at', { ascending: false });
+    if (data) setMyRequests(data);
+  };
+
   useEffect(() => {
     if (!selectedLgu || !profile) return;
-    
-    const fetchServices = async () => {
-      // Fetch dynamic service types from system config
-      const { data: configData } = await supabase
-        .from('system_config')
-        .select('value')
-        .eq('lgu_id', selectedLgu.id)
-        .eq('key', 'service_types')
-        .single();
-        
-      if (configData?.value && Array.isArray(configData.value)) {
-        setServiceTypes(configData.value);
-      } else {
-        // Fallback to default if not configured
-        setServiceTypes([
-          { id: 'birth', label: 'Birth Certificate', office: 'Civil Registrar', icon: 'document-outline' },
-          { id: 'business', label: 'Business Permit', office: 'BPLO', icon: 'briefcase-outline' },
-        ]);
-      }
 
-      // Fetch user's requests
-      const { data: reqData } = await supabase
-        .from('service_requests')
+    const fetchServices = async () => {
+      const { data } = await supabase
+        .from('lgu_services')
         .select('*')
-        .eq('citizen_id', profile.id)
-        .order('created_at', { ascending: false });
-        
-      if (reqData) setMyRequests(reqData);
+        .eq('lgu_id', selectedLgu.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (data) setCatalog(data);
     };
 
     fetchServices();
+    refreshRequests();
   }, [selectedLgu, profile]);
 
   const submitApplication = async () => {
@@ -66,46 +66,50 @@ export function ServicesScreen({ navigation }: any) {
       return;
     }
 
-    const ref = `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const { error } = await supabase.from('service_requests').insert({
-      reference_number: ref,
+    const { data: inserted, error } = await supabase.from('service_requests').insert({
       lgu_id: selectedLgu.id,
       citizen_id: profile.id,
       citizen_name: profile.name,
-      service_type: activeForm.label,
-      office_name: activeForm.office || 'LGU Office',
+      lgu_service_id: selectedService.id,
+      service_type: selectedService.name,
+      office_name: selectedService.office_name,
       status: 'Submitted',
       form_details: {
         full_name: fullName,
         purpose,
-        copies: parseInt(copies, 10) || 1
+        copies: parseInt(copies, 10) || 1,
       },
-      qr_code_url: '',
-    });
+    }).select('reference_number').single();
 
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('Success', `Application submitted. Reference: ${ref}`);
-      setActiveForm(null);
-      // Refresh list
-      const { data } = await supabase.from('service_requests').select('*').eq('citizen_id', profile.id).order('created_at', { ascending: false });
-      if (data) setMyRequests(data);
+      Alert.alert('Success', `Application submitted. Reference: ${inserted?.reference_number || 'N/A'}`);
+      setShowForm(false);
+      setSelectedService(null);
+      setPurpose('');
+      setCopies('1');
+      refreshRequests();
     }
   };
 
-  if (activeForm) {
+  const officeGroups = catalog.reduce((acc: Record<string, any[]>, s) => {
+    (acc[s.office_name] = acc[s.office_name] || []).push(s);
+    return acc;
+  }, {});
+
+  // ── Application form ────────────────────────────────────────────────────
+  if (showForm && selectedService) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
         <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false} style={{ backgroundColor: T.bg }}>
-          <TouchableOpacity style={{ marginBottom: 20 }} onPress={() => setActiveForm(null)}>
+          <TouchableOpacity style={{ marginBottom: 20 }} onPress={() => setShowForm(false)}>
             <Ionicons name="arrow-back" size={24} color={T.text} />
           </TouchableOpacity>
-          
-          <Text style={[globalStyles.serif, { color: T.text, fontSize: 28 }]}>{activeForm.label}</Text>
+
+          <Text style={[globalStyles.serif, { color: T.text, fontSize: 28 }]}>{selectedService.name}</Text>
           <Text style={[globalStyles.muted, { color: T.textMuted, marginTop: 6, marginBottom: 24 }]}>
-            Application form · Pay at Municipal Hall
+            Application form · {selectedService.fee_note}
           </Text>
 
           {!verified && (
@@ -169,6 +173,59 @@ export function ServicesScreen({ navigation }: any) {
     );
   }
 
+  // ── Detail sheet ─────────────────────────────────────────────────────────
+  if (selectedService) {
+    const requirements: string[] = Array.isArray(selectedService.requirements) ? selectedService.requirements : [];
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+        <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false} style={{ backgroundColor: T.bg }}>
+          <TouchableOpacity style={{ marginBottom: 20 }} onPress={() => setSelectedService(null)}>
+            <Ionicons name="arrow-back" size={24} color={T.text} />
+          </TouchableOpacity>
+
+          <Text style={{ color: T.textMuted, fontSize: 13, fontWeight: '600', marginBottom: 4 }}>{selectedService.office_name}</Text>
+          <Text style={[globalStyles.serif, { color: T.text, fontSize: 28, marginBottom: 10 }]}>{selectedService.name}</Text>
+          {!!selectedService.description && (
+            <Text style={[globalStyles.muted, { color: T.textMuted, marginBottom: 20 }]}>{selectedService.description}</Text>
+          )}
+
+          <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+            <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.metaLabel, { color: T.textMuted }]}>FEE</Text>
+                <Text style={{ color: T.text, fontSize: 14, fontWeight: '600' }}>{selectedService.fee_note}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.metaLabel, { color: T.textMuted }]}>PROCESSING TIME</Text>
+                <Text style={{ color: T.text, fontSize: 14, fontWeight: '600' }}>{selectedService.processing_time || 'Varies'}</Text>
+              </View>
+            </View>
+
+            {requirements.length > 0 && (
+              <>
+                <Text style={[styles.metaLabel, { color: T.textMuted, marginBottom: 10 }]}>REQUIREMENTS TO BRING</Text>
+                {requirements.map((req, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color={T.textMuted} style={{ marginRight: 8, marginTop: 1 }} />
+                    <Text style={{ color: T.text, fontSize: 14, flex: 1 }}>{req}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={[globalStyles.primaryButton, { backgroundColor: ACCENT }]}
+            onPress={() => setShowForm(true)}
+          >
+            <Text style={[globalStyles.primaryButtonText, { color: '#1A1A1A' }]}>Request this document</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Catalog list ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
       <View style={[globalStyles.screen, { backgroundColor: T.bg }]}>
@@ -180,20 +237,31 @@ export function ServicesScreen({ navigation }: any) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.grid}>
-            {serviceTypes.map((s, idx) => (
-              <TouchableOpacity
-                key={s.id || idx}
-                style={[styles.serviceCard, { backgroundColor: PASTELS[Object.keys(PASTELS)[idx % 6] as keyof typeof PASTELS] }]}
-                onPress={() => setActiveForm(s)}
-              >
-                <View style={styles.iconWrap}>
-                  <Ionicons name={s.icon || 'document-outline'} size={22} color="#1A1A1A" />
-                </View>
-                <Text style={styles.serviceLabel}>{s.label || s.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {Object.keys(officeGroups).length === 0 && (
+            <Text style={{ color: T.textMuted, fontSize: 14 }}>No services are available yet. Please check back later.</Text>
+          )}
+
+          {Object.entries(officeGroups).map(([office, services], groupIdx) => (
+            <View key={office} style={{ marginBottom: 20 }}>
+              <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, marginBottom: 10 }}>
+                {office.toUpperCase()}
+              </Text>
+              <View style={styles.grid}>
+                {services.map((s, idx) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.serviceCard, { backgroundColor: PASTELS[Object.keys(PASTELS)[(groupIdx + idx) % 6] as keyof typeof PASTELS] }]}
+                    onPress={() => setSelectedService(s)}
+                  >
+                    <View style={styles.iconWrap}>
+                      <Ionicons name={(OFFICE_ICONS[office] || 'document-outline') as any} size={22} color="#1A1A1A" />
+                    </View>
+                    <Text style={styles.serviceLabel}>{s.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
 
           {myRequests.length > 0 && (
             <>
@@ -210,7 +278,7 @@ export function ServicesScreen({ navigation }: any) {
                     <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '600' }}>{r.reference_number}</Text>
                     <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{r.service_type}</Text>
                   </View>
-                  <View style={[styles.statusPill, { backgroundColor: PASTELS.sage }]}>
+                  <View style={[styles.statusPill, { backgroundColor: r.status === 'Ready for Pickup' ? PASTELS.butter : PASTELS.sage }]}>
                     <Text style={styles.statusPillText}>{r.status}</Text>
                   </View>
                 </TouchableOpacity>
@@ -233,4 +301,5 @@ const styles = StyleSheet.create({
   requestCard: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
   statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
   statusPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
+  metaLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
 });

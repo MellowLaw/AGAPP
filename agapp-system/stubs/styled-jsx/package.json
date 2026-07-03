@@ -1,0 +1,6 @@
+{
+  "name": "styled-jsx",
+  "version": "0.0.0-hoist-blocker",
+  "private": true,
+  "description": "Not the real styled-jsx. Occupies root node_modules/styled-jsx so npm nests the real one (a dependency of next) inside apps/admin/node_modules, where it resolves admin's react@18 instead of the hoisted react@19 (needed by apps/mobile). See stubs/next/package.json and CLAUDE.md gotchas."
+}

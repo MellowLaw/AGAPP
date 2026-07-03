@@ -1,0 +1,6 @@
+{
+  "name": "next",
+  "version": "0.0.0-hoist-blocker",
+  "private": true,
+  "description": "Not the real Next.js. This stub occupies root node_modules/next so npm is forced to nest the real next@14 inside apps/admin/node_modules, where it resolves admin's React 18 pair instead of the hoisted React 19 (needed by apps/mobile). npm ignores yarn's workspaces.nohoist, so this placement conflict is the only way to prevent hoisting. See CLAUDE.md gotchas."
+}

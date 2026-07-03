@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [staffName, setStaffName] = useState('');
   const [staffEmail, setStaffEmail] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'LGU_ADMIN' | 'LGU_PERSONNEL'>('LGU_PERSONNEL');
 
   // Notification Preference States
@@ -134,7 +135,10 @@ export default function SettingsPage() {
     };
 
     loadSettings();
-  }, [lguId, showToast]);
+    // showToast is deliberately excluded — useToast() returns a new function
+    // reference on every render, so including it here would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lguId]);
 
   // Save General Info
   const handleSaveGeneral = async () => {
@@ -167,39 +171,36 @@ export default function SettingsPage() {
 
     try {
       if (editingStaff) {
-        // Update
+        // Update profile only (password changes are out of scope here)
         const { error } = await supabase
           .from('users')
-          .update({
-            name: staffName,
-            email: staffEmail,
-            role: staffRole,
-          })
+          .update({ name: staffName, email: staffEmail, role: staffRole })
           .eq('id', editingStaff.id);
 
         if (error) throw error;
 
-        setStaffList(prev => prev.map(s => s.id === editingStaff.id ? { ...s, name: staffName, email: staffEmail, role: staffRole } : s));
+        setStaffList(prev => prev.map(s =>
+          s.id === editingStaff.id ? { ...s, name: staffName, email: staffEmail, role: staffRole } : s
+        ));
         showToast('Staff member updated successfully!', 'success');
       } else {
-        // Create (Insert directly into users profile table)
-        const newUid = self.crypto.randomUUID();
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            id: newUid,
-            name: staffName,
-            email: staffEmail,
-            role: staffRole,
-            lgu_id: lguId,
-            is_active: true,
-            notification_preferences: { push: true, sms: true, email: true }
-          });
+        // Create — calls server API which uses service role key to create Auth user + profile
+        if (!staffPassword.trim() || staffPassword.length < 8) {
+          showToast('Password must be at least 8 characters.', 'info');
+          return;
+        }
 
-        if (error) throw error;
+        const res = await fetch('/api/create-staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: staffEmail, password: staffPassword, name: staffName, role: staffRole, lguId }),
+        });
 
-        setStaffList(prev => [...prev, { id: newUid, name: staffName, email: staffEmail, role: staffRole, is_active: true }]);
-        showToast('Staff member added successfully!', 'success');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to create staff account.');
+
+        setStaffList(prev => [...prev, { id: json.id, name: staffName, email: staffEmail, role: staffRole, is_active: true }]);
+        showToast(`Staff account created! Share these credentials securely: ${staffEmail} / ${staffPassword}`, 'success');
       }
 
       // Close modal and reset fields
@@ -207,6 +208,7 @@ export default function SettingsPage() {
       setEditingStaff(null);
       setStaffName('');
       setStaffEmail('');
+      setStaffPassword('');
       setStaffRole('LGU_PERSONNEL');
     } catch (err: any) {
       console.error('Failed to save staff member:', err);
@@ -514,6 +516,16 @@ export default function SettingsPage() {
                 value={staffEmail}
                 onChange={(e: any) => setStaffEmail(e.target.value)}
               />
+
+              {!editingStaff && (
+                <Input
+                  label="Temporary Password (min. 8 characters)"
+                  placeholder="Give a secure initial password"
+                  type="password"
+                  value={staffPassword}
+                  onChange={(e: any) => setStaffPassword(e.target.value)}
+                />
+              )}
 
               <div>
                 <label className="block text-sm text-[#737373] mb-1.5">Role</label>

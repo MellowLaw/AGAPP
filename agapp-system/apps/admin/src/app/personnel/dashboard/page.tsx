@@ -6,9 +6,10 @@ import { Card } from '@/components/ui/Card';
 import { Badge, ServiceStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { 
+import {
   FileText,
   Check,
   Clock,
@@ -16,17 +17,11 @@ import {
   Calendar,
   MagnifyingGlass,
   QrCode,
-  ArrowRight,
   Warning
 } from '@phosphor-icons/react';
 
-type ServiceStatus =
-  | 'under_review'
-  | 'processing'
-  | 'ready_for_pickup'
-  | 'completed'
-  | 'rejected'
-  | 'awaiting_payment';
+// Literal DB `service_requests.status` values (see supabase/schema.sql CHECK constraint).
+type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
 
 interface QueueItem {
   id: string;
@@ -35,7 +30,7 @@ interface QueueItem {
   citizen: string;
   submittedAt: string;
   status: ServiceStatus;
-  qrCode: string;
+  claimCode: string | null;
   documents: string[];
 }
 
@@ -47,24 +42,7 @@ interface RecentReportItem {
   time: string;
 }
 
-type DbServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Released' | 'Rejected';
 type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
-
-const mapServiceStatusToQueue = (status: string): ServiceStatus => {
-  switch (status as DbServiceStatus) {
-    case 'Submitted':
-    case 'Under Review':
-      return 'under_review';
-    case 'In Progress':
-      return 'processing';
-    case 'Released':
-      return 'ready_for_pickup';
-    case 'Rejected':
-      return 'rejected';
-    default:
-      return 'under_review';
-  }
-};
 
 const mapReportStatusToDashboard = (status: string): RecentReportItem['status'] => {
   switch (status as DbReportStatus) {
@@ -86,11 +64,13 @@ const mapReportStatusToDashboard = (status: string): RecentReportItem['status'] 
 const mapDbCategoryToLabel = (category: string): string => {
   switch (category) {
     case 'pothole':
-      return 'Pothole';
+      return 'Pothole / Road Damage';
     case 'clogged_drainage':
-      return 'Drainage';
+      return 'Drainage / Canal';
     case 'stray_animal':
-      return 'Stray Animal';
+      return 'Stray Pets';
+    case 'damaged_pole':
+      return 'Damaged Pole';
     default:
       return category || 'Other';
   }
@@ -104,13 +84,18 @@ export default function PersonnelDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [readyCode, setReadyCode] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [lguId, setLguId] = useState<string | null>(null);
   const { showToast, ToastContainer } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setLoadError(null);
+  const fetchData = async (forLguId?: string) => {
+    setLoading(true);
+    setLoadError(null);
 
+    let activeLguId = forLguId ?? lguId;
+
+    if (!activeLguId) {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError || !authData.user) {
         console.error('Error fetching auth user', authError);
@@ -133,112 +118,106 @@ export default function PersonnelDashboard() {
       }
 
       setCurrentUserName(userRow.name ?? null);
+      activeLguId = userRow.lgu_id;
+      setLguId(userRow.lgu_id);
+    }
 
-      const [svcRes, repRes] = await Promise.all([
-        supabase
-          .from('service_requests')
-          .select('id, reference_number, citizen_name, service_type, status, assigned_personnel, created_at, qr_code_url, form_details, lgu_id')
-          .eq('lgu_id', userRow.lgu_id),
-        supabase
-          .from('reports')
-          .select('id, reference_number, category, status, barangay, created_at')
-          .eq('lgu_id', userRow.lgu_id)
-          .order('created_at', { ascending: false })
-          .limit(5),
-      ]);
+    const [svcRes, repRes] = await Promise.all([
+      supabase
+        .from('service_requests')
+        .select('id, reference_number, citizen_name, service_type, status, assigned_personnel, created_at, claim_code, form_details, lgu_id')
+        .eq('lgu_id', activeLguId),
+      supabase
+        .from('reports')
+        .select('id, reference_number, category, status, barangay, created_at')
+        .eq('lgu_id', activeLguId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ]);
 
-      if (svcRes.error || repRes.error) {
-        console.error('Error loading personnel dashboard data', svcRes.error || repRes.error);
-        setLoadError((svcRes.error || repRes.error)?.message || 'Failed to load data');
-        setLoading(false);
-        return;
-      }
-
-      const queue: QueueItem[] = (svcRes.data || []).map((row: any) => ({
-        id: row.reference_number || row.id,
-        dbId: row.id,
-        serviceType: row.service_type,
-        citizen: row.citizen_name,
-        submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
-        status: mapServiceStatusToQueue(row.status || 'Submitted'),
-        qrCode: row.qr_code_url || row.reference_number || row.id,
-        documents: Array.isArray(row.form_details?.documents) ? row.form_details.documents : [],
-      }));
-
-      const reports: RecentReportItem[] = (repRes.data || []).map((row: any) => ({
-        id: row.reference_number || row.id,
-        category: mapDbCategoryToLabel(row.category || ''),
-        location: row.barangay,
-        status: mapReportStatusToDashboard(row.status || 'Submitted'),
-        time: row.created_at ? new Date(row.created_at).toLocaleString() : '',
-      }));
-
-      setQueueList(queue);
-      setSelectedRequest(queue[0] || null);
-      setRecentReports(reports);
+    if (svcRes.error || repRes.error) {
+      console.error('Error loading personnel dashboard data', svcRes.error || repRes.error);
+      setLoadError((svcRes.error || repRes.error)?.message || 'Failed to load data');
       setLoading(false);
-    };
-
-    fetchData();
-  }, []);
-
-  const handleProcess = async () => {
-    if (!selectedRequest) return;
-    
-    const prevQueue = queueList;
-    const prevSelected = selectedRequest;
-    const newStatus: ServiceStatus = 'processing';
-
-    const updated = queueList.map(r => 
-      r.id === selectedRequest.id ? { ...r, status: newStatus } : r
-    );
-    setQueueList(updated);
-    setSelectedRequest({ ...selectedRequest, status: newStatus });
-
-    const { error } = await supabase
-      .from('service_requests')
-      .update({ status: 'In Progress' })
-      .eq('id', selectedRequest.dbId);
-
-    if (error) {
-      console.error('Failed to start processing', error);
-      setQueueList(prevQueue);
-      setSelectedRequest(prevSelected);
-      showToast('Failed to start processing. Please try again.', 'error');
       return;
     }
 
-    showToast(`Started processing ${selectedRequest.id}!`, 'success');
+    const queue: QueueItem[] = (svcRes.data || []).map((row: any) => ({
+      id: row.reference_number || row.id,
+      dbId: row.id,
+      serviceType: row.service_type,
+      citizen: row.citizen_name,
+      submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+      status: (row.status as ServiceStatus) || 'Submitted',
+      claimCode: row.claim_code || null,
+      documents: Array.isArray(row.form_details?.documents) ? row.form_details.documents : [],
+    }));
+
+    const reports: RecentReportItem[] = (repRes.data || []).map((row: any) => ({
+      id: row.reference_number || row.id,
+      category: mapDbCategoryToLabel(row.category || ''),
+      location: row.barangay,
+      status: mapReportStatusToDashboard(row.status || 'Submitted'),
+      time: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+    }));
+
+    setQueueList(queue);
+    setSelectedRequest(prev => queue.find(q => q.dbId === prev?.dbId) || queue[0] || null);
+    setRecentReports(reports);
+    setLoading(false);
   };
 
-  const handleComplete = async () => {
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateStatus = async (newStatus: ServiceStatus) => {
     if (!selectedRequest) return;
-
-    const prevQueue = queueList;
-    const prevSelected = selectedRequest;
-    const newStatus: ServiceStatus = selectedRequest.status === 'processing' ? 'ready_for_pickup' : 'completed';
-
-    const updated = queueList.map(r => 
-      r.id === selectedRequest.id ? { ...r, status: newStatus } : r
-    );
-    setQueueList(updated);
-    setSelectedRequest({ ...selectedRequest, status: newStatus });
-
-    // Use allowed status check constraints: 'Submitted', 'Under Review', 'In Progress', 'Released', 'Rejected'
+    setActionBusy(true);
     const { error } = await supabase
       .from('service_requests')
-      .update({ status: 'Released' }) // maps to ready_for_pickup & completed
+      .update({ status: newStatus })
       .eq('id', selectedRequest.dbId);
+    setActionBusy(false);
 
     if (error) {
       console.error('Failed to update status', error);
-      setQueueList(prevQueue);
-      setSelectedRequest(prevSelected);
       showToast('Failed to update status. Please try again.', 'error');
       return;
     }
+    showToast(`${selectedRequest.id} is now ${newStatus}.`, 'success');
+    fetchData();
+  };
 
-    showToast(`Request ${selectedRequest.id} is now ${newStatus.replace('_', ' ')}!`, 'success');
+  const handleMarkReady = async () => {
+    if (!selectedRequest) return;
+    setActionBusy(true);
+    const { data, error } = await supabase.rpc('mark_service_ready', { p_request_id: selectedRequest.dbId });
+    setActionBusy(false);
+
+    if (error) {
+      console.error('Failed to mark ready', error);
+      showToast(error.message || 'Failed to mark ready for pickup.', 'error');
+      return;
+    }
+    setReadyCode(data as string);
+    fetchData();
+  };
+
+  const handleManualRelease = async () => {
+    if (!selectedRequest?.claimCode) return;
+    setActionBusy(true);
+    const { error } = await supabase.rpc('release_service_request', { p_code: selectedRequest.claimCode });
+    setActionBusy(false);
+
+    if (error) {
+      console.error('Failed to release', error);
+      showToast(error.message || 'Failed to release.', 'error');
+      return;
+    }
+    showToast(`${selectedRequest.id} marked as released.`, 'success');
+    fetchData();
   };
 
   const filteredQueue = useMemo(() => {
@@ -258,6 +237,16 @@ export default function PersonnelDashboard() {
       title="My Queue"
     >
       <ToastContainer />
+
+      <Modal isOpen={!!readyCode} onClose={() => setReadyCode(null)} title="Ready for Pickup" size="sm">
+        <p className="text-sm text-[#737373] mb-4">
+          The citizen has been notified. Give them this claim code (or they can show the QR from their app) at the counter:
+        </p>
+        <div className="text-center py-4 bg-[#f5f5f5] rounded-lg">
+          <span className="text-2xl font-bold tracking-widest text-[#1a1a1a]">{readyCode}</span>
+        </div>
+      </Modal>
+
       {loading && (
         <div className="mb-3 px-4 py-2 text-sm text-[#737373] bg-[#f5f5f5] rounded-md animate-pulse">
           Loading your queue…
@@ -409,24 +398,31 @@ export default function PersonnelDashboard() {
                   )}
                 </div>
 
+                {selectedRequest.status === 'Ready for Pickup' && selectedRequest.claimCode && (
+                  <div className="p-3 bg-[#eff6ff] border border-[#bfdbfe] rounded-lg text-center">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-[#2563eb] mb-1">Claim Code</p>
+                    <span className="text-lg font-bold tracking-widest text-[#1a1a1a]">{selectedRequest.claimCode}</span>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex flex-col gap-2.5 pt-4.5 border-t border-[#f0f0f0]">
-                  {selectedRequest.status === 'under_review' && (
-                    <Button onClick={handleProcess} className="w-full flex items-center justify-center gap-2">
+                  {selectedRequest.status === 'Under Review' && (
+                    <Button onClick={() => updateStatus('In Progress')} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
                       <Clock className="w-4 h-4" />
                       Start Processing
                     </Button>
                   )}
-                  {selectedRequest.status === 'processing' && (
-                    <Button onClick={handleComplete} className="w-full flex items-center justify-center gap-2">
+                  {selectedRequest.status === 'In Progress' && (
+                    <Button onClick={handleMarkReady} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
                       <Check className="w-4 h-4" />
                       Mark Ready for Pickup
                     </Button>
                   )}
-                  {selectedRequest.status === 'ready_for_pickup' && (
-                    <Button onClick={handleComplete} className="w-full flex items-center justify-center gap-2">
+                  {selectedRequest.status === 'Ready for Pickup' && (
+                    <Button onClick={handleManualRelease} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
                       <Check className="w-4 h-4" />
-                      Mark Completed
+                      Mark Released (manual override)
                     </Button>
                   )}
                 </div>

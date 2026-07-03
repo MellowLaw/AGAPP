@@ -54,11 +54,26 @@ cd apps/mobile && npx expo start --lan     # mobile on a phone (same Wi-Fi)
 ## Gotchas
 
 - **`.env` files are required and not committed** (`apps/api/.env`, `apps/mobile/.env`,
-  `apps/admin/.env.local`). Apps fail silently / show no data without them.
+  `apps/field-officer/.env`, `apps/admin/.env.local`). Apps fail silently / show no
+  data without them.
+- **Realtime needs tables in the `supabase_realtime` publication.** It shipped empty, so
+  every `postgres_changes` subscriber (push service, forum, notifications, tracking) was
+  silently dead until fixed 2026-07-03. If a new realtime feature gets no events, check
+  `pg_publication_tables` first — and the poller can lag a minute after `ALTER PUBLICATION`.
 - **Free-tier Supabase pauses when idle** — if everything "can't connect", check the
   project isn't INACTIVE and restore it.
 - **`@supabase/supabase-js` version split**: mobile/field-officer `2.108`, admin/api
   `2.43`. Align before relying on newer client APIs.
+- **React 18/19 split is held together by hoist-blockers** — mobile needs React 19
+  (hoisted to root), admin needs React 18. npm ignores yarn's `nohoist`, so the root
+  `package.json` pins `react`/`react-dom` 19.1.0 and maps `next`/`styled-jsx` to tiny
+  `stubs/*` placeholder packages; that forces npm to nest the real `next`, `styled-jsx`,
+  `react`, `react-dom`, and `@types/react*` (all React 18) inside `apps/admin/node_modules`
+  so `next build` never mixes React instances. Admin's `tsconfig.json` additionally maps
+  `react`/`react-dom` type imports to the nested `@types` and sets `"types": ["node"]`
+  so hoisted packages type-check against React 18. Don't remove the stubs, the root
+  react pins, or the tsconfig paths — and re-check `apps/admin/node_modules` placements
+  after dependency changes.
 - **Pothole ML is currently faked** — `ReportsScreen.tsx` hardcodes `ml_confidence`.
   See `Audits/Planning/Plan-ML-Pothole-Detection.md`.
 - **No tests exist** anywhere; `any` types are common. Don't assume coverage.

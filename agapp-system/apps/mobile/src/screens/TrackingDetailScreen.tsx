@@ -3,9 +3,37 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
-import { globalStyles, PASTELS } from '../theme';
+import { globalStyles, PASTELS, ACCENT } from '../theme';
+import { reportCategoryLabel } from '@agapp/shared';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
+import QRCode from 'react-native-qrcode-svg';
+
+const SERVICE_STEPS = ['Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released'];
+
+function ServiceTimeline({ status, T }: { status: string; T: any }) {
+  if (status === 'Rejected') return null;
+  const currentIdx = SERVICE_STEPS.indexOf(status);
+  return (
+    <View style={{ marginBottom: 20 }}>
+      {SERVICE_STEPS.map((step, i) => {
+        const done = i <= currentIdx;
+        const isLast = i === SERVICE_STEPS.length - 1;
+        return (
+          <View key={step} style={{ flexDirection: 'row' }}>
+            <View style={{ alignItems: 'center', width: 24 }}>
+              <View style={[styles.timelineDot, { backgroundColor: done ? ACCENT : T.cardAlt, borderColor: done ? ACCENT : T.border }]} />
+              {!isLast && <View style={[styles.timelineLine, { backgroundColor: i < currentIdx ? ACCENT : T.border }]} />}
+            </View>
+            <Text style={{ color: done ? T.text : T.textMuted, fontWeight: done ? '700' : '400', fontSize: 14, marginLeft: 12, marginBottom: 18 }}>
+              {step}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 export function TrackingDetailScreen({ route, navigation }: any) {
   const { id, type } = route.params;
@@ -13,12 +41,23 @@ export function TrackingDetailScreen({ route, navigation }: any) {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
+    const table = type === 'report' ? 'reports' : 'service_requests';
+
     const fetchDetail = async () => {
-      const table = type === 'report' ? 'reports' : 'service_requests';
       const { data: item } = await supabase.from(table).select('*').eq('id', id).single();
       if (item) setData(item);
     };
     fetchDetail();
+
+    // Live-update so the QR/timeline flip the moment staff changes status
+    const channel = supabase
+      .channel(`tracking-${type}-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter: `id=eq.${id}` }, (payload) => {
+        setData(payload.new);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [id, type]);
 
   if (!data) return null;
@@ -52,7 +91,7 @@ export function TrackingDetailScreen({ route, navigation }: any) {
             {type === 'report' ? (
               <>
                 <Text style={[styles.label, { color: T.textMuted }]}>CATEGORY</Text>
-                <Text style={[styles.value, { color: T.text }]}>{data.category}</Text>
+                <Text style={[styles.value, { color: T.text }]}>{reportCategoryLabel(data.category)}</Text>
 
                 {data.photo_url && (
                   <>
@@ -65,23 +104,23 @@ export function TrackingDetailScreen({ route, navigation }: any) {
 
                 <Text style={[styles.label, { color: T.textMuted }]}>DESCRIPTION</Text>
                 <Text style={[styles.value, { color: T.text }]}>{data.description}</Text>
-                {data.location && (
+                {(data.latitude && data.longitude) && (
                   <>
                     <Text style={[styles.label, { color: T.textMuted }]}>LOCATION</Text>
-                    <Text style={[styles.value, { color: T.text }]}>{data.location.address || 'GPS coordinates captured'}</Text>
+                    <Text style={[styles.value, { color: T.text }]}>GPS coordinates captured</Text>
                     <View style={{ height: 150, borderRadius: 12, overflow: 'hidden', marginTop: 8, borderWidth: 1, borderColor: T.border }}>
                       <MapView
                         style={{ flex: 1 }}
                         initialRegion={{
-                          latitude: data.location.lat,
-                          longitude: data.location.lng,
+                          latitude: data.latitude,
+                          longitude: data.longitude,
                           latitudeDelta: 0.005,
                           longitudeDelta: 0.005,
                         }}
                         scrollEnabled={false}
                         zoomEnabled={false}
                       >
-                        <Marker coordinate={{ latitude: data.location.lat, longitude: data.location.lng }} />
+                        <Marker coordinate={{ latitude: data.latitude, longitude: data.longitude }} />
                       </MapView>
                     </View>
                   </>
@@ -89,15 +128,49 @@ export function TrackingDetailScreen({ route, navigation }: any) {
               </>
             ) : (
               <>
+                <ServiceTimeline status={data.status} T={T} />
+
                 <Text style={[styles.label, { color: T.textMuted }]}>SERVICE TYPE</Text>
                 <Text style={[styles.value, { color: T.text }]}>{data.service_type}</Text>
                 <Text style={[styles.label, { color: T.textMuted }]}>OFFICE</Text>
                 <Text style={[styles.value, { color: T.text }]}>{data.office_name}</Text>
                 <Text style={[styles.label, { color: T.textMuted }]}>PURPOSE</Text>
                 <Text style={[styles.value, { color: T.text }]}>{data.form_details?.purpose}</Text>
+
+                {data.status === 'Rejected' && data.reject_reason && (
+                  <>
+                    <Text style={[styles.label, { color: T.textMuted }]}>REASON</Text>
+                    <Text style={[styles.value, { color: T.text }]}>{data.reject_reason}</Text>
+                  </>
+                )}
               </>
             )}
           </View>
+
+          {type === 'service' && data.status === 'Ready for Pickup' && data.claim_code && (
+            <View style={[globalStyles.card, { backgroundColor: PASTELS.butter, alignItems: 'center' }]}>
+              <Text style={{ color: '#1A1A1A', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>Ready for pickup!</Text>
+              <Text style={{ color: '#4B4B4B', fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+                Show this QR at {data.office_name}. Pay the fee at the counter — the officer scans it to release your document.
+              </Text>
+              <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16 }}>
+                <QRCode value={`agap:claim:${data.claim_code}`} size={180} />
+              </View>
+              <Text style={{ color: '#6B6B6B', fontSize: 12, marginTop: 14 }}>Or give this code at the counter:</Text>
+              <Text style={{ color: '#1A1A1A', fontSize: 22, fontWeight: '700', letterSpacing: 2, marginTop: 4 }}>{data.claim_code}</Text>
+            </View>
+          )}
+
+          {type === 'service' && data.status === 'Released' && (
+            <View style={[globalStyles.card, { backgroundColor: PASTELS.sage, alignItems: 'center' }]}>
+              <Text style={{ color: '#1A1A1A', fontSize: 16, fontWeight: '700' }}>Document released</Text>
+              {data.released_at && (
+                <Text style={{ color: '#4B4B4B', fontSize: 12, marginTop: 4 }}>
+                  {new Date(data.released_at).toLocaleString()}
+                </Text>
+              )}
+            </View>
+          )}
 
           {data.status === 'Resolved' && type === 'report' && !data.rating && (
             <View style={[globalStyles.card, { backgroundColor: T.cardAlt, borderColor: T.border, alignItems: 'center' }]}>
@@ -133,4 +206,6 @@ const styles = StyleSheet.create({
   statusPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
   value: { fontSize: 16, marginBottom: 16 },
+  timelineDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2 },
+  timelineLine: { width: 2, flex: 1, minHeight: 14 },
 });

@@ -7,7 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 type ViewState = 'list' | 'detail' | 'create';
 
@@ -33,13 +32,6 @@ export function ForumScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { profile, selectedLgu } = useAuth();
   
-  let tabBarHeight = 0;
-  try {
-    tabBarHeight = useBottomTabBarHeight();
-  } catch (e) {
-    tabBarHeight = 85;
-  }
-
   // ── Swipeable Row component (swipe right → reply) ──────────────────────
   const SwipeableRow = useCallback(({ children, onSwipe }: { children: React.ReactNode; onSwipe: () => void }) => {
     const translateX = useRef(new Animated.Value(0)).current;

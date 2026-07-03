@@ -7,23 +7,26 @@ import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
+import { analyzeReportPhoto } from '../utils/mlAnalysis';
+import { reportCategoryLabel } from '@agapp/shared';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
+// ids must match the reports.category CHECK constraint (supabase/schema.sql)
 const REPORT_CATEGORIES = [
-  { id: 'infrastructure', label: 'Infrastructure', icon: 'business-outline' },
-  { id: 'environment',    label: 'Environment',    icon: 'leaf-outline' },
-  { id: 'safety',         label: 'Public Safety',  icon: 'shield-half-outline' },
-  { id: 'other',          label: 'Other Issues',   icon: 'ellipsis-horizontal-outline' },
+  { id: 'pothole',          label: 'Pothole / Road Damage', icon: 'car-outline' },
+  { id: 'clogged_drainage', label: 'Drainage / Canal',      icon: 'water-outline' },
+  { id: 'stray_animal',     label: 'Stray Pets',            icon: 'paw-outline' },
+  { id: 'damaged_pole',     label: 'Damaged Pole',          icon: 'flash-outline' },
 ];
 
 export function ReportsScreen({ navigation }: any) {
   const { T } = useTheme();
   const { selectedLgu, profile } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
-  const [category, setCategory] = useState('infrastructure');
+  const [category, setCategory] = useState('pothole');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<any>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -162,17 +165,16 @@ export function ReportsScreen({ navigation }: any) {
     }
 
     // 5. GPS Boundary Check (Distance <= 15km from selected LGU center)
-    const lguLat = selectedLgu?.latitude || 14.1350;
-    const lguLng = selectedLgu?.longitude || 121.4363;
-    const dist = getDistanceFromLatLonInKm(location.lat, location.lng, lguLat, lguLng);
-    if (dist > 15) {
-      Alert.alert(
-        'Outside Municipal Boundary',
-        `Your coordinates (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}) are ${dist.toFixed(1)}km away from Liliw. Reports can only be submitted within municipal boundaries.`
-      );
-      return;
+    if (selectedLgu?.latitude && selectedLgu?.longitude) {
+      const dist = getDistanceFromLatLonInKm(location.lat, location.lng, selectedLgu.latitude, selectedLgu.longitude);
+      if (dist > 15) {
+        Alert.alert(
+          'Outside Municipal Boundary',
+          `Your coordinates (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}) are ${dist.toFixed(1)}km away from ${selectedLgu.name || 'the selected municipality'}. Reports can only be submitted within municipal boundaries.`
+        );
+        return;
+      }
     }
-
     setSubmitting(true);
     let publicUrl = null;
 
@@ -209,34 +211,35 @@ export function ReportsScreen({ navigation }: any) {
       return;
     }
 
-    // 7. Insert report record
-    const ref = `REP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    // 7. Insert report record (reference_number is set by DB trigger,
+    //    status defaults to 'Submitted')
     try {
-      const { error } = await supabase.from('reports').insert({
-        reference_number: ref,
+      // ML boundary: returns nulls ("not analyzed") until the pothole model exists.
+      const ml = await analyzeReportPhoto(category, imageUri);
+
+      const { data: inserted, error } = await supabase.from('reports').insert({
         lgu_id: selectedLgu.id,
         citizen_id: profile.id,
         citizen_name: profile.name,
         category,
         description: cleanDesc,
-        status: 'Pending',
         latitude: location.lat,
         longitude: location.lng,
         barangay: profile.barangay || 'Poblacion',
         photo_url: publicUrl,
-        ml_confidence: 0.95,
-        ml_verified: true,
+        ml_confidence: ml.confidence,
+        ml_verified: ml.verified,
         is_low_credibility: false
-      });
+      }).select('reference_number').single();
       if (error) throw error;
-      
+
       try {
         await AsyncStorage.setItem('last_report_time', String(Date.now()));
       } catch (e) {
         console.warn('AsyncStorage write error', e);
       }
 
-      Alert.alert('Success', `Report submitted. Reference: ${ref}`);
+      Alert.alert('Success', `Report submitted. Reference: ${inserted?.reference_number || 'N/A'}`);
       setDescription('');
       setLocation(null);
       setImageUri(null);
@@ -258,7 +261,7 @@ export function ReportsScreen({ navigation }: any) {
         <View style={{ padding: 20, paddingBottom: 10 }}>
           <Text style={[globalStyles.serif, { color: T.text, fontSize: 28 }]}>Report.</Text>
           <Text style={[globalStyles.muted, { color: T.textMuted, marginTop: 6, marginBottom: 16 }]}>
-            Help your barangay · captured by YOLOv11
+            Help your barangay · photo + GPS required
           </Text>
         </View>
 
@@ -303,7 +306,7 @@ export function ReportsScreen({ navigation }: any) {
               style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border, height: 80, textAlignVertical: 'top' }]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Provide detail (e.g. Garbage piling up, deep pothole...)"
+              placeholder="Provide detail (e.g. Deep pothole near the school gate, leaning electric pole...)"
               placeholderTextColor={T.textMuted}
               multiline
             />
@@ -403,7 +406,7 @@ export function ReportsScreen({ navigation }: any) {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '600' }}>{r.reference_number}</Text>
-                    <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{r.category.charAt(0).toUpperCase() + r.category.slice(1)}</Text>
+                    <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{reportCategoryLabel(r.category)}</Text>
                   </View>
                   <View style={[styles.statusPill, { backgroundColor: PASTELS.blue }]}>
                     <Text style={styles.statusPillText}>{r.status}</Text>

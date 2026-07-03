@@ -33,7 +33,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('[mobile/supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  console.warn('[field-officer/supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY — create apps/field-officer/.env (see .env.example)');
 }
 
 export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {

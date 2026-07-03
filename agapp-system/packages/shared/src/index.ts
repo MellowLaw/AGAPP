@@ -7,16 +7,26 @@ export { AgappLogo } from './components/AgappLogo';
 // Roles
 export type UserRole = 'SUPER_ADMIN' | 'LGU_ADMIN' | 'LGU_PERSONNEL' | 'CITIZEN';
 
-// Report Categories
+// Report Categories — must match the reports.category CHECK constraint in
+// supabase/schema.sql. Labels are the single source of truth for all UIs.
 export const REPORT_CATEGORIES = [
   'pothole',
-  'damaged_pole',
   'clogged_drainage',
   'stray_animal',
-  'missing_pet',
-  'lost_found'
+  'damaged_pole'
 ] as const;
 export type ReportCategory = typeof REPORT_CATEGORIES[number];
+
+export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
+  pothole: 'Pothole / Road Damage',
+  clogged_drainage: 'Drainage / Canal',
+  stray_animal: 'Stray Pets',
+  damaged_pole: 'Damaged Pole',
+};
+
+export function reportCategoryLabel(category: string): string {
+  return REPORT_CATEGORY_LABELS[category as ReportCategory] || category || 'Other';
+}
 
 // Report Statuses
 export const REPORT_STATUSES = [
@@ -92,8 +102,8 @@ export interface Report {
   assignedOffice?: string;
   slaTier?: SLATier;
   slaDueDate?: string;
-  mlConfidence: number; // confidence score (0.0 to 1.0)
-  mlVerified: boolean;  // whether YOLO checked it positively
+  mlConfidence: number | null; // confidence score (0.0 to 1.0); null = not analyzed (ML not implemented yet)
+  mlVerified: boolean | null;  // model verdict once the pothole model runs; null = not analyzed
   isLowCredibility: boolean; // Flagged if ML failed and user bypassed or EXIF mismatched
   rating?: number; // 1 to 5 stars
   feedback?: string;
@@ -181,7 +191,7 @@ export const ReportSubmitSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   barangay: z.string(),
-  mlConfidence: z.number(),
-  mlVerified: z.boolean(),
+  mlConfidence: z.number().nullable(),
+  mlVerified: z.boolean().nullable(),
   isLowCredibility: z.boolean(),
 });

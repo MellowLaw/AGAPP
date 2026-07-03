@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { 
+import { ReportsMap } from '@/components/map';
+import {
   Warning,
   MapPin,
   User,
@@ -34,6 +35,7 @@ interface ReportItem {
   lng: number;
   status: ReportStatus;
   submittedBy: string;
+  citizenId: string | null; // reports.citizen_id (null if account deleted)
   submittedAt: string;   // human readable timestamp
   photoUrl: string | null;
   assignedOffice: string | null;
@@ -78,11 +80,13 @@ const mapUiStatusToDb = (status: ReportStatus): string => {
 const mapDbCategoryToUi = (category: string): { category: string; subType: string | null } => {
   switch (category) {
     case 'pothole':
-      return { category: 'Pothole', subType: null };
+      return { category: 'Pothole / Road Damage', subType: null };
     case 'clogged_drainage':
-      return { category: 'Drainage', subType: 'Clogged drainage' };
+      return { category: 'Drainage / Canal', subType: null };
     case 'stray_animal':
-      return { category: 'Stray Pets', subType: 'Stray animal' };
+      return { category: 'Stray Pets', subType: null };
+    case 'damaged_pole':
+      return { category: 'Damaged Pole', subType: null };
     default:
       return { category, subType: null };
   }
@@ -100,6 +104,7 @@ const mapReportRowToItem = (row: any): ReportItem => {
     lng: row.longitude,
     status: mapDbStatusToUi(row.status || 'Submitted'),
     submittedBy: row.citizen_name || 'Citizen',
+    citizenId: row.citizen_id || null,
     submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
     photoUrl: row.photo_url || null,
     assignedOffice: row.assigned_office || null,
@@ -130,13 +135,37 @@ export default function ReportsPage() {
     [lguNameParam]
   );
 
+  // Citizen legitimacy info for the selected report. RLS: an LGU admin can
+  // read users in their own LGU, so this lookup works here; a null citizen_id
+  // (account deleted) is handled by skipping the query entirely.
+  const [citizenInfo, setCitizenInfo] = useState<{ verification_status: string | null; barangay: string | null } | null>(null);
+  const selectedCitizenId = selectedReport?.citizenId ?? null;
+  useEffect(() => {
+    setCitizenInfo(null);
+    if (!selectedCitizenId) return;
+    let cancelled = false;
+    supabase
+      .from('users')
+      .select('verification_status, barangay')
+      .eq('id', selectedCitizenId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data) setCitizenInfo(data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCitizenId]);
+
   useEffect(() => {
     const fetchReports = async () => {
       setLoading(true);
       setLoadError(null);
+      // Explicit column list — only what the list + detail panel actually
+      // render (avoids hauling unused blobs like status_history over the wire).
       const { data, error } = await supabase
         .from('reports')
-        .select('*')
+        .select('id, reference_number, category, status, barangay, latitude, longitude, citizen_id, citizen_name, created_at, photo_url, assigned_office, ml_verified, ml_confidence')
         .eq('lgu_id', lguId)
         .order('created_at', { ascending: false });
 
@@ -162,7 +191,10 @@ export default function ReportsPage() {
     };
 
     fetchReports();
-  }, [lguId, showToast, params]);
+    // showToast is deliberately excluded — useToast() returns a new function
+    // reference on every render, so including it here would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lguId, params]);
 
   const filteredReports = reportsList.filter(r => {
     const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -446,10 +478,28 @@ export default function ReportsPage() {
                   
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Submitted By</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <User className="w-4 h-4 text-[#737373]" />
                       <span className="text-[#1a1a1a]">{selectedReport.submittedBy}</span>
+                      {!selectedReport.citizenId ? (
+                        <Badge variant="default">Account deleted</Badge>
+                      ) : citizenInfo ? (
+                        <Badge
+                          variant={
+                            citizenInfo.verification_status === 'verified' ? 'success' :
+                            citizenInfo.verification_status === 'pending' ? 'warning' :
+                            'default'
+                          }
+                        >
+                          {citizenInfo.verification_status === 'verified' ? 'Verified citizen' :
+                           citizenInfo.verification_status === 'pending' ? 'Verification pending' :
+                           'Unverified'}
+                        </Badge>
+                      ) : null}
                     </div>
+                    {citizenInfo?.barangay && (
+                      <p className="text-xs text-[#737373] mt-1">Registered barangay: {citizenInfo.barangay}</p>
+                    )}
                   </div>
 
                   <div>
@@ -471,6 +521,31 @@ export default function ReportsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Location Map — the exact GPS point the citizen's phone
+                    captured when the report was submitted. */}
+                {typeof selectedReport.lat === 'number' && typeof selectedReport.lng === 'number' && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Location Map</p>
+                    <ReportsMap
+                      key={selectedReport.dbId}
+                      className="h-48"
+                      showLegend={false}
+                      center={[selectedReport.lat, selectedReport.lng]}
+                      reports={[{
+                        id: selectedReport.dbId,
+                        refNumber: selectedReport.id,
+                        lat: selectedReport.lat,
+                        lng: selectedReport.lng,
+                        status: mapUiStatusToDb(selectedReport.status),
+                        category: selectedReport.category,
+                        barangay: selectedReport.location,
+                        date: selectedReport.submittedAt,
+                        photoUrl: null,
+                      }]}
+                    />
+                  </div>
+                )}
 
                 {/* AI Detection Badge */}
                 {selectedReport.aiDetected && (

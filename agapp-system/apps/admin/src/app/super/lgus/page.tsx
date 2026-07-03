@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,12 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Search } from '@/components/ui/Search';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-
-const CaretDown = dynamic(() => import('@phosphor-icons/react').then(m => m.CaretDown), { ssr: false });
-const Eye = dynamic(() => import('@phosphor-icons/react').then(m => m.Eye), { ssr: false });
-const Power = dynamic(() => import('@phosphor-icons/react').then(m => m.Power), { ssr: false });
-const UserSwitch = dynamic(() => import('@phosphor-icons/react').then(m => m.UserSwitch), { ssr: false });
-const Download = dynamic(() => import('@phosphor-icons/react').then(m => m.Download), { ssr: false });
+import { formatAvgTurnaround } from '@/lib/turnaround';
+import { CaretDown, Eye, Power, UserSwitch, Download } from '@phosphor-icons/react';
 
 interface Lgu {
   id: string;
@@ -64,8 +59,8 @@ export default function SuperLgusPage() {
         const [{ data: lguData, error: lguError }, { data: dbUsers }, { data: dbReports }, { data: dbRequests }] = await Promise.all([
           supabase.from('lgus').select('*'),
           supabase.from('users').select('id, lgu_id'),
-          supabase.from('reports').select('id, lgu_id'),
-          supabase.from('service_requests').select('id, lgu_id'),
+          supabase.from('reports').select('id, lgu_id, status, created_at, updated_at'),
+          supabase.from('service_requests').select('id, lgu_id, status, created_at, updated_at'),
         ]);
 
         if (lguError) {
@@ -78,16 +73,16 @@ export default function SuperLgusPage() {
         if (lguData) {
           const mapped: Lgu[] = lguData.map((row: any) => {
             const lguUsers = (dbUsers || []).filter(u => u.lgu_id === row.id).length;
-            const lguReports = (dbReports || []).filter(r => r.lgu_id === row.id).length;
-            const lguRequests = (dbRequests || []).filter(s => s.lgu_id === row.id).length;
+            const lguOwnReports = (dbReports || []).filter(r => r.lgu_id === row.id);
+            const lguOwnRequests = (dbRequests || []).filter(s => s.lgu_id === row.id);
             return {
               id: row.id,
               name: row.name,
               status: row.is_active === false ? 'inactive' : 'active',
               users: lguUsers || 0,
-              reports: lguReports || 0,
-              requests: lguRequests || 0,
-              responseTime: '2.0 days',
+              reports: lguOwnReports.length,
+              requests: lguOwnRequests.length,
+              responseTime: formatAvgTurnaround(lguOwnReports, lguOwnRequests),
               logo: row.logo || '',
               banner_url: row.banner_url || null,
               primary_color: row.primary_color || '#A2B59F',

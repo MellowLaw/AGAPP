@@ -5,31 +5,22 @@ import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge, ServiceStatusBadge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { ServiceStatusBadge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { 
-  FileText,
+import {
   User,
   Calendar,
   Check,
   X,
   Clock,
   QrCode,
-  ArrowRight,
   MagnifyingGlass,
   Download
 } from '@phosphor-icons/react';
 
-type ServiceStatus =
-  | 'pending'
-  | 'under_review'
-  | 'awaiting_payment'
-  | 'processing'
-  | 'ready_for_pickup'
-  | 'completed'
-  | 'rejected';
+type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
 
 interface ServiceRequestItem {
   id: string;       // display id (reference_number)
@@ -39,61 +30,34 @@ interface ServiceRequestItem {
   status: ServiceStatus;
   submittedBy: string;
   submittedAt: string;
-  amount: number;
-  paymentStatus: 'paid' | 'pending' | 'refunded' | string;
+  purpose: string;
   assignedTo: string | null;
+  claimCode: string | null;
+  releasedAt: string | null;
+  rejectReason: string | null;
+  requirements: string[];
+  feeNote: string | null;
+  processingTime: string | null;
 }
 
-const mapDbStatusToUi = (status: string | null): ServiceStatus => {
-  switch (status) {
-    case 'Submitted':
-      return 'pending';
-    case 'Under Review':
-      return 'under_review';
-    case 'In Progress':
-      return 'processing';
-    case 'Released':
-      return 'completed';
-    case 'Rejected':
-      return 'rejected';
-    default:
-      return 'pending';
-  }
-};
-
-const mapUiStatusToDb = (status: ServiceStatus): string => {
-  switch (status) {
-    case 'pending':
-      return 'Submitted';
-    case 'under_review':
-      return 'Under Review';
-    case 'awaiting_payment':
-      return 'Under Review';
-    case 'processing':
-      return 'In Progress';
-    case 'ready_for_pickup':
-      return 'Released';
-    case 'completed':
-      return 'Released';
-    case 'rejected':
-      return 'Rejected';
-    default:
-      return 'Submitted';
-  }
-};
-
 const mapServiceRowToItem = (row: any): ServiceRequestItem => {
+  const catalog = row.lgu_services;
   return {
     id: row.reference_number || row.id,
     dbId: row.id,
     serviceType: row.service_type,
     category: row.office_name,
-    status: mapDbStatusToUi(row.status),
+    status: (row.status as ServiceStatus) || 'Submitted',
     submittedBy: row.citizen_name,
     submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
-    amount: (row.form_details && typeof row.form_details.amount === 'number') ? row.form_details.amount : 0,
-    paymentStatus: (row.form_details && row.form_details.payment_status) || 'pending',
+    purpose: row.form_details?.purpose || '',
     assignedTo: row.assigned_personnel || null,
+    claimCode: row.claim_code || null,
+    releasedAt: row.released_at || null,
+    rejectReason: row.reject_reason || null,
+    requirements: Array.isArray(catalog?.requirements) ? catalog.requirements : [],
+    feeNote: catalog?.fee_note || null,
+    processingTime: catalog?.processing_time || null,
   };
 };
 
@@ -107,6 +71,44 @@ export default function ServicesPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [readyModal, setReadyModal] = useState<{ code: string } | null>(null);
+  const [rejectModal, setRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const params = useSearchParams();
+  const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
+  const lguId = lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
+
+  const fetchRequests = async () => {
+    setLoading(true);
+    setLoadError(null);
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select('*, lgu_services(requirements, fee_note, processing_time)')
+      .eq('lgu_id', lguId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading service requests', error);
+      setLoadError(error.message);
+      showToast('Failed to load service requests. Please try again.', 'error');
+      setLoading(false);
+      return;
+    }
+
+    const mapped = (data || []).map(mapServiceRowToItem);
+    setRequestsList(mapped);
+    setSelectedRequest(prev => mapped.find(r => r.dbId === prev?.dbId) || mapped[0] || null);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchRequests();
+    // showToast is deliberately excluded — useToast() returns a new function
+    // reference on every render, so including it here would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lguId]);
 
   // ── Print / Download Document ─────────────────────────────────────────────
   const handlePrintDocument = (req: ServiceRequestItem) => {
@@ -115,8 +117,6 @@ export default function ServicesPage() {
       showToast('Pop-up blocked. Please allow pop-ups and try again.', 'error');
       return;
     }
-    const statusLabel = req.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const paymentLabel = req.paymentStatus.charAt(0).toUpperCase() + req.paymentStatus.slice(1);
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -136,8 +136,6 @@ export default function ServicesPage() {
           .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
           .row .label { color: #737373; }
           .row .value { font-weight: 500; text-align: right; max-width: 60%; }
-          .payment-box { background: #f5f5f5; border-radius: 6px; padding: 12px 16px; margin-top: 12px; }
-          .payment-box .row { border-bottom: none; padding: 4px 0; }
           .footer { margin-top: 40px; border-top: 1px solid #e5e5e5; padding-top: 16px; font-size: 11px; color: #999; display: flex; justify-content: space-between; }
           @media print { body { padding: 20px; } }
         </style>
@@ -158,7 +156,7 @@ export default function ServicesPage() {
           <h2>Request Details</h2>
           <div class="row"><span class="label">Service Type</span><span class="value">${req.serviceType}</span></div>
           <div class="row"><span class="label">Office / Category</span><span class="value">${req.category || '—'}</span></div>
-          <div class="row"><span class="label">Status</span><span class="value"><span class="badge">${statusLabel}</span></span></div>
+          <div class="row"><span class="label">Status</span><span class="value"><span class="badge">${req.status}</span></span></div>
           <div class="row"><span class="label">Reference No.</span><span class="value">${req.id}</span></div>
         </div>
 
@@ -170,15 +168,12 @@ export default function ServicesPage() {
         </div>
 
         <div class="section">
-          <h2>Payment</h2>
-          <div class="payment-box">
-            <div class="row"><span class="label">Amount Due</span><span class="value">₱${req.amount.toFixed(2)}</span></div>
-            <div class="row"><span class="label">Payment Status</span><span class="value">${paymentLabel}</span></div>
-          </div>
+          <h2>Fee</h2>
+          <div class="row"><span class="label">Payment</span><span class="value">${req.feeNote || 'Pay at the Municipal Hall'}</span></div>
         </div>
 
         <div class="footer">
-          <span>AGAPP — Automated Government Assistance and Processing Portal</span>
+          <span>AGAPP — Automated Governance and Public Service Platform</span>
           <span>This document is system-generated and does not require a signature.</span>
         </div>
 
@@ -188,37 +183,6 @@ export default function ServicesPage() {
     `);
     printWindow.document.close();
   };
-
-  const params = useSearchParams();
-  const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
-
-  useEffect(() => {
-    const fetchRequests = async () => {
-      setLoading(true);
-      setLoadError(null);
-      const { data, error } = await supabase
-        .from('service_requests')
-        .select('*')
-        .eq('lgu_id', lguId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading service requests', error);
-        setLoadError(error.message);
-        showToast('Failed to load service requests. Please try again.', 'error');
-        setLoading(false);
-        return;
-      }
-
-      const mapped = (data || []).map(mapServiceRowToItem);
-      setRequestsList(mapped);
-      setSelectedRequest(mapped[0] || null);
-      setLoading(false);
-    };
-
-    fetchRequests();
-  }, [lguId, showToast]);
 
   const filteredRequests = requestsList.filter(r => {
     const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -234,8 +198,8 @@ export default function ServicesPage() {
   const endNum = Math.min(filteredRequests.length, safePage * pageSize);
 
   const handleExportCsv = () => {
-    const cols = ['id','serviceType','category','status','submittedBy','submittedAt','amount','paymentStatus','assignedTo'];
-    const rows = filteredRequests.map(r => [r.id, r.serviceType, r.category, r.status, r.submittedBy, r.submittedAt, r.amount, r.paymentStatus, r.assignedTo || ''].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
+    const cols = ['id','serviceType','category','status','submittedBy','submittedAt','assignedTo'];
+    const rows = filteredRequests.map(r => [r.id, r.serviceType, r.category, r.status, r.submittedBy, r.submittedAt, r.assignedTo || ''].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
     const csv = [cols.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -246,118 +210,112 @@ export default function ServicesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleApprovePayment = async () => {
+  const updateStatus = async (newStatus: ServiceStatus) => {
     if (!selectedRequest) return;
-
-    const prevList = requestsList;
-    const prevSelected = selectedRequest;
-    const newStatus: ServiceStatus = 'processing';
-
-    const updatedList = requestsList.map(r => 
-      r.id === selectedRequest.id 
-        ? { ...r, paymentStatus: 'paid', status: newStatus } 
-        : r
-    );
-    setRequestsList(updatedList);
-    setSelectedRequest({ ...selectedRequest, paymentStatus: 'paid', status: newStatus });
-
-    // Merge payment_status into existing form_details JSON instead of overwriting
-    const dbRow = (await supabase
-      .from('service_requests')
-      .select('form_details')
-      .eq('id', selectedRequest.dbId)
-      .single()).data as { form_details: any } | null;
-
-    const existingDetails = (dbRow && dbRow.form_details) ? dbRow.form_details : {};
-    const mergedDetails = {
-      ...existingDetails,
-      payment_status: 'paid',
-      amount: prevSelected.amount,
-    };
-
+    setActionBusy(true);
     const { error } = await supabase
       .from('service_requests')
-      .update({
-        status: mapUiStatusToDb(newStatus),
-        form_details: mergedDetails,
-      })
+      .update({ status: newStatus })
       .eq('id', selectedRequest.dbId);
+    setActionBusy(false);
 
     if (error) {
-      console.error('Failed to approve payment', error);
-      setRequestsList(prevList);
-      setSelectedRequest(prevSelected);
-      showToast('Failed to confirm payment. Please try again.', 'error');
+      console.error('Failed to update status', error);
+      showToast('Failed to update status. Please try again.', 'error');
       return;
     }
-
-    showToast(`Payment confirmed for ${selectedRequest.id}! Now processing.`, 'success');
+    showToast(`${selectedRequest.id} is now ${newStatus}.`, 'success');
+    fetchRequests();
   };
 
-  const handleProcess = async () => {
+  const handleMarkReady = async () => {
     if (!selectedRequest) return;
-
-    const prevList = requestsList;
-    const prevSelected = selectedRequest;
-    const newStatus: ServiceStatus = 'processing';
-
-    const updated = requestsList.map(r => 
-      r.id === selectedRequest.id ? { ...r, status: newStatus } : r
-    );
-    setRequestsList(updated);
-    setSelectedRequest({ ...selectedRequest, status: newStatus });
-
-    const { error } = await supabase
-      .from('service_requests')
-      .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedRequest.dbId);
+    setActionBusy(true);
+    const { data, error } = await supabase.rpc('mark_service_ready', { p_request_id: selectedRequest.dbId });
+    setActionBusy(false);
 
     if (error) {
-      console.error('Failed to start processing', error);
-      setRequestsList(prevList);
-      setSelectedRequest(prevSelected);
-      showToast('Failed to start processing. Please try again.', 'error');
+      console.error('Failed to mark ready', error);
+      showToast(error.message || 'Failed to mark ready for pickup.', 'error');
       return;
     }
-
-    showToast(`Started processing ${selectedRequest.id}!`, 'success');
+    setReadyModal({ code: data as string });
+    fetchRequests();
   };
 
-  const handleComplete = async () => {
-    if (!selectedRequest) return;
-
-    const prevList = requestsList;
-    const prevSelected = selectedRequest;
-    const newStatus: ServiceStatus = selectedRequest.status === 'processing' ? 'ready_for_pickup' : 'completed';
-
-    const updated = requestsList.map(r => 
-      r.id === selectedRequest.id ? { ...r, status: newStatus } : r
-    );
-    setRequestsList(updated);
-    setSelectedRequest({ ...selectedRequest, status: newStatus });
-
-    const { error } = await supabase
-      .from('service_requests')
-      .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedRequest.dbId);
+  const handleManualRelease = async () => {
+    if (!selectedRequest?.claimCode) return;
+    setActionBusy(true);
+    const { error } = await supabase.rpc('release_service_request', { p_code: selectedRequest.claimCode });
+    setActionBusy(false);
 
     if (error) {
-      console.error('Failed to update request status', error);
-      setRequestsList(prevList);
-      setSelectedRequest(prevSelected);
-      showToast('Failed to update request status. Please try again.', 'error');
+      console.error('Failed to release', error);
+      showToast(error.message || 'Failed to release.', 'error');
       return;
     }
+    showToast(`${selectedRequest.id} marked as released.`, 'success');
+    fetchRequests();
+  };
 
-    showToast(`Request ${selectedRequest.id} is now ${newStatus.replace('_', ' ')}!`, 'success');
+  const handleReject = async () => {
+    if (!selectedRequest || !rejectReason.trim()) return;
+    setActionBusy(true);
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ status: 'Rejected', reject_reason: rejectReason.trim() })
+      .eq('id', selectedRequest.dbId);
+    setActionBusy(false);
+
+    if (error) {
+      console.error('Failed to reject request', error);
+      showToast('Failed to reject request. Please try again.', 'error');
+      return;
+    }
+    showToast(`${selectedRequest.id} was rejected.`, 'success');
+    setRejectModal(false);
+    setRejectReason('');
+    fetchRequests();
   };
 
   return (
-    <DashboardLayout 
-      role="lgu-admin" 
+    <DashboardLayout
+      role="lgu-admin"
       title="Service Requests"
     >
       <ToastContainer />
+
+      <Modal isOpen={!!readyModal} onClose={() => setReadyModal(null)} title="Ready for Pickup" size="sm">
+        <p className="text-sm text-[#737373] mb-4">
+          The citizen has been notified. Give them this claim code (or they can show the QR from their app) at the counter:
+        </p>
+        <div className="text-center py-4 bg-[#f5f5f5] rounded-lg">
+          <span className="text-2xl font-bold tracking-widest text-[#1a1a1a]">{readyModal?.code}</span>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={rejectModal}
+        onClose={() => { setRejectModal(false); setRejectReason(''); }}
+        title="Reject Request"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setRejectModal(false); setRejectReason(''); }}>Cancel</Button>
+            <Button variant="danger" onClick={handleReject} disabled={!rejectReason.trim() || actionBusy}>Reject</Button>
+          </>
+        }
+      >
+        <label className="block text-xs uppercase tracking-wide text-[#737373] mb-2">Reason</label>
+        <textarea
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
+          placeholder="e.g. Missing DTI registration"
+        />
+      </Modal>
+
       <div className="flex gap-6 h-[calc(100vh-140px)]">
         {/* Left Panel - Request List */}
         <div className="w-1/2 flex flex-col gap-4">
@@ -380,12 +338,12 @@ export default function ServicesPage() {
                 className="px-3 py-2 bg-white border border-[#e5e5e5] rounded-md text-sm focus:outline-none focus:border-[#2563eb]"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="under_review">Under Review</option>
-                <option value="awaiting_payment">Awaiting Payment</option>
-                <option value="processing">Processing</option>
-                <option value="ready_for_pickup">Ready for Pickup</option>
-                <option value="completed">Completed</option>
+                <option value="Submitted">Submitted</option>
+                <option value="Under Review">Under Review</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Ready for Pickup">Ready for Pickup</option>
+                <option value="Released">Released</option>
+                <option value="Rejected">Rejected</option>
               </select>
               <Button variant="secondary" onClick={handleExportCsv}>
                 <Download className="w-4 h-4 mr-1" />
@@ -444,7 +402,7 @@ export default function ServicesPage() {
 
         {/* Right Panel - Request Details */}
         <div className="w-1/2">
-          <Card className="h-full">
+          <Card className="h-full overflow-y-auto">
             {selectedRequest ? (
               <div className="space-y-6">
                 {/* Header */}
@@ -488,64 +446,98 @@ export default function ServicesPage() {
                     </div>
                   </div>
 
-                  {/* Payment Info */}
-                  <div className="p-4 bg-[#f5f5f5] rounded-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[#737373]">Amount</span>
-                      <span className="font-semibold text-[#1a1a1a]">₱{selectedRequest.amount.toFixed(2)}</span>
+                  {selectedRequest.purpose && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Purpose</p>
+                      <p className="text-[#1a1a1a]">{selectedRequest.purpose}</p>
                     </div>
+                  )}
+
+                  {selectedRequest.requirements.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#737373] mb-2">Requirements Checklist</p>
+                      <ul className="space-y-1">
+                        {selectedRequest.requirements.map((req, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-[#1a1a1a]">
+                            <Check className="w-3.5 h-3.5 text-[#737373]" />
+                            {req}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Fee Info */}
+                  <div className="p-4 bg-[#f5f5f5] rounded-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#737373]">Payment Status</span>
-                      <Badge 
-                        variant={
-                          selectedRequest.paymentStatus === 'paid' ? 'success' :
-                          selectedRequest.paymentStatus === 'pending' ? 'warning' :
-                          selectedRequest.paymentStatus === 'refunded' ? 'error' :
-                          'default'
-                        }
-                      >
-                        {selectedRequest.paymentStatus}
-                      </Badge>
+                      <span className="text-sm text-[#737373]">Fee</span>
+                      <span className="font-semibold text-[#1a1a1a]">{selectedRequest.feeNote || 'Pay at the Municipal Hall'}</span>
                     </div>
+                    {selectedRequest.processingTime && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-[#737373]">Processing Time</span>
+                        <span className="text-[#1a1a1a]">{selectedRequest.processingTime}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Assigned To */}
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[#737373] mb-1">Assigned To</p>
-                    <p className="text-[#1a1a1a]">{selectedRequest.assignedTo || 'Not assigned'}</p>
-                  </div>
+                  {selectedRequest.status === 'Ready for Pickup' && selectedRequest.claimCode && (
+                    <div className="p-4 bg-[#eff6ff] border border-[#bfdbfe] rounded-md text-center">
+                      <p className="text-xs uppercase tracking-wide text-[#2563eb] mb-1">Claim Code</p>
+                      <span className="text-xl font-bold tracking-widest text-[#1a1a1a]">{selectedRequest.claimCode}</span>
+                    </div>
+                  )}
+
+                  {selectedRequest.status === 'Released' && selectedRequest.releasedAt && (
+                    <div className="p-4 bg-[#f0fdf4] border border-[#bbf7d0] rounded-md text-center text-sm text-[#166534]">
+                      Released {new Date(selectedRequest.releasedAt).toLocaleString()}
+                    </div>
+                  )}
+
+                  {selectedRequest.status === 'Rejected' && selectedRequest.rejectReason && (
+                    <div className="p-4 bg-[#fef2f2] border border-[#fecaca] rounded-md text-sm text-[#991b1b]">
+                      <span className="font-medium">Reason: </span>{selectedRequest.rejectReason}
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-3 pt-4 border-t border-[#e5e5e5]">
-                  {selectedRequest.status === 'awaiting_payment' && (
-                    <Button onClick={handleApprovePayment}>
-                      <Check className="w-4 h-4 mr-1" />
-                      Confirm Payment
+                  {selectedRequest.status === 'Submitted' && (
+                    <Button onClick={() => updateStatus('Under Review')} disabled={actionBusy}>
+                      <Clock className="w-4 h-4 mr-1" />
+                      Start Review
                     </Button>
                   )}
-                  
-                  {(selectedRequest.status === 'pending' || selectedRequest.status === 'under_review') && (
-                    <Button onClick={handleProcess}>
+
+                  {selectedRequest.status === 'Under Review' && (
+                    <Button onClick={() => updateStatus('In Progress')} disabled={actionBusy}>
                       <Clock className="w-4 h-4 mr-1" />
                       Start Processing
                     </Button>
                   )}
-                  
-                  {selectedRequest.status === 'processing' && (
-                    <Button onClick={handleComplete}>
+
+                  {selectedRequest.status === 'In Progress' && (
+                    <Button onClick={handleMarkReady} disabled={actionBusy}>
                       <Check className="w-4 h-4 mr-1" />
-                      Mark Ready for Pickup
+                      Mark Ready
                     </Button>
                   )}
-                  
-                  {selectedRequest.status === 'ready_for_pickup' && (
-                    <Button onClick={handleComplete}>
+
+                  {selectedRequest.status === 'Ready for Pickup' && (
+                    <Button onClick={handleManualRelease} disabled={actionBusy}>
                       <Check className="w-4 h-4 mr-1" />
-                      Mark Completed
+                      Mark Released (manual override)
                     </Button>
                   )}
-                  
+
+                  {(selectedRequest.status === 'Submitted' || selectedRequest.status === 'Under Review' || selectedRequest.status === 'In Progress') && (
+                    <Button variant="danger" onClick={() => setRejectModal(true)} disabled={actionBusy}>
+                      <X className="w-4 h-4 mr-1" />
+                      Reject
+                    </Button>
+                  )}
+
                   <Button variant="secondary" onClick={() => handlePrintDocument(selectedRequest)}>
                     <Download className="w-4 h-4 mr-1" />
                     Download / Print Document

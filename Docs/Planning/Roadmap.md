@@ -2,6 +2,20 @@
 
 This document provides a comprehensive roadmap for transforming the current web prototype of the **Automated Governance and Public Service Platform (AGAPP)** into the production-ready system proposed in the capstone manuscript. It outlines the architecture gap analysis, design constraints, tenant isolation strategies, and a step-by-step phased execution plan.
 
+> [!NOTE]
+> **The "Proposed Production Stack" below is a proposal, not a contract.** It reflects
+> the manuscript's original plan. Where a simpler approach works better, fits the free
+> tier, or avoids needless complexity, **we keep what works** and deviate intentionally.
+> Deviations already made (kept on purpose, not gaps to "fix"):
+> - **Chatbot:** uses a curated **keyword-matched FAQ + Gemini API fallback**, *not*
+>   a RAG pipeline with pgvector embeddings. This is intentional — the FAQ set covers
+>   the common questions a citizen actually asks, and Gemini handles the long tail.
+>   The `faq_embeddings` table in `schema.sql` is leftover from this abandoned RAG
+>   plan and is unused (slated for removal).
+> - **Database:** Supabase Postgres (managed) instead of self-hosted Docker Postgres.
+>
+> _See [Codebase-Audit](../Audits/Codebase-Audit.md) for the actual implemented stack._
+
 ---
 
 ## 1. Core System Architecture & Scope
@@ -29,7 +43,7 @@ Below is the comparison between the **Current Prototype** and the **Proposed Pro
 | **Asset Storage** | Local mock urls | **Cloudflare R2 or Supabase Storage** | Required for citizen-uploaded report photos and generated PDF documents |
 | **Mapping Engine** | CSS grids / inline SVG maps | **MapLibre GL + OpenStreetMap** | Integrate interactive map canvases for navigation and location picking |
 | **Machine Learning (ML)** | Static simulator toggle | **YOLOv8n -> TensorFlow Lite INT8** | Train on custom Philippine road datasets and package inside Expo bundle |
-| **Support Chatbot** | Pre-scripted responses | **RAG Pipeline + pgvector** | Embed LGU FAQs, compare cosine similarities, and fallback to support tickets |
+| **Support Chatbot** | Pre-scripted responses | ~~RAG Pipeline + pgvector~~ → **Keyword FAQ + Gemini fallback** (adopted) | ✅ Done differently on purpose. Curated FAQ keyword match → Gemini API for the long tail. RAG/pgvector dropped as over-engineered for the FAQ scope. |
 | **User Authentication** | Mock localStorage flag | **JWT + OTP (One-Time Passcode) + Expo SecureStore** | Develop SMS/Email OTP flow with JWT authentication and secure storage |
 | **Push Notifications** | Simple alert banners | **Expo Push Notifications** | Configure backend triggers to send real-time system alerts to citizens |
 
@@ -122,10 +136,11 @@ Implement the core interactive and AI capabilities of AGAPP.
   - Train a custom YOLOv8n model using the RDD2020 dataset and Philippine road samples.
   - Export to a quantized `.tflite` model (INT8).
   - Package model into the React Native app using `react-native-fast-tflite` or custom WebAssembly bindings.
-- [ ] **AI Retrieval-Augmented Generation Chatbot**:
-  - Write a NestJS background worker to generate text embeddings for LGU FAQs.
-  - Store vector representations in the `pgvector` column.
-  - Build query logic verifying that similarity scores are above the threshold ($0.75$) before answering; otherwise, fallback to creating a support ticket.
+- [x] **Support Chatbot** — *implemented differently from the original RAG plan (on purpose):*
+  - ~~Generate text embeddings for LGU FAQs / store in `pgvector` / cosine-similarity threshold.~~
+  - ✅ Curated FAQ entries with keyword matching (`scoreFaq()` in `apps/api/src/app.controllers.ts`),
+    falling back to the **Gemini API** for questions the FAQ set doesn't cover.
+  - `faq_embeddings` table is unused legacy and slated for removal.
 - [ ] **Interactive Maps**:
   - Render OpenStreetMap tiles with custom markers representing municipal hall rooms, offices, and town tourist spots.
 - [ ] **PDF Generator**:

@@ -21,6 +21,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Feasibility-Analysis](Planning/Feasibility-Analysis.md) — feature feasibility + stack rationale
 - [Plan-Verification-Feature](Planning/Plan-Verification-Feature.md) — citizen ID verification (in progress)
 - [Plan-ML-Pothole-Detection](Planning/Plan-ML-Pothole-Detection.md) — pothole ML strategy (draft)
+- [Plan-eServices-QR-Pickup](Planning/Plan-eServices-QR-Pickup.md) — document requests + QR pickup (built)
 
 **Tasks**
 - [TODO](Tasks/TODO.md) — prioritized outstanding work
@@ -33,4 +34,4 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
   Obsidian is set up.
 - Dates are absolute (e.g. `2026-06-29`), not "last week".
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-03 (eServices document requests + QR pickup)_
