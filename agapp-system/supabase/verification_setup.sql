@@ -281,6 +281,34 @@ CREATE POLICY "Super admins read all citizen-ids" ON storage.objects
     )
   );
 
+-- --------------------------------------------------------
+-- 5. Staff notification bell: new verification pending (admin only)
+--    See Docs/Planning/Plan-Admin-Notifications.md.
+-- --------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_staff_new_verification()
+RETURNS trigger AS $$
+DECLARE
+  v_name text;
+BEGIN
+  SELECT name INTO v_name FROM users WHERE id = NEW.user_id;
+
+  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+  VALUES (
+    NEW.lgu_id, NULL, 'lgu_admin', 'new_verification',
+    'New Verification Pending',
+    COALESCE(v_name, 'A citizen') || ' submitted an ID for review.',
+    jsonb_build_object('verification_id', NEW.id, 'user_id', NEW.user_id),
+    false
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_notify_staff_new_verification ON verification_requests;
+CREATE TRIGGER trigger_notify_staff_new_verification
+  AFTER INSERT ON verification_requests FOR EACH ROW EXECUTE FUNCTION notify_staff_new_verification();
+
 -- Owners can delete their own files
 DROP POLICY IF EXISTS "Owners delete own citizen-ids" ON storage.objects;
 CREATE POLICY "Owners delete own citizen-ids" ON storage.objects

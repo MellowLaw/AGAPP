@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -147,7 +148,8 @@ export default function SuperAdminDashboard() {
     >
       {/* LGU Filter Tabs */}
       <div className="flex items-center gap-2.5 mb-8 flex-wrap">
-        <button
+        <motion.button
+          whileTap={{ scale: 0.96 }}
           onClick={() => setSelectedLgu(null)}
           className={`px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors ${
             selectedLgu === null
@@ -156,10 +158,11 @@ export default function SuperAdminDashboard() {
           }`}
         >
           All LGUs
-        </button>
+        </motion.button>
         {lgus.map(lgu => (
-          <button
+          <motion.button
             key={lgu.id}
+            whileTap={{ scale: 0.96 }}
             onClick={() => setSelectedLgu(lgu.id)}
             className={`px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors ${
               selectedLgu === lgu.id
@@ -168,34 +171,42 @@ export default function SuperAdminDashboard() {
             }`}
           >
             {lgu.name}
-          </button>
+          </motion.button>
         ))}
         <Link href="/super/lgus">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.96 }}
             className="px-5 py-2.5 bg-transparent border border-theme rounded-full text-[13px] font-semibold text-text-primary hover:border-text-muted flex items-center gap-1.5 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add LGU
-          </button>
+          </motion.button>
         </Link>
       </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {stats.map((stat) => {
+        {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.label} noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
-              <div className="flex items-start justify-between">
-                <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
-                <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
-                  <Icon className="w-4 h-4 text-accent" />
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Card noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
+                  <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
+                    <Icon className="w-4 h-4 text-accent" />
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
-              </div>
-            </Card>
+                <div className="mt-4">
+                  <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
+                </div>
+              </Card>
+            </motion.div>
           );
         })}
       </div>
@@ -252,17 +263,23 @@ export default function SuperAdminDashboard() {
           <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
               <tr>
-                <th className="pb-3 pl-10 pr-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">LGU</th>
-                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Users</th>
-                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Reports</th>
-                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Requests</th>
-                <th className="pb-3 px-6 text-[11px] font-bold text-text-primary uppercase tracking-wider">Avg Response</th>
-                <th className="pb-3 pl-6 pr-10 text-[11px] font-bold text-text-primary uppercase tracking-wider text-right">Status</th>
+                <th className="pb-3 pl-10 pr-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">LGU</th>
+                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Users</th>
+                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Reports</th>
+                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Requests</th>
+                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Avg Response</th>
+                <th className="pb-3 pl-6 pr-10 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider text-right">Status</th>
               </tr>
             </thead>
             <tbody>
-              {(selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map((lgu) => (
-                <tr key={lgu.id} className="bg-surface hover:bg-surface-alt transition-colors group">
+              {(selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map((lgu, i) => (
+                <motion.tr
+                  key={lgu.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.15 + i * 0.04, ease: 'easeOut' }}
+                  className="bg-surface hover:bg-surface-alt transition-colors group"
+                >
                   <td className="py-5 pl-10 pr-6 rounded-l-full">
                     <span className="font-semibold text-[15px] text-text-primary">{lgu.name}</span>
                   </td>
@@ -275,7 +292,7 @@ export default function SuperAdminDashboard() {
                       {lgu.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>

@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Bell } from '@phosphor-icons/react';
+import { Sun, Moon } from '@phosphor-icons/react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useToast } from '@/components/ui/Toast';
+import { NotificationBell } from './NotificationBell';
 
 function useClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -19,7 +19,6 @@ function useClock() {
 export function StatusRow() {
   const { isDark, toggleTheme } = useTheme();
   const now = useClock();
-  const { showToast, ToastContainer } = useToast();
 
   // UTC+8 (Philippines) regardless of the viewer's own machine timezone.
   const timeLabel = now
@@ -50,16 +49,7 @@ export function StatusRow() {
 
       <div className="h-4 w-px bg-theme" />
 
-      <motion.button
-        onClick={() => showToast('Notifications panel coming soon', 'info')}
-        aria-label="Notifications"
-        className="relative flex items-center justify-center w-6 h-6 text-text-muted hover:text-accent"
-        whileTap={{ scale: 0.85 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      >
-        <Bell className="w-4 h-4" />
-        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-accent rounded-full" />
-      </motion.button>
+      <NotificationBell />
 
       <div className="h-4 w-px bg-theme" />
 
@@ -83,7 +73,6 @@ export function StatusRow() {
           </motion.span>
         </AnimatePresence>
       </motion.button>
-      <ToastContainer />
     </div>
   );
 }

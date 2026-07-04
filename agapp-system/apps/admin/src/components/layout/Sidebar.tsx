@@ -17,7 +17,6 @@ import {
   IdentificationBadge,
   MapPin,
   ListChecks,
-  Bell,
 } from '@phosphor-icons/react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';

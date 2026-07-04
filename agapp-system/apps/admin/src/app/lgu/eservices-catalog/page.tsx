@@ -183,7 +183,7 @@ export default function EservicesCatalogPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
-        <Card className="lg:col-span-1 shadow-sm border border-theme">
+        <Card noBorder className="lg:col-span-1 shadow-sm">
           <CardHeader title={selectedId ? 'Edit Service' : 'Add Service'} subtitle="Shown to citizens in the mobile app" />
           <div className="space-y-4">
             <Input label="Office" placeholder="BPLO" value={officeName} onChange={(e: any) => setOfficeName(e.target.value)} />
@@ -266,7 +266,7 @@ export default function EservicesCatalogPage() {
         </Card>
 
         {/* List */}
-        <Card className="lg:col-span-2 shadow-sm border border-theme" padding="sm">
+        <Card noBorder className="lg:col-span-2 shadow-sm" padding="sm">
           <p className="text-xs font-bold text-text-faint uppercase tracking-wider px-2 pt-1 pb-2">
             Catalog ({services.length})
           </p>

@@ -293,7 +293,7 @@ export default function DashboardPage() {
 
         <Card className="lg:col-span-4 rounded-[20px]" noBorder>
           <p className="text-[11px] font-mono font-semibold tracking-widest text-accent uppercase mb-1">Distribution</p>
-          <p className="text-sm text-text-primary mb-6">
+          <p className="text-sm text-text-primary/70 mb-6">
             Live categorical distribution of citizen reports active in the municipality system.
           </p>
 
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                 <div key={cat.label}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm font-medium text-text-primary">{cat.label}</span>
-                    <span className="text-xs font-mono font-bold text-text-primary">{cat.count} item{cat.count === 1 ? '' : 's'}</span>
+                    <span className="text-xs font-mono font-medium text-text-primary/70">{cat.count} item{cat.count === 1 ? '' : 's'}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-theme overflow-hidden">
                     <motion.div
@@ -323,7 +323,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Submissions */}
       <Card noBorder className="rounded-[20px]">
         <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
           <div>
@@ -341,11 +340,11 @@ export default function DashboardPage() {
           <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
               <tr>
-                <th className="pb-2 pl-10 pr-4 text-xs font-bold text-text-primary uppercase tracking-wider">ID</th>
-                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Category</th>
-                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Location</th>
-                <th className="pb-2 px-4 text-xs font-bold text-text-primary uppercase tracking-wider">Status</th>
-                <th className="pb-2 pl-4 pr-10 text-xs font-bold text-text-primary uppercase tracking-wider text-right">Time</th>
+                <th className="pb-2 pl-10 pr-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">ID</th>
+                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Category</th>
+                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Location</th>
+                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Status</th>
+                <th className="pb-2 pl-4 pr-10 text-xs font-medium text-text-primary/80 uppercase tracking-wider text-right">Time</th>
               </tr>
             </thead>
             <tbody>
@@ -355,9 +354,9 @@ export default function DashboardPage() {
                   className="bg-surface-alt hover:bg-accent-soft transition-colors cursor-pointer group"
                   onClick={() => router.push(`/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(report.id)}`)}
                 >
-                  <td className="py-5 pl-10 pr-4 rounded-l-xl text-sm font-mono font-bold text-text-primary">{report.id}</td>
-                  <td className="py-5 px-4 text-sm text-text-primary font-semibold">{report.category}</td>
-                  <td className="py-5 px-4 text-sm text-text-primary">
+                  <td className="py-5 pl-10 pr-4 rounded-l-xl text-sm font-mono font-medium text-text-primary">{report.id}</td>
+                  <td className="py-5 px-4 text-sm text-text-primary">{report.category}</td>
+                  <td className="py-5 px-4 text-sm text-text-primary/80">
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-4 h-4 text-accent" />
                       {report.location}
@@ -375,7 +374,7 @@ export default function DashboardPage() {
                       {report.status.replace('_', ' ')}
                     </Badge>
                   </td>
-                  <td className="py-5 pl-4 pr-10 rounded-r-xl text-xs font-mono text-text-primary text-right">{report.time}</td>
+                  <td className="py-5 pl-4 pr-10 rounded-r-xl text-xs font-mono text-text-primary/70 text-right">{report.time}</td>
                 </tr>
               ))}
             </tbody>

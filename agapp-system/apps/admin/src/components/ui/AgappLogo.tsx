@@ -32,7 +32,7 @@ export function AgappLogo({
         <span
           className={`font-extrabold ${textClassName}`}
           style={{
-            fontFamily: 'var(--font-brand)',
+            fontFamily: 'var(--font-sans)',
             fontSize: size * 0.5,
             letterSpacing: '-0.02em',
             color: textColor || 'var(--text-primary)',

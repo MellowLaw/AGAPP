@@ -45,6 +45,9 @@ CREATE TABLE users (
     barangay text,
     notification_preferences jsonb DEFAULT '{"push": true, "sms": true, "email": true}'::jsonb,
     is_active boolean DEFAULT true,
+    -- Staff notification bell "mark all read" model (v1) — a single per-admin
+    -- timestamp; unread count = staff-audience notifications newer than this.
+    notifications_seen_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -230,6 +233,81 @@ CREATE OR REPLACE TRIGGER trigger_notify_report_status
 CREATE OR REPLACE TRIGGER trigger_notify_service_status
   AFTER UPDATE ON service_requests FOR EACH ROW EXECUTE FUNCTION notify_service_status_change();
 
+-- ── Staff notification bell (admin panel) ─────────────────────────────────
+-- Same `notifications` table, staff-audience rows (user_id NULL, audience
+-- set). See Docs/Planning/Plan-Admin-Notifications.md for the v1 scope.
+CREATE OR REPLACE FUNCTION notify_staff_new_report()
+RETURNS trigger AS $$
+DECLARE
+  v_label text;
+BEGIN
+  v_label := CASE NEW.category
+    WHEN 'pothole'          THEN 'Pothole / Road Damage'
+    WHEN 'clogged_drainage' THEN 'Drainage / Canal'
+    WHEN 'stray_animal'     THEN 'Stray Pets'
+    WHEN 'damaged_pole'     THEN 'Damaged Pole'
+    ELSE NEW.category
+  END;
+
+  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+  VALUES (
+    NEW.lgu_id, NULL, 'lgu_personnel', 'new_report',
+    'New Report Submitted',
+    'New ' || v_label || ' report ' || NEW.reference_number || COALESCE(' in ' || NEW.barangay, '') || '.',
+    jsonb_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number),
+    false
+  );
+
+  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+  VALUES (
+    NEW.lgu_id, NULL, 'super_admin', 'new_report',
+    'New Report Submitted',
+    'New ' || v_label || ' report ' || NEW.reference_number || ' in ' || NEW.lgu_id || '.',
+    jsonb_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number, 'lgu_id', NEW.lgu_id),
+    false
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE TRIGGER trigger_notify_staff_new_report
+  AFTER INSERT ON reports FOR EACH ROW EXECUTE FUNCTION notify_staff_new_report();
+
+CREATE OR REPLACE FUNCTION notify_staff_new_service_request()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+  VALUES (
+    NEW.lgu_id, NULL, 'lgu_personnel', 'new_service_request',
+    'New Service Request',
+    'New ' || NEW.service_type || ' request ' || NEW.reference_number || '.',
+    jsonb_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number),
+    false
+  );
+
+  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+  VALUES (
+    NEW.lgu_id, NULL, 'super_admin', 'new_service_request',
+    'New Service Request',
+    'New ' || NEW.service_type || ' request ' || NEW.reference_number || ' in ' || NEW.lgu_id || '.',
+    jsonb_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number, 'lgu_id', NEW.lgu_id),
+    false
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE TRIGGER trigger_notify_staff_new_service_request
+  AFTER INSERT ON service_requests FOR EACH ROW EXECUTE FUNCTION notify_staff_new_service_request();
+
+-- notify_staff_new_verification() lives in verification_setup.sql, since
+-- verification_requests is created there (run after this file).
+-- notify_staff_forum_post_flagged() / notify_staff_forum_comment_flagged()
+-- are defined further below, after the forum_posts/forum_comments tables
+-- exist (they reference those tables and must run after CREATE TABLE).
+
 -- Realtime: postgres_changes only delivers events for tables in this
 -- publication. Without these, EVERY realtime subscriber is silently dead —
 -- the API push service (notifications INSERT), mobile NotificationsScreen,
@@ -406,6 +484,55 @@ CREATE TABLE forum_comments (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Staff notification bell: forum content flagged by check_forum_profanity()
+-- (see trg_moderate_forum / trg_moderate_forum_comment below, which run
+-- BEFORE these AFTER triggers and set flagged_keywords on the same row).
+CREATE OR REPLACE FUNCTION notify_staff_forum_post_flagged()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.flagged_keywords IS NOT NULL AND array_length(NEW.flagged_keywords, 1) > 0
+     AND (TG_OP = 'INSERT' OR OLD.flagged_keywords IS DISTINCT FROM NEW.flagged_keywords) THEN
+    INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+    VALUES (
+      NEW.lgu_id, NULL, 'lgu_admin', 'forum_flagged',
+      'Forum Post Flagged',
+      'A forum post by ' || COALESCE(NEW.citizen_name, 'a citizen') || ' was flagged by the filter.',
+      jsonb_build_object('post_id', NEW.id),
+      false
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE TRIGGER trigger_notify_staff_forum_post_flagged
+  AFTER INSERT OR UPDATE ON forum_posts FOR EACH ROW EXECUTE FUNCTION notify_staff_forum_post_flagged();
+
+CREATE OR REPLACE FUNCTION notify_staff_forum_comment_flagged()
+RETURNS trigger AS $$
+DECLARE
+  v_lgu_id text;
+BEGIN
+  IF NEW.flagged_keywords IS NOT NULL AND array_length(NEW.flagged_keywords, 1) > 0
+     AND (TG_OP = 'INSERT' OR OLD.flagged_keywords IS DISTINCT FROM NEW.flagged_keywords) THEN
+    SELECT lgu_id INTO v_lgu_id FROM forum_posts WHERE id = NEW.post_id;
+
+    INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
+    VALUES (
+      v_lgu_id, NULL, 'lgu_admin', 'forum_flagged',
+      'Forum Comment Flagged',
+      'A forum comment by ' || COALESCE(NEW.citizen_name, 'a citizen') || ' was flagged by the filter.',
+      jsonb_build_object('post_id', NEW.post_id, 'comment_id', NEW.id),
+      false
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+CREATE OR REPLACE TRIGGER trigger_notify_staff_forum_comment_flagged
+  AFTER INSERT OR UPDATE ON forum_comments FOR EACH ROW EXECUTE FUNCTION notify_staff_forum_comment_flagged();
+
 -- 7. AUDIT LOGS
 CREATE TABLE audit_logs (
     id bigserial PRIMARY KEY,
@@ -436,7 +563,7 @@ CREATE TABLE news_announcements (
 
 CREATE INDEX news_announcements_lgu_status_idx ON news_announcements(lgu_id, status);
 
--- 12. NOTIFICATIONS (per-user in-app notifications)
+-- 12. NOTIFICATIONS (per-user in-app notifications, plus staff-audience rows)
 CREATE TABLE notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lgu_id text REFERENCES lgus(id) ON DELETE CASCADE,
@@ -446,6 +573,10 @@ CREATE TABLE notifications (
     body text,
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     is_read boolean DEFAULT false,
+    -- Staff-targeted rows (admin notification bell): user_id is NULL, lgu_id +
+    -- audience identify who should see it ('lgu_admin' | 'lgu_personnel' |
+    -- 'super_admin'). NULL = the original per-citizen behavior, unchanged.
+    audience text CHECK (audience IN ('lgu_admin', 'lgu_personnel', 'super_admin')),
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -682,6 +813,16 @@ CREATE POLICY "Users can read their own notifications" ON notifications FOR SELE
 );
 
 CREATE POLICY "System can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
+
+-- Staff notification bell: a staff row is visible to a user whose role (+ lgu,
+-- except the cross-LGU super admin rollup) matches the row's audience.
+CREATE POLICY "Staff can read audience notifications" ON notifications FOR SELECT USING (
+  audience IS NOT NULL AND (
+    (get_current_user_role() = 'SUPER_ADMIN' AND audience = 'super_admin')
+    OR (lgu_id = get_current_user_lgu() AND get_current_user_role() = 'LGU_ADMIN' AND audience IN ('lgu_admin', 'lgu_personnel'))
+    OR (lgu_id = get_current_user_lgu() AND get_current_user_role() = 'LGU_PERSONNEL' AND audience = 'lgu_personnel')
+  )
+);
 
 -- 8. Policies for Chatbot FAQs
 CREATE POLICY "Allow all users to read chatbot FAQs" ON chatbot_faqs FOR SELECT USING (true);

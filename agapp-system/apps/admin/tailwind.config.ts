@@ -32,9 +32,9 @@ const config: Config = {
         'accent-soft': 'var(--accent-soft)',
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
-        serif: ['"EB Garamond"', 'Georgia', 'serif'],
-        mono: ['"JetBrains Mono"', 'Fira Code', 'monospace'],
+        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Lora', 'serif'],
+        mono: ['var(--font-sans)', 'monospace'],
       },
     },
   },

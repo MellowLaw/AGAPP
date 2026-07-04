@@ -206,7 +206,7 @@ export default function FacilitiesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
-        <Card className="lg:col-span-2 shadow-sm border border-theme" padding="sm">
+        <Card noBorder className="lg:col-span-2 shadow-sm" padding="sm">
           <div className="px-2 pt-1 pb-3 flex items-center justify-between">
             <p className="text-sm text-text-muted">
               <MapPin className="inline w-4 h-4 mr-1 -mt-0.5" />
@@ -238,7 +238,7 @@ export default function FacilitiesPage() {
 
         {/* Form + list */}
         <div className="space-y-6">
-          <Card className="shadow-sm border border-theme">
+          <Card noBorder className="shadow-sm">
             <CardHeader
               title={selectedId ? 'Edit Facility' : 'Add Facility'}
               subtitle={
@@ -314,7 +314,7 @@ export default function FacilitiesPage() {
             </div>
           </Card>
 
-          <Card className="shadow-sm border border-theme" padding="sm">
+          <Card noBorder className="shadow-sm" padding="sm">
             <p className="text-xs font-bold text-text-faint uppercase tracking-wider px-2 pt-1 pb-2">
               Existing facilities ({facilities.length})
             </p>

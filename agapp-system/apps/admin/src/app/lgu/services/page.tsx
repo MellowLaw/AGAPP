@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -49,7 +50,9 @@ const mapServiceRowToItem = (row: any): ServiceRequestItem => {
     category: row.office_name,
     status: (row.status as ServiceStatus) || 'Submitted',
     submittedBy: row.citizen_name,
-    submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+    submittedAt: row.created_at 
+      ? new Date(row.created_at).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' }) + ' · ' + new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '',
     purpose: row.form_details?.purpose || '',
     assignedTo: row.assigned_personnel || null,
     claimCode: row.claim_code || null,
@@ -67,7 +70,7 @@ export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const { showToast, ToastContainer } = useToast();
-  const pageSize = 25;
+  const pageSize = 10;
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -316,26 +319,26 @@ export default function ServicesPage() {
         />
       </Modal>
 
-      <div className="flex gap-6 h-[calc(100vh-140px)]">
+      <div className="flex gap-6 items-stretch">
         {/* Left Panel - Request List */}
-        <div className="w-1/2 flex flex-col gap-4">
+        <div className="w-1/2 flex flex-col gap-4 h-full min-h-[600px]">
           {/* Search & Filter */}
-          <Card padding="sm">
-            <div className="flex gap-3">
+          <Card padding="sm" noBorder>
+            <div className="flex gap-3 items-center">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
                   placeholder="Search requests..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                  className="w-full pl-9 pr-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-primary/50 h-10"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                className="px-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent h-10"
               >
                 <option value="all">All Status</option>
                 <option value="Submitted">Submitted</option>
@@ -345,7 +348,7 @@ export default function ServicesPage() {
                 <option value="Released">Released</option>
                 <option value="Rejected">Rejected</option>
               </select>
-              <Button variant="secondary" onClick={handleExportCsv}>
+              <Button variant="secondary" className="h-10 !bg-accent !text-white !border-0 hover:opacity-90" onClick={handleExportCsv}>
                 <Download className="w-4 h-4 mr-1" />
                 Export CSV
               </Button>
@@ -353,63 +356,80 @@ export default function ServicesPage() {
           </Card>
 
           {/* Request List */}
-          <Card className="flex-1 overflow-hidden" padding="none">
-            <div className="overflow-y-auto h-full p-4 space-y-3">
+          <Card className="flex-1 flex flex-col overflow-hidden" padding="none" noBorder>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+              <span className="text-xs text-text-primary/70">{startNum}-{endNum} of {filteredRequests.length}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="hover:!text-accent" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
+                <span className="text-xs text-text-primary/70">Page {safePage} / {pageCount}</span>
+                <Button variant="ghost" size="sm" className="hover:!text-accent" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
               {loading && (
-                <div className="p-4 text-sm text-text-muted">Loading service requests…</div>
+                <div className="p-4 text-sm text-text-primary">Loading service requests…</div>
               )}
               {loadError && !loading && (
                 <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading requests: {loadError}</div>
               )}
               {!loading && !loadError && paginated.length === 0 && (
-                <div className="p-4 text-sm text-text-muted">No service requests found for this LGU.</div>
+                <div className="p-4 text-sm text-text-primary">No service requests found for this LGU.</div>
               )}
               {!loading && !loadError && paginated.map((request) => (
-                <button
+                <motion.button
                   key={request.dbId}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.005 }}
+                  whileTap={{ scale: 0.995 }}
                   onClick={() => setSelectedRequest(request)}
-                  className={`w-full text-left p-5 border border-theme rounded-md transition-colors ${
-                    selectedRequest && selectedRequest.id === request.id ? 'bg-surface-alt' : 'bg-surface hover:bg-surface-alt/50'
+                  className={`w-full text-left p-5 rounded-xl border transition-all ${
+                    selectedRequest && selectedRequest.id === request.id 
+                      ? 'bg-accent-soft border-accent ring-1 ring-accent' 
+                      : 'bg-surface border-theme hover:bg-surface-alt/50'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <QrCode className="w-4 h-4 text-text-muted" />
+                      <QrCode className="w-4 h-4 text-accent shrink-0" />
                       <span className="font-medium text-text-primary">{request.id}</span>
                     </div>
                     <ServiceStatusBadge status={request.status} />
                   </div>
-                  <p className="text-text-primary mb-2">{request.serviceType}</p>
-                  <div className="flex items-center gap-1 text-sm text-text-muted">
-                    <User className="w-3 h-3" />
-                    {request.submittedBy}
-                    <span className="mx-1">•</span>
-                    {request.submittedAt}
+                  <p className="text-text-primary mb-3">{request.serviceType}</p>
+                  <div className="space-y-1 text-xs text-text-primary/70">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <span className="truncate">{request.submittedBy}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <span>{request.submittedAt}</span>
+                    </div>
                   </div>
-                </button>
+                </motion.button>
               ))}
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 border-t border-theme">
-              <span className="text-xs text-text-muted">{startNum}-{endNum} of {filteredRequests.length}</span>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
-                <span className="text-xs text-text-muted">Page {safePage} / {pageCount}</span>
-                <Button variant="ghost" size="sm" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
-              </div>
             </div>
           </Card>
         </div>
 
         {/* Right Panel - Request Details */}
         <div className="w-1/2">
-          <Card className="h-full overflow-y-auto">
+          <Card noBorder className="rounded-[20px]">
             {selectedRequest ? (
-              <div className="space-y-6">
+              <motion.div
+                key={selectedRequest.id}
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-theme pb-4">
+                <div className="flex items-start justify-between pb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <QrCode className="w-5 h-5 text-text-muted" />
+                      <QrCode className="w-5 h-5 text-accent" />
                       <h2 className="text-lg font-semibold text-text-primary">{selectedRequest.id}</h2>
                     </div>
                     <ServiceStatusBadge status={selectedRequest.status} />
@@ -423,24 +443,24 @@ export default function ServicesPage() {
                 {/* Service Details */}
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Service Type</p>
-                    <p className="text-lg font-medium text-text-primary">{selectedRequest.serviceType}</p>
-                    <p className="text-sm text-text-muted">{selectedRequest.category}</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Service Type</p>
+                    <p className="text-lg font-semibold text-text-primary">{selectedRequest.serviceType}</p>
+                    <p className="text-sm text-text-primary/70">{selectedRequest.category}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted By</p>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted By</p>
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-text-muted" />
+                        <User className="w-4 h-4 text-accent" />
                         <span className="text-text-primary">{selectedRequest.submittedBy}</span>
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted</p>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted</p>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-text-muted" />
+                        <Calendar className="w-4 h-4 text-accent" />
                         <span className="text-text-primary">{selectedRequest.submittedAt}</span>
                       </div>
                     </div>
@@ -448,18 +468,18 @@ export default function ServicesPage() {
 
                   {selectedRequest.purpose && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Purpose</p>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Purpose</p>
                       <p className="text-text-primary">{selectedRequest.purpose}</p>
                     </div>
                   )}
 
                   {selectedRequest.requirements.length > 0 && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-muted mb-2">Requirements Checklist</p>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-2">Requirements Checklist</p>
                       <ul className="space-y-1">
                         {selectedRequest.requirements.map((req, i) => (
                           <li key={i} className="flex items-center gap-2 text-sm text-text-primary">
-                            <Check className="w-3.5 h-3.5 text-text-muted" />
+                            <Check className="w-3.5 h-3.5 text-accent" />
                             {req}
                           </li>
                         ))}
@@ -470,12 +490,12 @@ export default function ServicesPage() {
                   {/* Fee Info */}
                   <div className="p-4 bg-surface-alt rounded-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-text-muted">Fee</span>
+                      <span className="text-sm text-text-primary/70">Fee</span>
                       <span className="font-semibold text-text-primary">{selectedRequest.feeNote || 'Pay at the Municipal Hall'}</span>
                     </div>
                     {selectedRequest.processingTime && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-text-muted">Processing Time</span>
+                        <span className="text-sm text-text-primary/70">Processing Time</span>
                         <span className="text-text-primary">{selectedRequest.processingTime}</span>
                       </div>
                     )}
@@ -489,20 +509,20 @@ export default function ServicesPage() {
                   )}
 
                   {selectedRequest.status === 'Released' && selectedRequest.releasedAt && (
-                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-md text-center text-sm text-green-600 dark:text-green-400">
+                    <div className="p-4 bg-green-600 text-white rounded-md text-center text-sm font-semibold">
                       Released {new Date(selectedRequest.releasedAt).toLocaleString()}
                     </div>
                   )}
 
                   {selectedRequest.status === 'Rejected' && selectedRequest.rejectReason && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-md text-sm text-red-600 dark:text-red-400">
-                      <span className="font-medium">Reason: </span>{selectedRequest.rejectReason}
+                    <div className="p-4 bg-red-600 text-white rounded-md text-sm">
+                      <span className="font-semibold">Reason: </span>{selectedRequest.rejectReason}
                     </div>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t border-theme">
+                <div className="flex flex-wrap gap-3 pt-4">
                   {selectedRequest.status === 'Submitted' && (
                     <Button onClick={() => updateStatus('Under Review')} disabled={actionBusy}>
                       <Clock className="w-4 h-4 mr-1" />
@@ -543,9 +563,9 @@ export default function ServicesPage() {
                     Download / Print Document
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             ) : (
-              <div className="h-full flex items-center justify-center text-text-muted">
+              <div className="py-20 flex items-center justify-center text-text-primary">
                 Select a request to view details
               </div>
             )}

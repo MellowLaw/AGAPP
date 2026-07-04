@@ -51,7 +51,7 @@ export function PageHeader({ title, kicker, titleAccent, subtitle, action, varia
 
   return (
     <div className="flex items-center justify-between gap-6 mb-6 flex-wrap">
-      <h1 className="display-font text-2xl text-text-primary">{title}</h1>
+      <h1 className="text-2xl font-serif italic text-text-primary">{title}</h1>
       <div className="flex items-center gap-3 shrink-0">
         {action}
         <StatusRow />

@@ -35,13 +35,33 @@ interface ReportsMapProps {
   showLegend?: boolean;
 }
 
+function makePulsingDotIcon(color: string, size = 32): L.DivIcon {
+  const html = `
+    <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
+      <!-- Outer expanding pulse ring - hollow outline only -->
+      <div class="absolute rounded-full animate-ping opacity-75 border-2" style="width: 100%; height: 100%; border-color: ${color}; animation-duration: 1.8s;"></div>
+      <!-- Static halo ring -->
+      <div class="absolute rounded-full opacity-25 border border-white" style="width: 70%; height: 70%; background-color: ${color};"></div>
+      <!-- Core solid dot -->
+      <div class="absolute rounded-full border-2 border-white shadow-md" style="width: 35%; height: 35%; background-color: ${color};"></div>
+    </div>
+  `;
+  return L.divIcon({
+    className: 'leaflet-pulsing-marker',
+    html: html,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
+
 export function ReportsMap({ reports, center, className = 'h-96', getDetailHref, showLegend = true }: ReportsMapProps) {
   const icons = useMemo(() => {
     const byStatus: Record<string, L.DivIcon> = {};
-    for (const [status, color] of Object.entries(STATUS_COLORS)) byStatus[status] = makePinIcon(color);
+    for (const [status, color] of Object.entries(STATUS_COLORS)) byStatus[status] = makePulsingDotIcon(color);
     return byStatus;
   }, []);
-  const fallbackIcon = useMemo(() => makePinIcon('#6B7280'), []);
+  const fallbackIcon = useMemo(() => makePulsingDotIcon('#6B7280'), []);
 
   return (
     <div className={`relative ${className}`}>

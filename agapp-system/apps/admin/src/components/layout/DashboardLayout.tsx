@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { PageHeader } from './PageHeader';
 
+
 interface DashboardLayoutProps {
   children: React.ReactNode;
   role: 'lgu-admin' | 'super-admin' | 'lgu-personnel';
@@ -54,6 +55,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           {children}
         </main>
       </div>
+
     </div>
   );
 };

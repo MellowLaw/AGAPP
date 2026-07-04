@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -105,7 +106,9 @@ const mapReportRowToItem = (row: any): ReportItem => {
     status: mapDbStatusToUi(row.status || 'Submitted'),
     submittedBy: row.citizen_name || 'Citizen',
     citizenId: row.citizen_id || null,
-    submittedAt: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+    submittedAt: row.created_at 
+      ? new Date(row.created_at).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' }) + ' · ' + new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '',
     photoUrl: row.photo_url || null,
     assignedOffice: row.assigned_office || null,
     aiDetected: !!row.ml_verified,
@@ -125,7 +128,7 @@ export default function ReportsPage() {
   const offices = ['Engineering Office', 'Health Office', 'MDRRMO', 'Agriculture'];
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignOffice, setAssignOffice] = useState(offices[0]);
-  const pageSize = 25;
+  const pageSize = 10;
   const [page, setPage] = useState(1);
   const [assignHistory, setAssignHistory] = useState<Record<string, { office: string; at: string }[]>>({});
 
@@ -360,26 +363,26 @@ export default function ReportsPage() {
       title="Issue Reports"
     >
       <ToastContainer />
-      <div className="flex gap-6 h-[calc(100vh-140px)]">
+      <div className="flex gap-6 items-stretch">
         {/* Left Panel - Report List */}
-        <div className="w-1/2 flex flex-col gap-4">
+        <div className="w-1/2 flex flex-col gap-4 h-full min-h-[600px]">
           {/* Search & Filter */}
-          <Card padding="sm">
-            <div className="flex gap-3">
+          <Card padding="sm" noBorder>
+            <div className="flex gap-3 items-center">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
                   placeholder="Search reports..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                  className="w-full pl-9 pr-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-primary/50 h-10"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                className="px-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent h-10"
               >
                 <option value="all">All Status</option>
                 <option value="submitted">Submitted</option>
@@ -387,7 +390,7 @@ export default function ReportsPage() {
                 <option value="in_progress">In Progress</option>
                 <option value="resolved">Resolved</option>
               </select>
-              <Button variant="secondary" onClick={handleExportCsv}>
+              <Button variant="secondary" className="h-10 !bg-accent !text-white !border-0 hover:opacity-90" onClick={handleExportCsv}>
                 <Download className="w-4 h-4 mr-1" />
                 Export CSV
               </Button>
@@ -395,57 +398,74 @@ export default function ReportsPage() {
           </Card>
 
           {/* Report List */}
-          <Card className="flex-1 overflow-hidden" padding="none">
-            <div className="overflow-y-auto h-full p-4 space-y-3">
+          <Card className="flex-1 flex flex-col overflow-hidden" padding="none" noBorder>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+              <span className="text-xs text-text-primary/70">{startNum}-{endNum} of {filteredReports.length}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="hover:!text-accent" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
+                <span className="text-xs text-text-primary/70">Page {safePage} / {pageCount}</span>
+                <Button variant="ghost" size="sm" className="hover:!text-accent" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
               {loading && (
-                <div className="p-4 text-sm text-text-muted">Loading reports…</div>
+                <div className="p-4 text-sm text-text-primary">Loading reports…</div>
               )}
               {loadError && !loading && (
                 <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading reports: {loadError}</div>
               )}
               {!loading && !loadError && paginated.length === 0 && (
-                <div className="p-4 text-sm text-text-muted">No reports found for this LGU.</div>
+                <div className="p-4 text-sm text-text-primary">No reports found for this LGU.</div>
               )}
               {!loading && !loadError && paginated.map((report) => (
-                <button
+                <motion.button
                   key={report.dbId}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.005 }}
+                  whileTap={{ scale: 0.995 }}
                   onClick={() => setSelectedReport(report)}
-                  className={`w-full text-left p-5 border border-theme rounded-md transition-colors ${
-                    selectedReport && selectedReport.id === report.id ? 'bg-surface-alt' : 'bg-surface hover:bg-surface-alt/50'
+                  className={`w-full text-left p-5 rounded-xl border transition-all ${
+                    selectedReport && selectedReport.id === report.id 
+                      ? 'bg-accent-soft border-accent ring-1 ring-accent' 
+                      : 'bg-surface border-theme hover:bg-surface-alt/50'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <span className="font-medium text-text-primary">{report.id}</span>
                     <ReportStatusBadge status={report.status} />
                   </div>
-                  <p className="text-text-primary mb-2">{report.category}{report.subType ? ` - ${report.subType}` : ''}</p>
-                  <div className="flex items-center gap-1 text-sm text-text-muted">
-                    <MapPin className="w-4 h-4" />
-                    {report.location}
-                    <span className="mx-1">•</span>
-                    {report.submittedAt}
+                  <p className="text-text-primary mb-3">{report.category}{report.subType ? ` - ${report.subType}` : ''}</p>
+                  <div className="space-y-1 text-xs text-text-primary/70">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <span className="truncate">{report.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <span>{report.submittedAt}</span>
+                    </div>
                   </div>
-                </button>
+                </motion.button>
               ))}
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 border-t border-theme">
-              <span className="text-xs text-text-muted">{startNum}-{endNum} of {filteredReports.length}</span>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" disabled={safePage<=1} onClick={() => setPage(Math.max(1, safePage-1))}>Prev</Button>
-                <span className="text-xs text-text-muted">Page {safePage} / {pageCount}</span>
-                <Button variant="ghost" size="sm" disabled={safePage>=pageCount} onClick={() => setPage(Math.min(pageCount, safePage+1))}>Next</Button>
-              </div>
             </div>
           </Card>
         </div>
 
         {/* Right Panel - Report Details */}
         <div className="w-1/2">
-          <Card className="h-full">
+          <Card noBorder className="rounded-[20px]">
             {selectedReport ? (
-              <div className="space-y-6">
+              <motion.div
+                key={selectedReport.id}
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-theme pb-4">
+                <div className="flex items-start justify-between pb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-text-primary">{selectedReport.id}</h2>
                     <ReportStatusBadge status={selectedReport.status} />
@@ -453,7 +473,7 @@ export default function ReportsPage() {
                 </div>
 
                 {/* Photo */}
-                <div className="aspect-video bg-surface-alt rounded-lg overflow-hidden flex items-center justify-center border border-theme">
+                <div className="aspect-video bg-surface-alt rounded-lg overflow-hidden flex items-center justify-center">
                   {selectedReport.photoUrl ? (
                     <img 
                       src={selectedReport.photoUrl} 
@@ -462,8 +482,8 @@ export default function ReportsPage() {
                     />
                   ) : (
                     <div className="text-center">
-                      <Warning className="w-12 h-12 text-text-muted mx-auto mb-2" />
-                      <p className="text-text-muted">No photo proof attached</p>
+                      <Warning className="w-12 h-12 text-text-primary mx-auto mb-2" />
+                      <p className="text-text-primary">No photo proof attached</p>
                     </div>
                   )}
                 </div>
@@ -471,15 +491,15 @@ export default function ReportsPage() {
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Category</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Category</p>
                     <p className="text-text-primary">{selectedReport.category}</p>
-                    <p className="text-sm text-text-muted">{selectedReport.subType}</p>
+                    <p className="text-sm text-text-primary/70">{selectedReport.subType}</p>
                   </div>
                   
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted By</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted By</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <User className="w-4 h-4 text-text-muted" />
+                      <User className="w-4 h-4 text-accent" />
                       <span className="text-text-primary">{selectedReport.submittedBy}</span>
                       {!selectedReport.citizenId ? (
                         <Badge variant="default">Account deleted</Badge>
@@ -498,38 +518,37 @@ export default function ReportsPage() {
                       ) : null}
                     </div>
                     {citizenInfo?.barangay && (
-                      <p className="text-xs text-text-muted mt-1">Registered barangay: {citizenInfo.barangay}</p>
+                      <p className="text-xs text-text-primary/70 mt-1">Registered barangay: {citizenInfo.barangay}</p>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Location</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Location</p>
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-text-muted mt-0.5" />
+                      <MapPin className="w-4 h-4 text-accent mt-0.5" />
                       <div>
                         <p className="text-text-primary">{selectedReport.location}</p>
-                        <p className="text-xs text-text-muted">{selectedReport.lat}° N, {selectedReport.lng}° E</p>
+                        <p className="text-xs text-text-primary/70">{selectedReport.lat}° N, {selectedReport.lng}° E</p>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Submitted</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted</p>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-text-muted" />
+                      <Calendar className="w-4 h-4 text-accent" />
                       <span className="text-text-primary">{selectedReport.submittedAt}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Location Map — the exact GPS point the citizen's phone
-                    captured when the report was submitted. */}
+                {/* Location Map */}
                 {typeof selectedReport.lat === 'number' && typeof selectedReport.lng === 'number' && (
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Location Map</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Location Map</p>
                     <ReportsMap
                       key={selectedReport.dbId}
-                      className="h-48"
+                      className="h-48 rounded-lg overflow-hidden"
                       showLegend={false}
                       center={[selectedReport.lat, selectedReport.lng]}
                       reports={[{
@@ -549,9 +568,9 @@ export default function ReportsPage() {
 
                 {/* AI Detection Badge */}
                 {selectedReport.aiDetected && (
-                  <div className="flex items-center gap-2 p-3 bg-green-500/10 rounded-md">
-                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm text-green-600 dark:text-green-400">
+                  <div className="flex items-center gap-2 p-3 bg-green-600 text-white rounded-md font-semibold">
+                    <Check className="w-4 h-4" />
+                    <span className="text-sm">
                       AI Verified ({Math.round(selectedReport.aiConfidence! * 100)}% confidence)
                     </span>
                   </div>
@@ -559,22 +578,22 @@ export default function ReportsPage() {
 
                 {/* Assigned Office */}
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Assigned Office</p>
+                  <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Assigned Office</p>
                   <p className="text-text-primary">{selectedReport.assignedOffice || 'Not assigned'}</p>
                 </div>
                 {assignHistory[selectedReport.id]?.length ? (
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Assignment History</p>
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Assignment History</p>
                     <div className="space-y-1">
                       {assignHistory[selectedReport.id].slice().reverse().map((h, i) => (
-                        <div key={i} className="text-sm text-text-primary">{h.office} • {h.at}</div>
+                        <div key={i} className="text-sm text-text-primary/80">{h.office} • {h.at}</div>
                       ))}
                     </div>
                   </div>
                 ) : null}
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-4 border-t border-theme">
+                <div className="flex gap-3 pt-4">
                   {selectedReport.status === 'submitted' || selectedReport.status === 'under_review' ? (
                     <>
                       <Button variant="primary" onClick={handleAcknowledge}>
@@ -601,9 +620,9 @@ export default function ReportsPage() {
                     </Button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ) : (
-              <div className="h-full flex items-center justify-center text-text-muted">
+              <div className="py-20 flex items-center justify-center text-text-primary">
                 Select a report to view details
               </div>
             )}
@@ -612,9 +631,9 @@ export default function ReportsPage() {
       </div>
       {assignOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm bg-surface rounded-lg border border-theme p-5">
+          <div className="w-full max-w-sm bg-surface rounded-lg p-5">
             <h3 className="text-base font-semibold mb-3">Assign Office</h3>
-            <select value={assignOffice} onChange={(e) => setAssignOffice(e.target.value)} className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm mb-4">
+            <select value={assignOffice} onChange={(e) => setAssignOffice(e.target.value)} className="w-full px-3 py-2 bg-surface-alt border-0 focus:ring-1 focus:ring-accent rounded-md text-sm mb-4">
               {offices.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <div className="flex justify-end gap-2">

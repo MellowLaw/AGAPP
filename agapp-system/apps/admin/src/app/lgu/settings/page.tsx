@@ -275,7 +275,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar Tabs */}
         <div className="lg:col-span-1">
-          <Card padding="none">
+          <Card noBorder padding="none">
             <nav className="p-2">
               <button
                 onClick={() => setActiveTab('general')}
@@ -317,7 +317,7 @@ export default function SettingsPage() {
         {/* Content */}
         <div className="lg:col-span-3">
           {activeTab === 'general' && (
-            <Card>
+            <Card noBorder>
               <h2 className="text-lg font-semibold text-text-primary mb-6">Municipality Information</h2>
               
               <div className="space-y-6">
@@ -402,7 +402,7 @@ export default function SettingsPage() {
               </div>
 
               {staffList.map((member) => (
-                <Card key={member.id}>
+                <Card noBorder key={member.id}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
@@ -437,7 +437,7 @@ export default function SettingsPage() {
               ))}
 
               {staffList.length === 0 && (
-                <Card>
+                <Card noBorder>
                   <p className="text-center py-6 text-text-muted text-sm">No LGU staff members found.</p>
                 </Card>
               )}
@@ -445,7 +445,7 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'notifications' && (
-            <Card>
+            <Card noBorder>
               <h2 className="text-lg font-semibold text-text-primary mb-6">Notification Preferences</h2>
               
               <div className="space-y-4">

@@ -1,10 +1,59 @@
 # AGAPP System — Full Codebase Audit
 
 > **Scope:** `agapp-system/` monorepo (mobile, admin, field-officer, api, shared, supabase)
-> **Date:** 2026-06-17 · Last updated: 2026-07-03
+> **Date:** 2026-06-17 · Last updated: 2026-07-04
 > **Purpose:** Ground-truth status of every folder/file — what's done, what's stubbed, what's broken, what's not connected. Use this instead of the AI-generated requirements doc, which is partly inaccurate.
 
 ---
+
+## 🔄 Update — 2026-07-04 (Admin redesign finalized — "Matte Swiss Brutalist", header removed, all pages themed)
+
+Continuation + finalization of the 2026-07-03 admin redesign (see that block below
+for the theme-system origin). Committed as `Redesign admin panel` (c26ea1c). This is
+the **current ground truth** for the admin chrome and supersedes the "honest scope gap"
+noted in the 2026-07-03 block — that gap is now closed.
+
+**Chrome consolidation — the standalone top header bar is gone.**
+- Deleted `components/layout/{Header,UserMenu,DashboardHero}.tsx`. The sidebar now owns
+  logo + profile; the SYS_LIVE/clock/theme row sits inline at the top-right of each
+  page's content (never a separate bar).
+- New `components/layout/PageHeader.tsx` replaces both Header and DashboardHero. Two
+  variants: `hero` (the two dashboards — mono kicker + large `font-serif italic` headline
+  + subtitle + StatusRow) and `compact` (every other page — a humble serif title +
+  StatusRow). `DashboardLayout` renders it inline; `heroKicker` prop selects the variant.
+  The only two pages that passed header `action` props (`lgu/news` "Create New",
+  `super/analytics` search+export) now pass them through PageHeader unchanged.
+- **`Sidebar.tsx` is now a hover-to-expand icon rail:** collapsed `w-[72px]`, expands to
+  `w-[512px]` on hover (`group` + `group-hover:opacity-100` reveals labels/logo-text/
+  profile), gradient-to-transparent background (no solid panel edge — matte, not floating).
+  `DashboardLayout` uses `ml-[72px]` to match the collapsed rail. Active nav = soft rose
+  tint + bold rose text, no hard fill/stripe. Profile block at the bottom shows an
+  initials avatar + name + email (no photos exist for admin users).
+- **Notifications** live in `StatusRow` (the inline top-right row: SYS_LIVE pulse · UTC+8
+  clock · Bell · Sun/Moon toggle), firing the same "coming soon" toast the old header
+  bell did — behavior unchanged, placement moved. There is still **no real notifications
+  page** (toast only).
+
+**Every admin page body themed — no more light-mode islands.** The 2026-07-03 redesign
+only themed the shared chrome + LGU dashboard; this pass migrated all remaining page
+bodies (reports, services, forum, verifications, news, eservices-catalog, facilities,
+settings, super/personnel sub-pages) to the semantic tokens. Confirmed live: **zero**
+hardcoded light literals (`bg-white`, `#e5e5e5`, `#1a1a1a`, etc.) remain in
+`apps/admin/src/app` — dark mode is now fully consistent across every role. Shared UI
+(`Button/Input/Search/Modal/Pagination/Badge`) also token-migrated, so the swap is
+central, not per-page. Tables use the spacious isolated-row pattern (rounded rows,
+`borderSpacing`, no vertical rules, `hover:bg-accent-soft`); global custom brand
+scrollbars; matte `Card` (no box-shadow). Data/logic untouched — purely visual.
+
+**Design fidelity note:** the reference screenshots contained fabricated elements
+(`+12% from last month` deltas, stat-card sparklines, "Terrain/Infrastructure" map
+toggles, an "AI Prompt Enhancer" nav item). These were deliberately **not** replicated —
+per the directive's "avoid obviously-fake mock graphs" rule, real data stays real and no
+fictional nav entries were invented. The aesthetic (structure, type, color, inline status
+row, hover rail) matches; the fake data does not.
+
+**Known small cleanup:** `Sidebar.tsx` still imports `Bell` (line ~20) but no longer
+renders it (the bell moved to `StatusRow`). Harmless dead import — remove on next touch.
 
 ## 🔄 Update — 2026-07-03 (eServices: document requests + QR pickup)
 
@@ -94,13 +143,11 @@ full-app token migration — see the honest gap noted at the end.
   a proportion-based decorative accent bar instead. Verified live in both
   themes: metrics, map (pins render correctly on both dark and light tiles),
   and distribution panel all show real Liliw data.
-- **Honest scope gap:** only the LGU dashboard's own content was rebuilt.
-  Every other page (reports, services, forum, settings, super/personnel
-  dashboards, etc.) still hardcodes light-only colors — confirmed live: in
-  dark mode they render as a light-mode island inside the now-dark shared
-  chrome (sidebar/header/map re-theme correctly, page content does not).
-  Extending the token migration to those pages is the natural next step if
-  full dark-mode coverage is wanted.
+- **Honest scope gap (RESOLVED 2026-07-04 — see the update block above):** at the
+  time of this pass only the LGU dashboard's own content was rebuilt; every other
+  page still hardcoded light-only colors and rendered as a light-mode island in
+  dark mode. The 2026-07-04 pass finished the full token migration across all
+  pages/roles, so this gap no longer exists.
 
 **Security hole + dead code cleanup (same day, flagged during map work):**
 - **`/api/create-staff` had ZERO auth check** — it's not covered by
@@ -497,8 +544,8 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 
 ### Stack (actual)
 - **Mobile / Field Officer** — Expo SDK 54, React Native 0.81, React 19, React Navigation v7, `expo-camera`, `expo-location`, `expo-secure-store`, `react-native-maps`, Supabase JS v2
-- **Admin** — Next.js 14 (App Router), Tailwind, `@supabase/ssr` (browser + server clients; middleware route guard), `leaflet` + `react-leaflet@4` + OpenStreetMap for maps (replaced the old custom SVG charts, which are deleted). ⚠️ `next build` currently broken — see the 2026-07-02 update block.
-- **API** — NestJS 10, Supabase JS, `@google/generative-ai` (Gemini 2.0-flash), `pdf-lib`, `expo-server-sdk`, zod, class-validator
+- **Admin** — Next.js 14 (App Router), Tailwind + `framer-motion`, `@supabase/ssr` (browser + server clients; middleware route guard), `leaflet` + `react-leaflet@4` + CartoDB tiles (theme-aware light/dark) for maps. Class-based dark mode via `contexts/ThemeContext.tsx` + semantic CSS-var tokens; chrome = hover-expand `Sidebar` + inline `PageHeader` (no top header bar) — see the 2026-07-04 block. ⚠️ `next build` currently broken — see the 2026-07-02 update block.
+- **API** — NestJS 10, Supabase JS, `@mistralai/mistralai` (chatbot) + `@google/generative-ai` (forum moderation), `expo-server-sdk`, zod, class-validator (`pdf-lib` removed 2026-07-03)
 - **DB** — Supabase Postgres + PostGIS + pgvector; RLS on all tenant tables
 - **Shared** — `@agapp/shared` TypeScript interfaces + zod schemas (built once, consumed by api; declared but unused in mobile)
 
@@ -562,7 +609,7 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 | ~~**PDF generation**~~ | 🗑️ Removed 2026-07-03 | Was legacy from before the eServices QR-pickup redesign (no in-app payment, checklist-only requirements, pickup verified by QR not a printed form). Never mounted as a live route; deleted along with `pdf-lib` dep. |
 | **QR codes** | `mobile/src/screens/ServicesScreen.tsx:78` | `qr_code_url: ''` always empty; client builds a qrserver.com URL on the fly |
 | **Push notifications** | `mobile/src/utils/push.ts` | Skips registration entirely in Expo Go (SDK 54). Only works in standalone EAS builds. |
-| **Admin notifications panel** | `admin/.../layout/Header.tsx:32`, `UserMenu.tsx:73` | "coming soon" toast |
+| **Admin notifications panel** | `admin/src/components/layout/StatusRow.tsx` (bell) | "coming soon" toast — no real notifications page/route exists |
 | **News attachments** | `admin/src/app/lgu/news/page.tsx` | Drop-zone UI but always inserts `attachments: []` |
 | **Report assignment history** | `admin/src/app/lgu/reports/page.tsx` | Tracked in component state, never persisted to DB |
 | **Forum follow / copy-link / image upload** | `mobile/src/screens/ForumScreen.tsx` | Local-only / no-op |
@@ -578,7 +625,7 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 2. **🔴 Fake ML verification** — hardcoded `ml_*` in `mobile/src/screens/ReportsScreen.tsx:225-227`. Either wire a real model or honestly label it as "manual review."
 3. ~~**PDF route orphaned**~~ — moot; `src/pdf-generator.ts` deleted 2026-07-03 (legacy, superseded by QR pickup — see STUBBED table above).
 4. **🟠 Staff can't log in** — `admin/src/app/lgu/settings/page.tsx` inserts a `users` row via `crypto.randomUUID()` but never calls Supabase Auth `admin.createUser`. New staff have no credentials.
-5. **🟠 `UserMenu.handleSignOut`** navigates home without calling `supabase.auth.signOut()` → orphaned session. `Sidebar` does it correctly.
+5. ~~**`UserMenu.handleSignOut`**~~ — moot; `UserMenu.tsx` deleted in the 2026-07-04 redesign. Sign-out now lives in `Sidebar.tsx` and correctly calls `supabase.auth.signOut()`.
 6. **🟠 Liliw hardcoding in boundary check** — `mobile/src/screens/ReportsScreen.tsx:163,169` hardcodes Liliw coords + the name "Liliw" in the alert. Breaks for Nagcarlan/Pila/etc.
 7. **🟠 React Hooks violation** — `useBottomTabBarHeight()` called inside `try/catch` in `mobile/src/screens/ChatbotScreen.tsx:65-69` and `ForumScreen.tsx:35-40`. Violates Rules of Hooks.
 8. **🟡 Personnel reports tab filter is a no-op** — `admin/src/app/personnel/reports/page.tsx:119` condition `tab === 'assigned' || tab === 'office'` is always true → tab switching does nothing.
@@ -658,10 +705,9 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 | `src/app/personnel/{dashboard,reports}/page.tsx` | ✅ Real (reports tab filter is a no-op bug) |
 | `src/app/personnel/settings/page.tsx` | ❌ Pure mockup |
 | `src/app/super/{page,analytics,lgus,settings}/page.tsx` | ✅ Real (`responseTime` hardcoded; `/super` add-LGU is local-only) |
-| `src/components/auth/{LGUAdminLogin,SuperAdminLogin}.tsx` | ❌ Fake setTimeout mocks, unmounted |
-| `src/components/auth/LoginLayout.tsx` | ✅ Presentational |
-| `src/components/layout/{DashboardLayout,Header,Sidebar}.tsx` | ✅ Real (Header/UserMenu notif = stub) |
-| `src/components/layout/UserMenu.tsx` | ⚠️ signOut missing `supabase.auth.signOut()` |
+| ~~`src/components/auth/*`~~ | 🗑️ Whole dir removed — `LGUAdminLogin`/`SuperAdminLogin` (2026-06-30) then `LoginLayout.tsx` (2026-07-03), all dead |
+| `src/components/layout/{DashboardLayout,Sidebar,PageHeader,StatusRow}.tsx` | ✅ Real — the 2026-07-04 chrome. Sidebar = hover-expand rail; PageHeader replaced Header+DashboardHero; StatusRow holds the notif bell (still a "coming soon" stub) |
+| ~~`src/components/layout/{Header,UserMenu,DashboardHero}.tsx`~~ | 🗑️ Deleted 2026-07-04 (header bar removed; chrome moved into Sidebar + PageHeader) |
 | `src/components/ui/*` (11 files) | ✅ All real; `Modal.tsx` + `LoadingSpinner.tsx` unused |
 | `src/lib/supabase.ts` | ✅ Real client |
 

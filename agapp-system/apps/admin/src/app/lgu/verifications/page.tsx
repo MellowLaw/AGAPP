@@ -244,7 +244,7 @@ export default function VerificationsPage() {
       </div>
 
       {/* Search */}
-      <Card padding="sm" className="mb-6">
+      <Card noBorder padding="sm" className="mb-6">
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
@@ -260,7 +260,7 @@ export default function VerificationsPage() {
       {/* Requests List */}
       <div className="space-y-4">
         {filteredRequests.map((req) => (
-          <Card key={req.id}>
+          <Card noBorder key={req.id}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
@@ -341,7 +341,7 @@ export default function VerificationsPage() {
         ))}
 
         {filteredRequests.length === 0 && (
-          <Card>
+          <Card noBorder>
             <div className="text-center py-8 text-text-muted">
               <IdentificationBadge className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No verification requests found</p>

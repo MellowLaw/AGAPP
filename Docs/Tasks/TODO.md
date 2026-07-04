@@ -1,9 +1,13 @@
 # AGAPP — To-Do
 
-> **Updated:** 2026-07-03 · Living list. Synthesized from the
+> **Updated:** 2026-07-04 · Living list. Synthesized from the
 > [Codebase-Audit](../Audits/Codebase-Audit.md) and current work.
 
 ## 🔴 Now (active)
+
+- [ ] **Remove dead `Bell` import in `apps/admin/src/components/layout/Sidebar.tsx`**
+      (~line 20) — the notification bell moved to `StatusRow` in the 2026-07-04 redesign;
+      the import is now unused. Trivial, harmless, do on next touch.
 
 - [ ] **Add `MISTRAL_API_KEY` to `apps/api/.env`** — required for the chatbot fallback
       (replaced Gemini 2026-07-01). Get it from **admin.mistral.ai/organization/api-keys**
