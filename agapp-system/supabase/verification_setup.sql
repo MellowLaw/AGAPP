@@ -317,3 +317,18 @@ CREATE POLICY "Owners delete own citizen-ids" ON storage.objects
     bucket_id = 'citizen-ids'
     AND (storage.foldername(name))[2] = auth.uid()::text
   );
+
+-- --------------------------------------------------------
+-- 6. Realtime for the admin "Verifications" nav badge.
+--    verification_requests is created here, so it can't be added to the
+--    ALTER PUBLICATION list in schema.sql (that runs first).
+-- --------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'verification_requests'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE verification_requests;
+  END IF;
+END $$;

@@ -1,10 +1,17 @@
 # Plan — Admin Notification System
 
-> **Status:** 🔵 Draft / strategy · not started in code · _living doc, can change._
+> **Status:** 🟢 Built (v1 + v1.1) · shipped 2026-07-04 · see `Docs/Tasks/TODO.md` Done
+> section for both implementation summaries. ML detection (separate plan) is still not
+> started — intentionally, per explicit user direction to build this first.
+> **v1.1 follow-up (same day):** the bell was narrowed to important-notices-only
+> (verification + forum-flagged + computed overdue/abandoned) and the routine
+> `new_report`/`new_service_request` volume moved to new **nav "new since last visit"
+> badges** on the sidebar tabs instead (`NavBadgeContext.tsx`, `importantNotices.ts`).
 > **Updated:** 2026-07-04
 > **Scope:** Admin panel only (LGU admin, LGU personnel, super admin). The bell
-> already exists in `apps/admin/src/components/layout/StatusRow.tsx` and currently
-> just fires a "coming soon" toast — this plan makes it real.
+> in `apps/admin/src/components/layout/StatusRow.tsx` is now a real
+> `NotificationBell` component (realtime, unread badge, deep-links) — no longer
+> the "coming soon" toast placeholder this plan originally described.
 
 ## Why this is mostly wiring, not new infrastructure
 
@@ -88,7 +95,9 @@ category labels already added to `notify_report_status_change()`.
 4. Verify live per role in both themes: submit a citizen report → admin bell increments in realtime → click → lands on the report.
 5. (v2) Add the computed SLA-overdue / pickup-aging digest queries on panel-open; per-item read receipts if wanted.
 
-## Open decisions for you
-- **Which notification items in v1?** (recommend 1–4.)
-- **Read model:** simple "mark all read" (recommend v1) vs per-item receipts?
-- Should personnel get a narrower set than admin (recommend yes — items 1, 2, 6)?
+## Decisions made (built as v1)
+- **Items shipped:** 1–4 (new report, new service request, new verification pending,
+  forum flagged). Items 5–7 (SLA overdue, pickup aging, citizen rating) remain v2.
+- **Read model:** simple "mark all read" — `users.notifications_seen_at`, as recommended.
+- **Personnel scope:** narrower than admin — items 1 and 2 only (report + service request).
+  Admin sees 1–4. Super admin sees a cross-LGU rollup of 1–2 only, as planned.

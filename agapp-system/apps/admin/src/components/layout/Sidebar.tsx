@@ -20,6 +20,7 @@ import {
 } from '@phosphor-icons/react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
+import { useNavBadges, NavSection } from './NavBadgeContext';
 
 const ROLE_LABEL: Record<SidebarProps['role'], string> = {
   'lgu-admin': 'LGU Admin',
@@ -37,6 +38,8 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** "New since last visit" badge section, if this tab shows one. */
+  section?: NavSection;
 }
 
 interface SidebarProps {
@@ -46,13 +49,13 @@ interface SidebarProps {
 
 const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/lgu/dashboard', icon: House },
-  { label: 'Service Requests', href: '/lgu/services', icon: FileText },
+  { label: 'Service Requests', href: '/lgu/services', icon: FileText, section: 'services' },
   { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: ListChecks },
-  { label: 'Issue Reports', href: '/lgu/reports', icon: Warning },
+  { label: 'Issue Reports', href: '/lgu/reports', icon: Warning, section: 'reports' },
   { label: 'News', href: '/lgu/news', icon: Newspaper },
-  { label: 'Forum', href: '/lgu/forum', icon: ChatCircle },
+  { label: 'Forum', href: '/lgu/forum', icon: ChatCircle, section: 'forum' },
   { label: 'Facilities', href: '/lgu/facilities', icon: MapPin },
-  { label: 'Verifications', href: '/lgu/verifications', icon: IdentificationBadge },
+  { label: 'Verifications', href: '/lgu/verifications', icon: IdentificationBadge, section: 'verifications' },
   { label: 'Settings', href: '/lgu/settings', icon: Gear },
 ];
 
@@ -63,8 +66,8 @@ const SUPER_ADMIN_NAV: NavItem[] = [
 ];
 
 const LGU_PERSONNEL_NAV: NavItem[] = [
-  { label: 'My Queue', href: '/personnel/dashboard', icon: FileText },
-  { label: 'Issue Reports', href: '/personnel/reports', icon: Warning },
+  { label: 'My Queue', href: '/personnel/dashboard', icon: FileText, section: 'services' },
+  { label: 'Issue Reports', href: '/personnel/reports', icon: Warning, section: 'reports' },
   { label: 'Settings', href: '/personnel/settings', icon: Gear },
 ];
 
@@ -72,7 +75,7 @@ const LGU_PERSONNEL_NAV: NavItem[] = [
 // scale. Hover: a faint 2%-opacity wash, never a hard-edged box. Both are
 // plain divs behind the label rather than a filled pill, so there's no rigid
 // container line at any state.
-function NavLink({ item, active, href }: { item: NavItem; active: boolean; href: string }) {
+function NavLink({ item, active, href, count }: { item: NavItem; active: boolean; href: string; count?: number }) {
   const Icon = item.icon;
   const [hovering, setHovering] = useState(false);
 
@@ -84,11 +87,18 @@ function NavLink({ item, active, href }: { item: NavItem; active: boolean; href:
         whileTap={{ scale: 0.98 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       >
-        <Icon
-          className={`relative w-6 h-6 shrink-0 transition-colors duration-200 ${
-            active ? 'text-accent' : hovering ? 'text-text-primary' : 'text-text-muted'
-          }`}
-        />
+        <span className="relative inline-flex shrink-0">
+          <Icon
+            className={`relative w-6 h-6 transition-colors duration-200 ${
+              active ? 'text-accent' : hovering ? 'text-text-primary' : 'text-text-muted'
+            }`}
+          />
+          {!!count && (
+            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-[3px] flex items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white leading-none">
+              {count > 9 ? '9+' : count}
+            </span>
+          )}
+        </span>
         <span
           className={`relative transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100 ${
             active ? 'text-accent font-semibold' : hovering ? 'text-text-primary font-medium' : 'text-text-muted font-medium'
@@ -109,6 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
 
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
   const { showToast, ToastContainer } = useToast();
+  const { counts } = useNavBadges();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -173,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
             ? `${item.href}?lguName=${encodeURIComponent(lguParam)}`
             : item.href;
 
-          return <NavLink key={item.href} item={item} active={active} href={href} />;
+          return <NavLink key={item.href} item={item} active={active} href={href} count={item.section ? counts[item.section] : undefined} />;
         })}
       </nav>
 

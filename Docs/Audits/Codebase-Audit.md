@@ -6,6 +6,87 @@
 
 ---
 
+## 🔄 Update — 2026-07-04 later (Admin notifications REAL: important-only bell + nav "new" badges; mock cleanup)
+
+Two same-day passes implementing `Docs/Planning/Plan-Admin-Notifications.md` (now 🟢 Built,
+v1 + v1.1), then a test-data purge + repo-wide mock audit. **The StatusRow bell is a real
+notification system now — every "coming soon toast" statement in the blocks below is
+superseded by this one.**
+
+**v1 — staff notification bell (DB + UI):**
+- Migration `admin_staff_notifications`: `notifications.audience` column
+  (`'lgu_admin' | 'lgu_personnel' | 'super_admin'`; NULL = the per-citizen rows, unchanged),
+  `users.notifications_seen_at` (single-timestamp "mark all read" model), and a new RLS
+  SELECT policy scoping staff-audience rows to matching role+lgu (super admin gets a
+  cross-LGU rollup). Citizen notification behavior untouched.
+- New `components/layout/NotificationBell.tsx` wired into `StatusRow`: realtime
+  `postgres_changes` subscription (RLS does the role/LGU filtering — no client-side role
+  logic to drift), unread badge, dropdown panel, deep links via `payload`
+  (reports land on `/lgu/reports?…&reportId=` selecting the exact row), Mark all read.
+- **File-placement gotcha for reproducibility:** the verification trigger
+  (`notify_staff_new_verification`) lives in `verification_setup.sql`, not `schema.sql`,
+  because `verification_requests` is created there (runs after schema.sql); the two
+  forum-flagged triggers sit after `forum_comments`' own `CREATE TABLE`. Top-to-bottom
+  apply order stays valid.
+
+**v1.1 — bell narrowed to important-only + nav badges (explicit user direction:
+"notification is only for important notices… in the nav have like a notification number
+indicator… if we go to that nav it will be cleared… real time"):**
+- Migration `nav_badges_and_bell_scope`: **dropped** the v1 routine triggers
+  `notify_staff_new_report` / `notify_staff_new_service_request` + their rows (routine
+  volume is not bell material), added `users.nav_seen jsonb` (per-section last-seen
+  timestamps) and put `verification_requests` into the `supabase_realtime` publication.
+- **Bell = two groups.** "Recent notices" (stored, realtime: verification pending +
+  forum post/comment flagged) and "Needs attention" (computed fresh on panel-open by
+  `lib/importantNotices.ts` — no cron, no stored rows): reports past `sla_due_date`;
+  reports `Submitted` >3 days or any non-terminal status untouched >7 days; requests
+  `Submitted`/`Under Review` untouched >3 days; `Ready for Pickup` uncollected >7 days
+  (thresholds are exported constants). Needs-attention items are **deliberately NOT
+  cleared by Mark-all-read** — they persist while the underlying problem is still true.
+- **Nav "new since last visit" badges** — new `components/layout/NavBadgeContext.tsx`
+  provider (wrapped around everything by `DashboardLayout`): each badged tab shows the
+  count of rows created since that admin last opened the section (`nav_seen[section]`),
+  LGU-scoped, incremented live by realtime INSERTs, cleared (and the timestamp persisted)
+  the moment the section's route becomes active. LGU admin: Issue Reports / Service
+  Requests / Forum / Verifications; personnel: Issue Reports + My Queue; super admin:
+  none in v1 (cross-LGU rollup deferred). `Sidebar`'s `NavLink` renders the count dot on
+  the icon (visible in both collapsed-rail and expanded states).
+- **Two real bugs hit while verifying — both instructive:**
+  1. **supabase-js query builders are lazily thenable** — a fire-and-forget
+     `supabase.from(...).update(...)` with no `await`/`.then()` **never sends the HTTP
+     request at all.** The mark-seen write silently no-oped, so badges never cleared.
+     Awaited now; grepped the layout components to confirm no other fire-and-forget writes.
+  2. The first design had "compute count" and "mark seen" as two independent effects
+     racing each other — whichever resolved last clobbered the other. Redesigned into one
+     sequenced flow keyed off `usePathname()` inside the provider (mark seen → then count).
+- Verified live for admin + personnel on a clean server: realtime badge increments with
+  no reload, clear-on-visit persists across navigation and reload, LGU scoping correct,
+  bell deep-links select the exact report, role scoping matches the table above.
+- Dead `Bell` import in `Sidebar.tsx` removed (the "known small cleanup" below — done).
+
+**Test-data purge + mock audit (user direction: "get rid of the test things… maybe
+there's still mocks"):**
+- All test reports/notifications created while verifying this work were deleted;
+  `nav_seen`/`notifications_seen_at` reset on the three demo staff accounts.
+- Repo-wide mock sweep (ML stub + seed data excluded as known-intentional):
+  - **Fixed:** `apps/mobile/src/screens/HomeScreen.tsx`'s `getMockLandmarks()` fallback
+    (fabricated Liliw/Nagcarlan landmark cards with stock Unsplash photos) fed a
+    `landmarksToShow` value that was **never rendered anywhere in the file** — fully dead
+    code. Deleted, along with the unused `lgu_facilities` fetch that only fed it (one
+    fewer network call on Home).
+  - **Confirmed dead, deliberately not patched:** `apps/api/src/app.controllers.ts`
+    `writeAuditLog()` hardcodes `ip_address: '127.0.0.1'` + demo user ids — but the LGU
+    provision/subscription/feature-flags endpoints that call it are never hit by the real
+    admin frontend (it writes `lgus` directly via Supabase; `audit_logs` has 0 rows).
+    Folded into the existing "decide audit logging" TODO instead of fixing an unreachable path.
+  - **Not mocks:** the `'Liliw, Laguna'` URL-param fallback across admin pages (pilot's
+    single default LGU, see `lib/lgu.ts`), placehold.co image fallbacks in the API.
+  - **Confirmed genuinely real:** admin dashboards/charts (no fake deltas/sparklines/counts
+    anywhere), the field-officer app, and all remaining API controllers.
+- ~~One manual fix pending: demo citizen "Juan Dela Cruz" stuck at `pending` from a scope
+  test~~ — ✅ **resolved same day**: the user ran the one-time guard-bypass SQL in the
+  Supabase SQL editor; verified live back to `verified`/Poblacion. DB test residue = zero.
+
 ## 🔄 Update — 2026-07-04 (Admin redesign finalized — "Matte Swiss Brutalist", header removed, all pages themed)
 
 Continuation + finalization of the 2026-07-03 admin redesign (see that block below
@@ -30,9 +111,9 @@ noted in the 2026-07-03 block — that gap is now closed.
   tint + bold rose text, no hard fill/stripe. Profile block at the bottom shows an
   initials avatar + name + email (no photos exist for admin users).
 - **Notifications** live in `StatusRow` (the inline top-right row: SYS_LIVE pulse · UTC+8
-  clock · Bell · Sun/Moon toggle), firing the same "coming soon" toast the old header
-  bell did — behavior unchanged, placement moved. There is still **no real notifications
-  page** (toast only).
+  clock · Bell · Sun/Moon toggle). _At the time of this pass_ the bell fired a
+  "coming soon" toast — **superseded later the same day** by the real notification
+  system (see the block above).
 
 **Every admin page body themed — no more light-mode islands.** The 2026-07-03 redesign
 only themed the shared chrome + LGU dashboard; this pass migrated all remaining page
@@ -52,8 +133,8 @@ per the directive's "avoid obviously-fake mock graphs" rule, real data stays rea
 fictional nav entries were invented. The aesthetic (structure, type, color, inline status
 row, hover rail) matches; the fake data does not.
 
-**Known small cleanup:** `Sidebar.tsx` still imports `Bell` (line ~20) but no longer
-renders it (the bell moved to `StatusRow`). Harmless dead import — remove on next touch.
+**Known small cleanup:** ~~`Sidebar.tsx` still imports `Bell` but no longer renders it~~
+— removed later the same day during the notifications build (see the block above).
 
 ## 🔄 Update — 2026-07-03 (eServices: document requests + QR pickup)
 
@@ -228,7 +309,14 @@ the Supabase Dashboard (Authentication → Sign In / Providers → Password). On
 Large multi-part session. Grouped by area. **Read the ⚠️ KNOWN BROKEN item first if you
 are about to run a production build.**
 
-### ⚠️ KNOWN BROKEN: `next build` in apps/admin (React 18/19 hoist clash)
+### ~~⚠️ KNOWN BROKEN~~ (since RESOLVED): `next build` in apps/admin (React 18/19 hoist clash)
+**Resolution note (added 2026-07-04):** the "separate session" fix landed — root
+`package.json` pins react/react-dom 19 and maps `next`/`styled-jsx` to tiny `stubs/*`
+placeholders so npm nests the real React-18 packages inside `apps/admin/node_modules`;
+admin's tsconfig maps react types to the nested `@types`. **Do not remove the stubs, the
+root react pins, or the tsconfig paths** — and re-check `apps/admin/node_modules`
+placements after any dependency change. See CLAUDE.md "Gotchas". Original diagnosis kept
+below for context:
 `npx next build` in `apps/admin` crashes with
 `TypeError: Cannot read properties of undefined (reading 'ReactCurrentDispatcher')` in
 `node_modules/react-dom/cjs/react-dom-server-legacy...`. **Root cause:** npm workspaces
@@ -544,9 +632,9 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 
 ### Stack (actual)
 - **Mobile / Field Officer** — Expo SDK 54, React Native 0.81, React 19, React Navigation v7, `expo-camera`, `expo-location`, `expo-secure-store`, `react-native-maps`, Supabase JS v2
-- **Admin** — Next.js 14 (App Router), Tailwind + `framer-motion`, `@supabase/ssr` (browser + server clients; middleware route guard), `leaflet` + `react-leaflet@4` + CartoDB tiles (theme-aware light/dark) for maps. Class-based dark mode via `contexts/ThemeContext.tsx` + semantic CSS-var tokens; chrome = hover-expand `Sidebar` + inline `PageHeader` (no top header bar) — see the 2026-07-04 block. ⚠️ `next build` currently broken — see the 2026-07-02 update block.
+- **Admin** — Next.js 14 (App Router), Tailwind + `framer-motion`, `@supabase/ssr` (browser + server clients; middleware route guard), `leaflet` + `react-leaflet@4` + CartoDB tiles (theme-aware light/dark) for maps. Class-based dark mode via `contexts/ThemeContext.tsx` + semantic CSS-var tokens; chrome = hover-expand `Sidebar` (with nav badges) + inline `PageHeader` + real notification bell — see the 2026-07-04 blocks. The React 18/19 `next build` clash is resolved via root pins + `stubs/*` hoist-blockers (see CLAUDE.md Gotchas — don't remove them).
 - **API** — NestJS 10, Supabase JS, `@mistralai/mistralai` (chatbot) + `@google/generative-ai` (forum moderation), `expo-server-sdk`, zod, class-validator (`pdf-lib` removed 2026-07-03)
-- **DB** — Supabase Postgres + PostGIS + pgvector; RLS on all tenant tables
+- **DB** — Supabase Postgres + PostGIS (pgvector removed 2026-06-30); RLS on all tenant tables; realtime publication covers `notifications, reports, service_requests, forum_posts, forum_comments, verification_requests`
 - **Shared** — `@agapp/shared` TypeScript interfaces + zod schemas (built once, consumed by api; declared but unused in mobile)
 
 ---
@@ -558,7 +646,7 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 |---|---|---|
 | Auth (login/register/forgot) | ✅ Real | Supabase Auth + SecureStore adapter |
 | LGU selection flow | ✅ Real | Query `lgus` + AsyncStorage persistence + rehydration |
-| Home dashboard | ✅ Real | news, facilities, reports, requests, unread notif count |
+| Home dashboard | ✅ Real | news, reports, requests, unread notif count (unused facilities fetch + dead mock-landmark fallback removed 2026-07-04) |
 | News + detail | ✅ Real | `news_announcements` |
 | Forum (posts + comments) | ✅ Real | CRUD + Supabase realtime channels + client profanity filter |
 | Service requests | ✅ Real | Submission to `service_requests` |
@@ -568,12 +656,13 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 | Chatbot | ✅ Real | Calls NestJS `/chatbot/ask` |
 | Profile | 🟡 Partial | Display real; consent/badges/menu stubbed |
 
-### 🖥️ Admin (Next.js) — ~85% functional
-- **Real Supabase login** with role routing (Super / LGU Admin / Personnel)
-- **LGU Admin:** dashboard charts, reports triage (ack/reassign/reject/resolve), service workflow w/ printable receipt, news CRUD + scheduling, forum moderation, settings (LGU profile + staff + notifications) — all live
+### 🖥️ Admin (Next.js) — functional across all roles
+- **Real Supabase login** with role routing (Super / LGU Admin / Personnel) + middleware role→path guard
+- **LGU Admin:** dashboard (report hotspot map + real category distribution), reports triage (ack/reassign/reject/resolve), service workflow + QR-pickup release, eServices catalog CRUD, news CRUD + scheduling, forum moderation (posts + comment threads), facilities map manager, verification review queue, settings (LGU profile + real staff creation) — all live
 - **Personnel:** queue dashboard + report status updates — live
 - **Super Admin:** cross-LGU analytics, LGU directory management, analytics pivot, `system_config` settings — all live
-- 11 reusable UI primitives (custom SVG charts, no chart lib)
+- **Notifications (2026-07-04):** important-only bell + per-tab "new since last visit" nav badges, all realtime
+- Reusable UI primitives all token-themed; charts replaced by Leaflet report maps (2026-07-02)
 
 ### 👷 Field Officer app — minimal but real
 - Role-gated auth (rejects CITIZENs)
@@ -583,14 +672,14 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 - Profile + manual force-sync
 
 ### ⚙️ API (NestJS, the live one)
-- Chatbot: keyword-scored FAQ matching → Gemini 2.0-flash fallback → graceful "no answer / support ticket"
+- Chatbot: keyword-scored FAQ matching → **Mistral** fallback (swapped from Gemini 2026-07-01) → graceful "no answer / support ticket"
 - Forum moderation: local profanity/PII/URL filter + Gemini safety check
-- Audit log writer (when Supabase connected)
+- Audit log writer — ⚠️ confirmed dead code 2026-07-04: its calling endpoints are never hit by the real clients (`audit_logs` = 0 rows); revive via DB triggers instead (see TODO)
 - `SupabaseAuthGuard` (validates JWT via `supabase.auth.getUser`)
 - `PushService`: listens to `notifications` table via Supabase realtime → sends via Expo SDK
 
 ### 🗄️ Supabase backend — solid
-- 14 tables: `lgus, users, offices, reports, service_requests, forum_posts, forum_comments, audit_logs, news_announcements, notifications, chatbot_faqs, lgu_facilities, faq_embeddings`
+- Tables: `lgus, users, offices, reports, service_requests, lgu_services, forum_posts, forum_comments, audit_logs, news_announcements, notifications, chatbot_faqs, lgu_facilities, verification_requests` (_`faq_embeddings` dropped 2026-06-30_)
 - RLS policies on every tenant table
 - PostGIS `verify_geofence()` function (20 km)
 - Profanity trigger (`trg_moderate_forum` + comment variant)
@@ -605,42 +694,45 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 
 | Item | Where | Reality |
 |---|---|---|
-| **On-device pothole ML (YOLO)** | `mobile/src/screens/ReportsScreen.tsx:225-227` | `ml_confidence: 0.95, ml_verified: true` **hardcoded**. UI says "captured by YOLOv11" — **no model exists.** Biggest thesis risk. |
+| **On-device pothole ML (YOLO)** | `mobile/src/utils/mlAnalysis.ts` + API `verify-image` | Honest stub since 2026-07-03: fake hardcoded `0.95/true` values and "YOLOv11" claims removed; both boundaries return null ("not analyzed") until a real model exists. **Deferred by explicit user direction** — plan in [Plan-ML-Pothole-Detection](../Planning/Plan-ML-Pothole-Detection.md). |
 | ~~**PDF generation**~~ | 🗑️ Removed 2026-07-03 | Was legacy from before the eServices QR-pickup redesign (no in-app payment, checklist-only requirements, pickup verified by QR not a printed form). Never mounted as a live route; deleted along with `pdf-lib` dep. |
-| **QR codes** | `mobile/src/screens/ServicesScreen.tsx:78` | `qr_code_url: ''` always empty; client builds a qrserver.com URL on the fly |
+| ~~**QR codes**~~ | ✅ Real since 2026-07-03 | QR now encodes the opaque `claim_code`, rendered client-side (`react-native-qrcode-svg`) — no external qrserver.com dependency; release flows through SECURITY DEFINER RPCs. |
 | **Push notifications** | `mobile/src/utils/push.ts` | Skips registration entirely in Expo Go (SDK 54). Only works in standalone EAS builds. |
-| **Admin notifications panel** | `admin/src/components/layout/StatusRow.tsx` (bell) | "coming soon" toast — no real notifications page/route exists |
+| ~~**Admin notifications panel**~~ | ✅ Real since 2026-07-04 | `NotificationBell.tsx` — important-only bell (verification/forum-flagged + computed overdue/abandoned) + nav "new since last visit" badges. See the 2026-07-04 "later" block. |
 | **News attachments** | `admin/src/app/lgu/news/page.tsx` | Drop-zone UI but always inserts `attachments: []` |
 | **Report assignment history** | `admin/src/app/lgu/reports/page.tsx` | Tracked in component state, never persisted to DB |
 | **Forum follow / copy-link / image upload** | `mobile/src/screens/ForumScreen.tsx` | Local-only / no-op |
 | **Profile consent toggle, "Verified" badge, Help/Privacy buttons** | `mobile/src/screens/ProfileScreen.tsx` | Hardcoded / dead |
 | ~~`faq_embeddings` table~~ | 🗑️ Removed 2026-06-30 | Was unused legacy from the abandoned RAG plan. Dropped from live DB + schema (along with `match_faqs` RPC and `vector` ext). Chatbot is keyword FAQ + Gemini by design. |
-| **Personnel settings** | `admin/src/app/personnel/settings/page.tsx` | Pure hardcoded mockup ("Ana Reyes") |
+| ~~**Personnel settings**~~ | ✅ Real since 2026-07-02 | Fake "Ana Reyes" mockup replaced — loads/saves real `users` profile + `supabase.auth.updateUser` password change. |
 
 ---
 
 ## 🐛 BUGS to fix (ranked by severity)
 
-1. **🔴 Report map never renders (mobile)** — `mobile/src/screens/TrackingDetailScreen.tsx:68-85` reads `data.location.lat/lng/address` as a JSON object, but `ReportsScreen` writes flat `latitude`/`longitude`/`barangay` columns. Service branch works; report branch is broken.
-2. **🔴 Fake ML verification** — hardcoded `ml_*` in `mobile/src/screens/ReportsScreen.tsx:225-227`. Either wire a real model or honestly label it as "manual review."
+_(Historical list from the original 2026-06-17 audit — reconciled 2026-07-04. Almost
+everything here has since been fixed in the dated update blocks above.)_
+
+1. ~~**Report map never renders (mobile)**~~ — ✅ fixed 2026-06-30 (flat `latitude`/`longitude` reads).
+2. ~~**Fake ML verification**~~ — ✅ resolved 2026-07-03: fake hardcoded values removed everywhere; honest null "not analyzed" boundary kept; model itself deferred by user direction.
 3. ~~**PDF route orphaned**~~ — moot; `src/pdf-generator.ts` deleted 2026-07-03 (legacy, superseded by QR pickup — see STUBBED table above).
-4. **🟠 Staff can't log in** — `admin/src/app/lgu/settings/page.tsx` inserts a `users` row via `crypto.randomUUID()` but never calls Supabase Auth `admin.createUser`. New staff have no credentials.
+4. ~~**Staff can't log in**~~ — ✅ fixed 2026-06-30 (`/api/create-staff` route using service-role `admin.createUser`); auth/authorization hole in that route closed 2026-07-03.
 5. ~~**`UserMenu.handleSignOut`**~~ — moot; `UserMenu.tsx` deleted in the 2026-07-04 redesign. Sign-out now lives in `Sidebar.tsx` and correctly calls `supabase.auth.signOut()`.
-6. **🟠 Liliw hardcoding in boundary check** — `mobile/src/screens/ReportsScreen.tsx:163,169` hardcodes Liliw coords + the name "Liliw" in the alert. Breaks for Nagcarlan/Pila/etc.
-7. **🟠 React Hooks violation** — `useBottomTabBarHeight()` called inside `try/catch` in `mobile/src/screens/ChatbotScreen.tsx:65-69` and `ForumScreen.tsx:35-40`. Violates Rules of Hooks.
-8. **🟡 Personnel reports tab filter is a no-op** — `admin/src/app/personnel/reports/page.tsx:119` condition `tab === 'assigned' || tab === 'office'` is always true → tab switching does nothing.
-9. **🟡 Client-generated reference numbers** (`Math.random` / `reports.length+1`) → collision risk under concurrent submissions. Should be a DB sequence/trigger.
-10. **🟡 Dead `admin/src/app/lgu/page.tsx`** — early `return null` on line 75 makes ~370 lines unreachable. Delete it.
-11. **🟡 Dead auth components** — `admin/src/components/auth/LGUAdminLogin.tsx`, `SuperAdminLogin.tsx` use fake `setTimeout` mocks, unmounted, and `SuperAdminLogin` redirects to non-existent `/super/dashboard`.
-12. **🟡 No `middleware.ts` in admin** — every route is publicly URL-reachable; auth enforced only inside page effects.
-13. **🟡 `@agapp/shared` declared as dep in mobile `package.json` but never imported** — dead dependency.
+6. ~~**Liliw hardcoding in boundary check**~~ — ✅ fixed 2026-06-30 (uses `selectedLgu` coords/name).
+7. ~~**React Hooks violation**~~ — ✅ fixed 2026-06-30 (`useBottomTabBarHeight` try/catch removed in both screens).
+8. **🟡 Personnel reports tab filter is a no-op** — `admin/src/app/personnel/reports/page.tsx` condition `tab === 'assigned' || tab === 'office'` is always true → tab switching does nothing. **Still open (last unverified item on this list).**
+9. ~~**Client-generated reference numbers**~~ — ✅ fixed 2026-06-30 (DB sequences + `BEFORE INSERT` trigger, `REP-YYYY-NNNN`).
+10. ~~**Dead `admin/src/app/lgu/page.tsx`**~~ — ✅ trimmed 2026-06-30 to a redirect-only file.
+11. ~~**Dead auth components**~~ — ✅ deleted (2026-06-30, then `LoginLayout.tsx` 2026-07-03; whole `components/auth/` dir gone).
+12. ~~**No `middleware.ts` in admin**~~ — ✅ added 2026-06-30; upgraded to real `@supabase/ssr` session + role→path guard 2026-07-02.
+13. ~~**`@agapp/shared` unused in mobile**~~ — ✅ resolved 2026-06-30 (mobile re-exports shared theme/ThemeContext/Logo; also uses `reportCategoryLabel`).
 
 ---
 
 ## 🔌 Systems NOT connected / integration gaps
 
 1. **The NestJS API is 90% orphaned.** Mobile, admin, and field-officer all hit Supabase directly. The API's report/service/LGU/forum CRUD endpoints are effectively unused. **Consequence: most citizen & admin actions never create audit logs**, because audit logging only happens inside API controllers. Either route writes through the API, or move audit logging into Supabase triggers.
-2. **PDF generation disconnected** — generator code is good but no live route exposes it.
+2. ~~**PDF generation disconnected**~~ — moot; deleted 2026-07-03 (superseded by QR pickup).
 3. ~~**Chatbot RAG / faq_embeddings**~~ ✅ Resolved 2026-06-30. The chatbot is keyword FAQ + Gemini by design (the roadmap's "RAG + pgvector" was never adopted). The unused `faq_embeddings` table, `match_faqs` RPC, and `vector` extension were dropped; the Gemini fallback was hardened against prompt injection (see the 2026-06-30 update block).
 4. **Push notifications end-to-end untested** — backend listener exists, mobile registration is inert in Expo Go. Needs a standalone build to verify.
 5. **No `.env*` files committed** — every app needs externally-supplied Supabase keys to run.
@@ -651,23 +743,25 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 
 ## 🎯 Recommended next steps (priority order)
 
+_(Reconciled 2026-07-04 — nearly all done; see [TODO](../Tasks/TODO.md) for the live list.)_
+
 ### Must-fix before any demo/defense
-1. Fix `TrackingDetailScreen` location-shape bug (small mapping fix)
-2. Decide ML story: either ship a real TFLite model or remove the "YOLOv11" claims and relabel as manual verification
-3. Port `/api/services/:id/pdf` into NestJS (or delete `server.ts`)
-4. Fix Liliw hardcoding in report geofence
+1. ~~Fix `TrackingDetailScreen` location-shape bug~~ ✅ Done 2026-06-30
+2. ~~Decide ML story~~ ✅ Decided 2026-07-03: fake claims removed, honest null boundary kept, model deferred by user direction (plan written 2026-07-04)
+3. ~~Port `/api/services/:id/pdf` into NestJS (or delete `server.ts`)~~ ✅ Moot — `server.ts` deleted 2026-06-30, PDF generation itself deleted 2026-07-03 (QR pickup superseded it)
+4. ~~Fix Liliw hardcoding in report geofence~~ ✅ Done 2026-06-30
 
 ### High-value enhancements
-5. Add `middleware.ts` route guards to admin
-6. Wire staff creation through Supabase Auth `admin.createUser`
-7. Move audit logging into Supabase triggers (since clients bypass the API)
-8. Replace client-side reference numbers with a DB sequence/trigger
+5. ~~Add `middleware.ts` route guards to admin~~ ✅ Done 2026-06-30 + role guard 2026-07-02
+6. ~~Wire staff creation through Supabase Auth `admin.createUser`~~ ✅ Done 2026-06-30 (+ auth check 2026-07-03)
+7. Move audit logging into Supabase triggers (since clients bypass the API) — **still open**, the only survivor of this list; the NestJS `writeAuditLog` path is confirmed dead code (see the 2026-07-04 "later" block)
+8. ~~Replace client-side reference numbers with a DB sequence/trigger~~ ✅ Done 2026-06-30
 9. ~~Drop the unused `faq_embeddings` table~~ ✅ Done 2026-06-30 (also hardened the Gemini chatbot against prompt injection)
 
 ### Cleanup
-10. Delete dead code: `api/src/server.ts`, `admin/src/app/lgu/page.tsx`, `admin/src/components/auth/LGUAdminLogin.tsx`, `SuperAdminLogin.tsx`, unused `components/ui/Modal.tsx`, `LoadingSpinner.tsx`
-11. Remove `@agapp/shared` from mobile's deps or actually use it
-12. Strip committed demo credentials from `admin/src/app/page.tsx:10-13`
+10. ~~Delete dead code~~ ✅ Done across 2026-06-30 → 2026-07-04 (`server.ts`, `lgu/page.tsx` trimmed, whole `components/auth/` dir, `mock-db.ts`, PDF generator, `Header`/`UserMenu`/`DashboardHero`, dead `Bell` import, `getMockLandmarks`). `Modal.tsx`/`LoadingSpinner.tsx` are now used.
+11. ~~Remove `@agapp/shared` from mobile's deps or actually use it~~ ✅ Used since 2026-06-30
+12. ~~Strip committed demo credentials~~ ✅ Done 2026-06-30; quick-login restored safely 2026-07-02 via server-side route + non-public base64 env vars
 
 ---
 
@@ -683,10 +777,10 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 | `src/navigation/AppNavigator.tsx` | ✅ Gates Login → LguSelect → Main tabs |
 | `src/screens/LoginScreen.tsx` | ✅ Real; password check says "8 chars" but enforces 6; orphaned-auth-user risk on profile-insert failure |
 | `src/screens/LguSelectScreen.tsx` | ✅ Real |
-| `src/screens/HomeScreen.tsx` | ✅ Real + mock-landmark fallback when facilities empty |
-| `src/screens/ServicesScreen.tsx` | ✅ Real submit; `qr_code_url` empty; client-generated ref# |
-| `src/screens/ReportsScreen.tsx` | 🟡 Real submit; **fake ML**; **Liliw hardcoding** |
-| `src/screens/TrackingDetailScreen.tsx` | 🐛 Report-branch map broken (data shape) |
+| `src/screens/HomeScreen.tsx` | ✅ Real (mock-landmark fallback deleted 2026-07-04 — it was dead code, never rendered) |
+| `src/screens/ServicesScreen.tsx` | ✅ Real — live `lgu_services` catalog (2026-07-03); ref# from DB trigger; QR is claim-code-based |
+| `src/screens/ReportsScreen.tsx` | ✅ Real submit (fake ML removed 2026-07-03 → null boundary; Liliw hardcoding fixed 2026-06-30) |
+| `src/screens/TrackingDetailScreen.tsx` | ✅ Real — data-shape bug fixed 2026-06-30; realtime status timeline + client-side claim QR (2026-07-03) |
 | `src/screens/ForumScreen.tsx` | ✅ Real CRUD + realtime; follow/copy-link/image-upload stubbed; hooks-rule violation |
 | `src/screens/ChatbotScreen.tsx` | ✅ Real backend call; mic stubbed; hooks-rule violation |
 | `src/screens/MapExplorerScreen.tsx` | ✅ Most polished screen |
@@ -698,18 +792,21 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 ### `apps/admin/` (Next.js dashboard)
 | File | Status |
 |---|---|
-| `src/app/page.tsx` | ✅ Real login w/ role routing; **committed plaintext creds** |
+| `src/app/page.tsx` | ✅ Real login w/ role routing (plaintext creds stripped 2026-06-30; quick login via server-side `/api/demo-login` since 2026-07-02) |
 | `src/app/layout.tsx` | ✅ Real |
-| `src/app/lgu/page.tsx` | ❌ Dead stub (early `return null`) |
-| `src/app/lgu/{dashboard,forum,news,reports,services,settings}/page.tsx` | ✅ Real (attachments + assignment history partial) |
-| `src/app/personnel/{dashboard,reports}/page.tsx` | ✅ Real (reports tab filter is a no-op bug) |
-| `src/app/personnel/settings/page.tsx` | ❌ Pure mockup |
-| `src/app/super/{page,analytics,lgus,settings}/page.tsx` | ✅ Real (`responseTime` hardcoded; `/super` add-LGU is local-only) |
+| `src/app/lgu/page.tsx` | ✅ Redirect-only (dead 400-line stub trimmed 2026-06-30) |
+| `src/app/lgu/{dashboard,forum,news,reports,services,settings,eservices-catalog,facilities,verifications}/page.tsx` | ✅ Real (news attachments + assignment-history persistence still partial) |
+| `src/app/personnel/{dashboard,reports}/page.tsx` | ✅ Real (reports tab filter is a no-op bug — still open) |
+| `src/app/personnel/settings/page.tsx` | ✅ Real since 2026-07-02 (was the "Ana Reyes" mockup) |
+| `src/app/super/{page,analytics,lgus,settings}/page.tsx` | ✅ Real (turnaround time computed from real `updated_at` since 2026-07-02) |
+| `src/app/api/{create-staff,demo-login}/route.ts` | ✅ Real server-side routes (create-staff auth-hardened 2026-07-03) |
 | ~~`src/components/auth/*`~~ | 🗑️ Whole dir removed — `LGUAdminLogin`/`SuperAdminLogin` (2026-06-30) then `LoginLayout.tsx` (2026-07-03), all dead |
-| `src/components/layout/{DashboardLayout,Sidebar,PageHeader,StatusRow}.tsx` | ✅ Real — the 2026-07-04 chrome. Sidebar = hover-expand rail; PageHeader replaced Header+DashboardHero; StatusRow holds the notif bell (still a "coming soon" stub) |
+| `src/components/layout/{DashboardLayout,Sidebar,PageHeader,StatusRow}.tsx` | ✅ Real — the 2026-07-04 chrome. Sidebar = hover-expand rail w/ nav badges; PageHeader replaced Header+DashboardHero; StatusRow holds the real notification bell |
+| `src/components/layout/{NotificationBell,NavBadgeContext}.tsx` | ✅ NEW 2026-07-04 — important-only bell (stored + computed groups) and the per-section "new since last visit" badge provider |
 | ~~`src/components/layout/{Header,UserMenu,DashboardHero}.tsx`~~ | 🗑️ Deleted 2026-07-04 (header bar removed; chrome moved into Sidebar + PageHeader) |
-| `src/components/ui/*` (11 files) | ✅ All real; `Modal.tsx` + `LoadingSpinner.tsx` unused |
-| `src/lib/supabase.ts` | ✅ Real client |
+| `src/components/ui/*` | ✅ All real and token-themed (2026-07-04) |
+| `src/components/map/*` | ✅ Real Leaflet components (2026-07-02) — import ONLY via the `index.tsx` dynamic barrel |
+| `src/lib/{supabase,lgu,turnaround,importantNotices}.ts` | ✅ Real — ssr browser client; LGU id↔name map; avg turnaround; bell aging thresholds/queries (NEW 2026-07-04) |
 
 ### `apps/field-officer/` (officer app)
 | File | Status |
@@ -720,6 +817,7 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 | `src/screens/LoginScreen.tsx` | ✅ Real; role-gates (rejects CITIZENs) |
 | `src/screens/TasksScreen.tsx` | ✅ Real `reports` query (Under Review/In Progress) |
 | `src/screens/TaskDetailsScreen.tsx` | ✅ Resolve via offline queue |
+| `src/screens/ScanPickupScreen.tsx` | ✅ NEW 2026-07-03 — camera QR scan / manual code → `lookup_claim_code` → `release_service_request` |
 | `src/screens/ProfileScreen.tsx` | ✅ Profile + manual force-sync |
 | `src/utils/OfflineSyncManager.ts` | ✅ AsyncStorage queue; only handles `UPDATE_REPORT_STATUS` |
 | `src/utils/supabaseClient.ts` | ✅ Real |
@@ -752,8 +850,9 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 ### `supabase/`
 | File | Status |
 |---|---|
-| `schema.sql` | ✅ 14 tables, RLS, PostGIS, pgvector, profanity triggers |
-| `seed.sql` | ✅ Liliw seed (lgus, users, reports, services, facilities, faqs) |
+| `schema.sql` | ✅ Core tables, RLS, PostGIS, profanity + notification + staff-bell triggers, realtime publication (pgvector removed 2026-06-30; `users.nav_seen`/`audience` added 2026-07-04) |
+| `verification_setup.sql` | ✅ Citizen ID verification: `verification_requests`, `verify_citizen()` RPC, guard trigger, `citizen-ids` bucket, staff-bell verification trigger + realtime (2026-07-04) — run AFTER schema.sql, idempotent |
+| `seed.sql` | ✅ Liliw + Nagcarlan seed (lgus, users, reports, services, facilities, faqs, eServices catalog) |
 | `storage_setup.sql` | ✅ Buckets + policies |
 | `patches/001_fix_rls_and_security.sql` | ✅ RLS hardening |
 | `reset.sql` | 🔧 Reset script |

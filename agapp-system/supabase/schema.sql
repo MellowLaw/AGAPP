@@ -48,6 +48,11 @@ CREATE TABLE users (
     -- Staff notification bell "mark all read" model (v1) — a single per-admin
     -- timestamp; unread count = staff-audience notifications newer than this.
     notifications_seen_at timestamp with time zone,
+    -- Nav "new since last visit" badges — per-section last-seen timestamps,
+    -- e.g. {"reports": "<iso>", "services": "<iso>", "forum": "<iso>", "verifications": "<iso>"}.
+    -- A badge count = rows newer than nav_seen[section]; opening that section
+    -- writes now() and the badge clears.
+    nav_seen jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -236,72 +241,10 @@ CREATE OR REPLACE TRIGGER trigger_notify_service_status
 -- ── Staff notification bell (admin panel) ─────────────────────────────────
 -- Same `notifications` table, staff-audience rows (user_id NULL, audience
 -- set). See Docs/Planning/Plan-Admin-Notifications.md for the v1 scope.
-CREATE OR REPLACE FUNCTION notify_staff_new_report()
-RETURNS trigger AS $$
-DECLARE
-  v_label text;
-BEGIN
-  v_label := CASE NEW.category
-    WHEN 'pothole'          THEN 'Pothole / Road Damage'
-    WHEN 'clogged_drainage' THEN 'Drainage / Canal'
-    WHEN 'stray_animal'     THEN 'Stray Pets'
-    WHEN 'damaged_pole'     THEN 'Damaged Pole'
-    ELSE NEW.category
-  END;
-
-  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
-  VALUES (
-    NEW.lgu_id, NULL, 'lgu_personnel', 'new_report',
-    'New Report Submitted',
-    'New ' || v_label || ' report ' || NEW.reference_number || COALESCE(' in ' || NEW.barangay, '') || '.',
-    jsonb_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number),
-    false
-  );
-
-  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
-  VALUES (
-    NEW.lgu_id, NULL, 'super_admin', 'new_report',
-    'New Report Submitted',
-    'New ' || v_label || ' report ' || NEW.reference_number || ' in ' || NEW.lgu_id || '.',
-    jsonb_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number, 'lgu_id', NEW.lgu_id),
-    false
-  );
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SET search_path = public;
-
-CREATE OR REPLACE TRIGGER trigger_notify_staff_new_report
-  AFTER INSERT ON reports FOR EACH ROW EXECUTE FUNCTION notify_staff_new_report();
-
-CREATE OR REPLACE FUNCTION notify_staff_new_service_request()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
-  VALUES (
-    NEW.lgu_id, NULL, 'lgu_personnel', 'new_service_request',
-    'New Service Request',
-    'New ' || NEW.service_type || ' request ' || NEW.reference_number || '.',
-    jsonb_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number),
-    false
-  );
-
-  INSERT INTO notifications (lgu_id, user_id, audience, type, title, body, payload, is_read)
-  VALUES (
-    NEW.lgu_id, NULL, 'super_admin', 'new_service_request',
-    'New Service Request',
-    'New ' || NEW.service_type || ' request ' || NEW.reference_number || ' in ' || NEW.lgu_id || '.',
-    jsonb_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number, 'lgu_id', NEW.lgu_id),
-    false
-  );
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SET search_path = public;
-
-CREATE OR REPLACE TRIGGER trigger_notify_staff_new_service_request
-  AFTER INSERT ON service_requests FOR EACH ROW EXECUTE FUNCTION notify_staff_new_service_request();
-
+-- NOTE: routine "new report" / "new service request" volume does NOT live
+-- here — the bell is important-notices-only (verifications, forum flags,
+-- computed overdue/abandoned via apps/admin/src/lib/importantNotices.ts).
+-- Routine new-item counts are nav badges instead (users.nav_seen above).
 -- notify_staff_new_verification() lives in verification_setup.sql, since
 -- verification_requests is created there (run after this file).
 -- notify_staff_forum_post_flagged() / notify_staff_forum_comment_flagged()

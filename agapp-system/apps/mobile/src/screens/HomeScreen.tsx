@@ -13,7 +13,6 @@ export function HomeScreen({ navigation }: any) {
   const { profile, selectedLgu, guestLgu } = useAuth();
   const [activeTab, setActiveTab] = useState<'for_you' | 'updates' | 'activity'>('for_you');
   const [news, setNews] = useState<any[]>([]);
-  const [facilities, setFacilities] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -23,7 +22,7 @@ export function HomeScreen({ navigation }: any) {
   const activeLgu = selectedLgu || guestLgu || { id: 'liliw-laguna', name: 'Liliw, Laguna' };
 
   useEffect(() => {
-    // News & facilities only need an LGU id — fetch for guests too.
+    // News only needs an LGU id — fetch for guests too.
     const fetchPublicData = async () => {
       const { data: newsData } = await supabase
         .from('news_announcements')
@@ -34,14 +33,6 @@ export function HomeScreen({ navigation }: any) {
         .limit(5);
 
       if (newsData) setNews(newsData);
-
-      const { data: facilitiesData } = await supabase
-        .from('lgu_facilities')
-        .select('*')
-        .eq('lgu_id', activeLgu.id)
-        .limit(5);
-
-      if (facilitiesData) setFacilities(facilitiesData);
     };
 
     // Private data needs a logged-in profile.
@@ -81,32 +72,6 @@ export function HomeScreen({ navigation }: any) {
 
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';
   const lguColor = activeLgu.primary_color || activeLgu.primaryColor || ACCENT;
-
-  // Localized mock landmarks fallback based on selected LGU for premium visual feel
-  const getMockLandmarks = () => {
-    if (activeLgu?.name?.toLowerCase().includes('liliw')) {
-      return [
-        { id: 'l1', name: 'Liliw Cold Springs', category: 'Nature & Parks', desc: 'Chill in crystal-clear mountain waters.', img: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=400&q=80' },
-        { id: 'l2', name: 'St. John the Baptist Parish', category: 'Heritage', desc: 'Historic 16th-century red-brick church.', img: 'https://images.unsplash.com/photo-1548625361-155de0cbb55a?auto=format&fit=crop&w=400&q=80' },
-        { id: 'l3', name: 'Gat Tayaw Street', category: 'Shopping', desc: 'The famous footwear shopping strip.', img: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=400&q=80' },
-      ];
-    }
-    return [
-      { id: 'n1', name: 'Nagcarlan Underground Cemetery', category: 'Heritage', desc: 'Unique historical underground burial site.', img: 'https://images.unsplash.com/photo-1605649487212-47bdab064df7?auto=format&fit=crop&w=400&q=80' },
-      { id: 'n2', name: 'Bunga Falls', category: 'Nature & Parks', desc: 'Twin waterfalls perfect for weekend outings.', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=400&q=80' },
-      { id: 'n3', name: 'St. Bartholomew Church', category: 'Heritage', desc: 'Majestic Spanish colonial structure.', img: 'https://images.unsplash.com/photo-1438784471464-6c3e3870bb75?auto=format&fit=crop&w=400&q=80' },
-    ];
-  };
-
-  const landmarksToShow = facilities.length > 0
-    ? facilities.map(f => ({
-        id: f.id,
-        name: f.name,
-        category: f.category || 'LGU Facility',
-        desc: f.description || 'Visit and explore this local landmark.',
-        img: f.photo_url || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80'
-      }))
-    : getMockLandmarks();
 
   // Status Badge styling helper for Activity Tab
   const getStatusBadge = (status: string) => {

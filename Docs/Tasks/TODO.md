@@ -5,22 +5,12 @@
 
 ## 🔴 Now (active)
 
-- [ ] **Remove dead `Bell` import in `apps/admin/src/components/layout/Sidebar.tsx`**
-      (~line 20) — the notification bell moved to `StatusRow` in the 2026-07-04 redesign;
-      the import is now unused. Trivial, harmless, do on next touch.
-
-- [ ] **Add `MISTRAL_API_KEY` to `apps/api/.env`** — required for the chatbot fallback
-      (replaced Gemini 2026-07-01). Get it from **admin.mistral.ai/organization/api-keys**
-      (La Plateforme's key management page), NOT chat.mistral.ai/Le Chat — those are
-      separate products with separate billing. Free tier is enough. Without it, chatbot
-      silently falls through to the generic "couldn't find an answer" message whenever
-      the keyword FAQ has no match.
 - [ ] **Add `SUPABASE_SERVICE_ROLE_KEY` to `apps/admin/.env.local`** — required for the
-      new staff creation flow (`/api/create-staff` route). Get value from Supabase dashboard
+      staff creation flow (`/api/create-staff` route). Get value from Supabase dashboard
       → Project Settings → API → service_role key. Without it, "Add Staff" throws 500.
-- [ ] Apply `supabase/verification_setup.sql` to the live DB if not already fully applied
-      (`verification_requests` table exists but confirm `verify_citizen` RPC and
-      `citizen-ids` storage bucket are also present).
+      _(2026-07-04: user believed env was fully configured — checked the file directly;
+      this key is genuinely still absent from `.env.local`. `MISTRAL_API_KEY` in the api
+      app IS present — that one's done.)_
 - [ ] Test the verification flow end-to-end (mobile submit → admin approve).
       See [Plan-Verification-Feature](../Planning/Plan-Verification-Feature.md).
 - [ ] ⚠️ **Enable leaked-password protection in Supabase Dashboard** — Authentication →
@@ -50,12 +40,118 @@
       stray pets), the same boundary supports them — pothole first.
 - [ ] Reconcile model name: code says "YOLOv11", paper says "YOLOv8n".
 - [ ] Decide audit logging: move into DB triggers (clients bypass the NestJS API).
+      Confirmed dead code, not a live bug: `apps/api/src/app.controllers.ts`
+      `writeAuditLog()` hardcodes `ip_address: '127.0.0.1'` and demo user ids
+      (`usr-super`/`usr-liliw-admin`) — but the LGU provision/subscription/feature-flags
+      endpoints that call it are never hit by the admin frontend (which writes directly
+      to Supabase's `lgus` table, confirmed via grep of `super/lgus/page.tsx`); `audit_logs`
+      has 0 rows in the live DB. Don't patch the hardcoded values in place — if audit
+      logging is ever revived, do it via the DB-trigger approach above instead of fixing
+      this unreachable NestJS path.
 - [ ] Replace client-generated reference numbers (`Math.random`) with DB sequences —
       DB side **done** (sequences + BEFORE INSERT trigger deployed 2026-06-30);
       mobile screens updated to omit `reference_number` and read it back via `.select()`.
 
 ## ✅ Done
 
+- [x] **`MISTRAL_API_KEY` configured in `apps/api/.env`** — verified present with a value
+      (2026-07-04, key-name check only, value never read). Chatbot LLM fallback is live.
+- [x] **`verification_setup.sql` confirmed fully applied to the live DB** — all pieces
+      verified live 2026-07-04: `verification_requests` table (used all session),
+      `verify_citizen()` RPC + `guard_verification_columns` trigger (both exercised —
+      the guard actively blocked writes, the RPC path restored the demo citizen), and
+      the private `citizen-ids` bucket (`public: false`).
+- [x] **Demo citizen "Juan Dela Cruz" restored to `verified`** — user ran the one-time
+      guard-bypass SQL in the Supabase SQL editor (2026-07-04); verified live:
+      `verification_status='verified'`, `verified_barangay='Poblacion'`, `verified_by` =
+      the Liliw admin. This was the last piece of test residue from the notification
+      scope-testing — DB is now fully clean.
+- [x] **Post-notification cleanup: test data purged + a mock-data audit run** — user asked
+      to "get rid of the test things" and check for remaining mocks/fake data (2026-07-04).
+      DB: deleted all test reports/notifications created while verifying the nav-badge and
+      bell work this session; reset `nav_seen`/`notifications_seen_at` on the 3 demo staff
+      accounts so they start fresh. Codebase audit (full-repo grep for mock/stub/placeholder
+      patterns, ML stub and seed data excluded as already-intentional):
+      - **Fixed:** `apps/mobile/src/screens/HomeScreen.tsx` had a `getMockLandmarks()`
+        fallback (hardcoded fake Liliw/Nagcarlan landmark cards with stock Unsplash photos)
+        feeding a `landmarksToShow` value that was computed but **never actually rendered
+        anywhere in the file** — fully dead code. Deleted it along with the `facilities`
+        state/fetch that only fed it (one fewer unnecessary network call too).
+      - **Confirmed dead, not fixed in place:** `apps/api/src/app.controllers.ts`
+        `writeAuditLog()` hardcodes `ip_address: '127.0.0.1'` and demo user ids — but see
+        the "Decide audit logging" item above, the calling endpoints are unreachable from
+        the real admin frontend (0 rows in `audit_logs` confirms it). Left as-is pending
+        the DB-trigger redesign rather than patching an endpoint nothing calls.
+      - **Not a mock, left as-is:** the `'Liliw, Laguna'` fallback used across admin pages
+        when no `lguName` URL param is present — this is the pilot's single default LGU,
+        not fabricated data (see `lib/lgu.ts`).
+      - **Confirmed real, no action:** admin dashboards/charts, field-officer app, and all
+        other API controllers are genuinely Supabase-backed — no fake deltas, sparklines,
+        or hardcoded counts found anywhere in the admin UI.
+- [x] **Nav "new since last visit" badges + bell narrowed to important notices only** —
+      follow-up to the v1 bell (below). Two changes per user direction ("get rid of the
+      test... the notification is only for important notices... in the nav have like a
+      notification number indicator... if we go to that nav it will be cleared"):
+      1. **Nav badges** (`NavBadgeContext.tsx`, new): each admin/personnel nav tab that
+         maps to a data section (Issue Reports, Service Requests/My Queue, Forum,
+         Verifications) shows a count of items created since that admin last visited it
+         (`users.nav_seen` jsonb, per section). Realtime `postgres_changes` INSERTs bump
+         the count live; opening the section's route marks it seen (writes `now()`) and
+         the badge clears. LGU admin gets all 4 sections; personnel gets Reports +
+         Services only; super admin has none in v1 (cross-LGU rollup deferred).
+      2. **Bell narrowed to important-only** (`NotificationBell.tsx`, `importantNotices.ts`
+         new): the routine `new_report`/`new_service_request` triggers were dropped
+         entirely (`notify_staff_new_report`, `notify_staff_new_service_request` — that
+         volume is now nav badges, not bell noise). The bell now shows two groups:
+         stored "Recent notices" (verification pending + forum flagged — unchanged) and
+         computed "Needs attention" (overdue reports past `sla_due_date`; abandoned
+         reports — `Submitted` >3 days or any non-terminal status untouched >7 days;
+         stale requests — `Submitted`/`Under Review` untouched >3 days; uncollected
+         requests — `Ready for Pickup` >7 days). Needs-attention items are computed
+         fresh each time the panel opens (no cron, no stored rows) and are **not**
+         cleared by "mark all read" — they persist while the underlying problem is
+         still true, by design (an overdue report is still overdue).
+      Migration `nav_badges_and_bell_scope`: added `users.nav_seen jsonb`; dropped the
+      two routine trigger functions + their rows; added `verification_requests` to the
+      `supabase_realtime` publication (for the Verifications badge). `schema.sql` +
+      `verification_setup.sql` synced (the publication line had to go in
+      `verification_setup.sql`, not `schema.sql`, since that table is created there).
+      **Bug hit and fixed:** the nav-badge "mark seen" write
+      (`supabase.from('users').update(...)`) was fire-and-forget with no `.then()`/
+      `await` — supabase-js query builders are lazily thenable, so the HTTP request
+      never actually fired; the badge silently never cleared. Fixed by awaiting it.
+      **Second bug hit and fixed:** the original design had two independent effects —
+      one computing the badge count, one marking the section seen — racing each other;
+      whichever resolved last clobbered the other's result. Redesigned so marking-seen
+      happens synchronously before computing counts in one sequenced flow (keyed off
+      the route via `usePathname()` inside the provider itself), removing the race.
+      Verified live for admin + personnel: badges render, clear on visit and stay
+      cleared across navigation, update in realtime without reload, and are correctly
+      role/LGU-scoped; bell shows real aging seed data under "Needs attention".
+- [x] **Admin notification bell built (v1)** — `Docs/Planning/Plan-Admin-Notifications.md`
+      implemented end-to-end. Migration `admin_staff_notifications`: `notifications.audience`
+      (`lgu_admin`/`lgu_personnel`/`super_admin`), `users.notifications_seen_at`, and a new
+      RLS SELECT policy scoping staff rows to matching role+lgu (super admin gets a
+      cross-LGU rollup). New AFTER INSERT triggers write staff-audience rows for the v1
+      set: new report + new service request (→ personnel & admin, plus a super-admin
+      rollup row), new verification pending (→ admin only), forum post/comment flagged
+      (→ admin only, reusing `check_forum_profanity()`'s `flagged_keywords`). New
+      `apps/admin/src/components/layout/NotificationBell.tsx`: realtime `postgres_changes`
+      subscription (RLS-scoped, no manual role filtering needed client-side), unread badge
+      via the `notifications_seen_at` model, dropdown panel, deep-links (reports link
+      straight to the reference-number-matched row via `?reportId=`; other types land on
+      the relevant list page). Wired into `StatusRow.tsx`, replacing the old "coming soon"
+      toast placeholder. Also removed the dead `Bell` import in `Sidebar.tsx` while in the
+      area (flagged after the other-AI redesign pass, never actually used post-move).
+      Verified live for all three roles + realtime push + click-through deep link +
+      role-scoping (personnel sees reports/services only; admin also sees
+      verifications/forum-flags; a test report/verification pair confirmed the RLS split
+      exactly as designed). `schema.sql` synced (new trigger placed after
+      `verification_requests` lives in `verification_setup.sql` since that table is
+      created there, not in the base schema — the two forum triggers were placed after
+      `forum_comments`'s own `CREATE TABLE`, both to preserve top-to-bottom apply order).
+      ML detection intentionally NOT touched this pass (explicit user direction — separate
+      plan, separate work).
 - [x] **Dead PDF form generation removed** — `apps/api/src/pdf-generator.ts` and
       `generate-sample-pdfs.ts` deleted (2026-07-03), plus the `pdf-lib` dependency.
       It filled out municipal application forms server-side (birth cert, business

@@ -4,6 +4,7 @@ import React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { PageHeader } from './PageHeader';
+import { NavBadgeProvider } from './NavBadgeContext';
 
 
 interface DashboardLayoutProps {
@@ -42,20 +43,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     : title;
 
   return (
-    <div className="min-h-screen bg-bg">
-      <Sidebar role={role} lguName={lguName} />
+    <NavBadgeProvider role={role}>
+      <div className="min-h-screen bg-bg">
+        <Sidebar role={role} lguName={lguName} />
 
-      <div className="ml-[72px]">
-        <main className={heroKicker ? 'p-8' : 'p-6'}>
-          {heroKicker ? (
-            <PageHeader variant="hero" kicker={heroKicker} title={title} titleAccent={heroTitleAccent} subtitle={heroSubtitle} action={action} />
-          ) : (
-            <PageHeader variant="compact" title={displayTitle} action={action} />
-          )}
-          {children}
-        </main>
+        <div className="ml-[72px]">
+          <main className={heroKicker ? 'p-8' : 'p-6'}>
+            {heroKicker ? (
+              <PageHeader variant="hero" kicker={heroKicker} title={title} titleAccent={heroTitleAccent} subtitle={heroSubtitle} action={action} />
+            ) : (
+              <PageHeader variant="compact" title={displayTitle} action={action} />
+            )}
+            {children}
+          </main>
+        </div>
+
       </div>
-
-    </div>
+    </NavBadgeProvider>
   );
 };
