@@ -78,8 +78,13 @@ cd apps/mobile && npx expo start --lan     # mobile on a phone (same Wi-Fi)
   so hoisted packages type-check against React 18. Don't remove the stubs, the root
   react pins, or the tsconfig paths — and re-check `apps/admin/node_modules` placements
   after dependency changes.
-- **Pothole ML is currently faked** — `ReportsScreen.tsx` hardcodes `ml_confidence`.
-  See `Audits/Planning/Plan-ML-Pothole-Detection.md`.
+- **Pothole + stray-pets ML are both live** (Roboflow Hosted, since 2026-07-06) — not
+  faked. `verify-image` writes real `ml_confidence`/`ml_verified`. Both admin report
+  views (`lgu/reports`, `personnel/reports`) show a tri-state badge: green when
+  detected, amber "No {pothole/animal} detected — review photo" when the model ran
+  but found nothing, nothing when the model never ran (`null`, e.g. older data or an
+  unmodeled category) — don't render only the `true` case, a `false` result looks
+  identical to "no ML" if you do. See `Docs/Planning/Plan-ML-Pothole-Detection.md`.
 - **No tests exist** anywhere; `any` types are common. Don't assume coverage.
 
 ## Conventions

@@ -86,6 +86,42 @@ stray pets = a stock COCO dog/cat detector filtered to the anti-troll validity c
   case" model (PawBoost/pet-finder style) as scope creep away from LGU incident
   reporting.
 
+## 🔄 Update — 2026-07-06 (bug: "not detected" result was invisible — both admin report views)
+
+User tested a real pothole report after the above went live and saw **no AI indicator
+anywhere** — reported as "there's still no implementation of the ai/ml." The backend
+was not the problem: querying the DB directly showed the just-submitted report
+(`REP-2026-1009`) had `ml_confidence=0, ml_verified=false` — proof the Roboflow call
+had actually run (a genuine not-analyzed row is `null`/`null`, not `0`/`false`). The
+photo the user tested with simply scored 0% confidence (a model/threshold question,
+separate from "is it wired up").
+
+The real bug was frontend: both report-detail views rendered the AI badge only when
+`ml_verified === true`. `false` (model ran, found nothing) and `null` (model never ran,
+e.g. older seed data or a category with no model) were visually identical — nothing
+shown — so a real, working negative result was indistinguishable from the feature not
+existing.
+
+Fixed in both admin report-detail views:
+- `apps/admin/src/app/lgu/reports/page.tsx` — badge is now tri-state: green "AI
+  Verified — {pothole/animal} detected in photo (N%)" (`true`), amber "No
+  {pothole/animal} detected — review photo" (`false`), nothing (`null`).
+- `apps/admin/src/app/personnel/reports/page.tsx` — this view had **no photo and no AI
+  badge at all** before this fix (it only ever fetched/rendered category/location/
+  status). Added the report photo plus the same tri-state badge, matching the admin
+  view.
+
+This effectively ships the "stray-specific AI badge wording" half of
+`Plan-StrayPets-Reporting.md`'s v1 (item 2) for both ML categories, not just stray
+pets — the `ML_SUBJECT_LABEL` map (`pothole` → "pothole", `stray_animal` → "animal")
+lives in both files. The "Last Seen" relabel (item 1) is still not done — that part
+is unrelated to ML wiring and remains open.
+
+Verified live: typechecked clean (`tsc --noEmit` in `apps/admin`), then confirmed via
+an authenticated personnel-session browser check (accessibility snapshot) that
+`REP-2026-1009` now renders its photo and the amber "No pothole detected — review
+photo" badge instead of nothing.
+
 ## 🔄 Update — 2026-07-05 (Security sweep: API attack surface deleted, notifications RLS hardened, legacy cleanup)
 
 Full sweep for bugs/holes/legacy while the pothole model trains on Kaggle. Supabase
@@ -435,9 +471,11 @@ from before the eServices redesign settled on QR-only pickup with no in-app paym
 and checklist-only requirements. Was never mounted as a live NestJS route. Confirmed
 zero other references before deleting; API typechecks clean.
 
-**Pothole ML explicitly deferred (user direction, not a gap to fix now).** The
-`mlAnalysis.ts` boundary + `POST /reports/verify-image` both correctly return
-"not analyzed" and are NOT to be filled in yet — revisit only when asked.
+~~**Pothole ML explicitly deferred (user direction, not a gap to fix now).**~~
+Superseded 2026-07-06 — both pothole and stray-pets ML are live (see the update block
+above); `mlAnalysis.ts` / `verify-image` do real Roboflow inference for those two
+categories, not "not analyzed" placeholders. Left struck through rather than deleted
+so the historical decision trail stays intact.
 
 **⚠️ Still outstanding, keep visible:** leaked-password protection is still OFF in
 the Supabase Dashboard (Authentication → Sign In / Providers → Password). One toggle,
@@ -820,7 +858,7 @@ deleted 2026-06-30; the PDF generator followed 2026-07-03.)_
 
 ### ⚙️ API (NestJS, the live one — trimmed to reality 2026-07-05)
 - Chatbot: keyword-scored FAQ matching → **Mistral** fallback (swapped from Gemini 2026-07-01) → graceful "no answer / support ticket" — guarded
-- `POST /api/reports/verify-image` — ✅ real for `category==='pothole'` since 2026-07-06 (Roboflow Hosted call, pending only the Roboflow-side deploy + env keys); still nulls for every other category — guarded
+- `POST /api/reports/verify-image` — ✅ real (Roboflow Hosted) for `pothole` and `stray_animal` since 2026-07-06, both deployed and verified with real photos; still nulls for every other category — guarded
 - ~~Forum moderation (Gemini)~~ — deleted 2026-07-05; was dead code (mobile posts directly to Supabase; the real filter is the DB `check_forum_profanity()` trigger)
 - ~~Audit log writer~~ — deleted 2026-07-05 along with the dead controllers that called it
 - `SupabaseAuthGuard` (validates JWT via `supabase.auth.getUser`)

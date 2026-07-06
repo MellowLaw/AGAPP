@@ -1,6 +1,6 @@
 # AGAPP — To-Do
 
-> **Updated:** 2026-07-05 · Living list. Synthesized from the
+> **Updated:** 2026-07-06 · Living list. Synthesized from the
 > [Codebase-Audit](../Audits/Codebase-Audit.md) and current work.
 
 ## 🔴 Now (active)
@@ -28,10 +28,11 @@
       queue ("X reports overdue right now"), personnel workload chart (needs
       `service_requests.assigned_personnel` to actually be set when staff click
       "Start Processing" — it exists in the schema but nothing writes to it yet).
-- [ ] **Stray-pets reporting UI — `Plan-StrayPets-Reporting.md`'s "Last Seen" framing +
-      AI-badge wording** — a frontend-only task (relabel stray-report cards as
-      "Last Seen: [barangay] · [relative time]", stray-specific AI badge text). The ML
-      side is now DONE (see below); this UI polish is independent and unblocked.
+- [ ] **Stray-pets reporting UI — `Plan-StrayPets-Reporting.md`'s "Last Seen" framing**
+      (item 1 + the shared `timeAgo()` helper, item 3) — relabel stray-report cards'
+      "Location"/"Submitted" pair as "Last Seen: [barangay] · [relative time]" (admin +
+      mobile tracking screen). The AI-badge wording (item 2) is now DONE for both ML
+      categories (see below); this "Last Seen" relabel is the only remaining piece.
 - [ ] Reconcile model name: code says "YOLOv11", paper says "YOLOv8n".
 - [ ] Decide audit logging: implement via DB triggers if wanted (clients talk directly
       to Supabase, so API-side logging can never see their actions). The old dead
@@ -45,6 +46,24 @@
 
 ## ✅ Done
 
+- [x] **Fixed: ML "not detected" result was invisible in both admin report views
+      (2026-07-06)** — user tested a real pothole report after the ML rollout below and
+      saw no AI indicator at all, reported as "still no implementation of the ai/ml."
+      Root cause wasn't the backend: a direct DB query showed the tested report
+      (`REP-2026-1009`) had `ml_confidence=0, ml_verified=false` — proof Roboflow had
+      actually run (a genuine not-analyzed row is `null`/`null`, not `0`/`false`); the
+      test photo just scored 0% confidence, a model/threshold question, not a wiring
+      one. The actual bug: both `lgu/reports/page.tsx` and `personnel/reports/page.tsx`
+      only rendered the AI badge when `ml_verified === true` — `false` (model ran,
+      found nothing) and `null` (model never ran) both showed nothing, so a working
+      negative result was indistinguishable from the feature not existing. Fixed:
+      badge is now tri-state (green "AI Verified — {pothole/animal} detected (N%)" /
+      amber "No {pothole/animal} detected — review photo" / nothing for `null`) in
+      both files via a shared `ML_SUBJECT_LABEL` map. `personnel/reports/page.tsx` also
+      had **no photo and no AI badge at all** before this — added both, it previously
+      only fetched category/location/status. Verified: `tsc --noEmit` clean in
+      `apps/admin`; confirmed live via an authenticated personnel-session browser
+      check that `REP-2026-1009` now shows its photo + the amber badge.
 - [x] **Stray-pets ML: deployed, wired, and VERIFIED LIVE (2026-07-06)** — no
       training needed (stock COCO-pretrained YOLOv8n already detects dog/cat).
       Deployed the stock `yolov8n.pt` to Roboflow Hosted as a vessel project

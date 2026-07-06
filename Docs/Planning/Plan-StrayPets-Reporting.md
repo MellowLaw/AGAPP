@@ -1,7 +1,8 @@
 # Plan — Stray-Pets Reporting ("Last Seen" + AI validity)
 
-> **Status:** 🔵 Draft for review · not started in code · _living doc._
-> **Updated:** 2026-07-05
+> **Status:** 🟡 Partially shipped — v1 item 2 (AI badge wording) is done; item 1
+> ("Last Seen" relabel) and item 3 (shared `timeAgo()`) are still not started.
+> **Updated:** 2026-07-06
 > **Scope:** How stray-animal reports are framed and shown (admin + mobile), and how the
 > COCO dog/cat detector's result is surfaced. Purely presentational + one optional ML
 > label — the underlying report data model is unchanged.
@@ -42,11 +43,16 @@ locating this animal"). It's a sighting record, not a promise the animal is stil
    makes staleness obvious at a glance. Other categories keep the current labels
    unchanged. Admin detail panel first (staff triage benefits most); mirror the same
    relative-time line on the mobile tracking screen.
-2. **Stray-specific AI badge wording.** Reuse the existing `ml_verified`/`ml_confidence`
-   — for a stray report, the green badge reads **"AI Verified — animal detected in photo
-   ({conf}%)"**; when `ml_verified === false` (a model ran and found no dog/cat), show a
-   neutral amber **"No animal detected — review photo"** flag so staff can spot trolls/
-   mis-files. (Pothole keeps "AI Verified (X%)".) This is the anti-troll payoff.
+2. ✅ **Done (2026-07-06, both admin report views).** Stray-specific AI badge wording.
+   Reuse the existing `ml_verified`/`ml_confidence` — for a stray report, the green
+   badge reads **"AI Verified — animal detected in photo ({conf}%)"**; when
+   `ml_verified === false` (a model ran and found no dog/cat), show a neutral amber
+   **"No animal detected — review photo"** flag so staff can spot trolls/mis-files.
+   Shipped slightly broader than originally scoped: pothole got the same tri-state
+   treatment too (green/amber/nothing, via an `ML_SUBJECT_LABEL` map), not just kept at
+   plain "AI Verified (X%)" — the `false` state was invisible for pothole as well before
+   this fix (see the 2026-07-06 Codebase-Audit update block), so fixing it only for
+   stray pets would've left the same bug live for the other category.
 3. A tiny shared `timeAgo()` helper (the bell already has one in
    `NotificationBell.tsx`/`importantNotices.ts` — lift it to `lib/` and reuse).
 

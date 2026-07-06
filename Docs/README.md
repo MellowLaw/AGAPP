@@ -23,7 +23,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-ML-Pothole-Detection](Planning/Plan-ML-Pothole-Detection.md) — pothole + stray-pets ML: 🟢 both LIVE, verified end-to-end
 - [ML-Dataset-Citations](Planning/ML-Dataset-Citations.md) — RSDD (CC BY 4.0) + New Pothole (CC0) + RDD2020 attribution/BibTeX for the manuscript
 - [Plan-Admin-Notifications](Planning/Plan-Admin-Notifications.md) — admin notification bell + nav badges (built, v1 + v1.1)
-- [Plan-StrayPets-Reporting](Planning/Plan-StrayPets-Reporting.md) — "Last Seen" sighting framing + AI validity badge for stray reports (draft)
+- [Plan-StrayPets-Reporting](Planning/Plan-StrayPets-Reporting.md) — "Last Seen" sighting framing (open) + AI validity badge (shipped 2026-07-06, both ML categories)
 - [Plan-eServices-QR-Pickup](Planning/Plan-eServices-QR-Pickup.md) — document requests + QR pickup (built)
 
 **Tasks**
@@ -37,4 +37,6 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
   Obsidian is set up.
 - Dates are absolute (e.g. `2026-06-29`), not "last week".
 
-_Last updated: 2026-07-06 (BOTH ML detectors live — pothole + stray-pets deployed, wired, verified with real photos; admin "AI Verified" badge is real for both — see Codebase-Audit)_
+_Last updated: 2026-07-06 (fixed the ML "not detected" result being invisible in both
+admin report views — a false/null ml_verified rendered nothing, indistinguishable from
+the feature not existing; now a tri-state badge for pothole + stray pets — see Codebase-Audit)_

@@ -30,6 +30,7 @@ type ReportStatus = 'submitted' | 'under_review' | 'in_progress' | 'resolved' | 
 interface ReportItem {
   id: string;            // display id (reference number)
   dbId: string;          // underlying reports.id UUID
+  dbCategory: string;    // raw category (pothole/stray_animal/...) for ML wording
   category: string;
   subType: string | null;
   location: string;
@@ -41,9 +42,17 @@ interface ReportItem {
   submittedAt: string;   // human readable timestamp
   photoUrl: string | null;
   assignedOffice: string | null;
-  aiDetected?: boolean;
-  aiConfidence?: number | null;
+  /** null = model never ran ("not analyzed"); true/false = model ran and did/didn't confirm the subject. */
+  aiVerified: boolean | null;
+  aiConfidence: number | null;
 }
+
+// Wording for the ML validity badge, per Docs/Planning/Plan-StrayPets-Reporting.md
+// (dog/cat detector is an anti-troll validity check, not identity/breed matching).
+const ML_SUBJECT_LABEL: Record<string, string> = {
+  pothole: 'pothole',
+  stray_animal: 'animal',
+};
 
 const mapDbStatusToUi = (status: string): ReportStatus => {
   switch (status) {
@@ -99,6 +108,7 @@ const mapReportRowToItem = (row: any): ReportItem => {
   return {
     id: row.reference_number || row.id,
     dbId: row.id,
+    dbCategory: row.category || '',
     category,
     subType,
     location: row.barangay || 'Unknown location',
@@ -112,7 +122,7 @@ const mapReportRowToItem = (row: any): ReportItem => {
       : '',
     photoUrl: row.photo_url || null,
     assignedOffice: row.assigned_office || null,
-    aiDetected: !!row.ml_verified,
+    aiVerified: row.ml_verified ?? null,
     aiConfidence: row.ml_confidence ?? null,
   };
 };
@@ -564,14 +574,25 @@ export default function ReportsPage() {
                   </div>
                 )}
 
-                {/* AI Detection Badge */}
-                {selectedReport.aiDetected && (
-                  <div className="flex items-center gap-2 p-3 bg-green-600 text-white rounded-md font-semibold">
-                    <Check className="w-4 h-4" />
-                    <span className="text-sm">
-                      AI Verified ({Math.round(selectedReport.aiConfidence! * 100)}% confidence)
-                    </span>
-                  </div>
+                {/* AI Detection Badge — null means no model ran for this category
+                    (older data, or a category with no deployed model): show nothing.
+                    true/false means the model ran and did/didn't confirm the subject. */}
+                {selectedReport.aiVerified !== null && (
+                  selectedReport.aiVerified ? (
+                    <div className="flex items-center gap-2 p-3 bg-green-600 text-white rounded-md font-semibold">
+                      <Check className="w-4 h-4" />
+                      <span className="text-sm">
+                        AI Verified — {ML_SUBJECT_LABEL[selectedReport.dbCategory] || 'subject'} detected in photo ({Math.round((selectedReport.aiConfidence || 0) * 100)}%)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-amber-500 text-white rounded-md font-semibold">
+                      <Warning className="w-4 h-4" />
+                      <span className="text-sm">
+                        No {ML_SUBJECT_LABEL[selectedReport.dbCategory] || 'match'} detected — review photo
+                      </span>
+                    </div>
+                  )
                 )}
 
                 {/* Assigned Office */}
