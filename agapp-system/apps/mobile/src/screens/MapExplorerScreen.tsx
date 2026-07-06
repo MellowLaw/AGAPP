@@ -103,7 +103,13 @@ const SHEET_EXPANDED  = 300;
 
 export function MapExplorerScreen() {
   const { T, isDarkMode } = useTheme();
-  const { selectedLgu, profile } = useAuth();
+  const { selectedLgu, guestLgu, profile } = useAuth();
+  // Map is intentionally guest-accessible (see AppNavigator's AuthGate copy:
+  // "browse Home, News, and the Map without an account") — but selectedLgu is
+  // only ever set after login+profile. Without this fallback, guests get an
+  // empty map: no facilities fetch, no boundary, wrong region. Same pattern
+  // already used in HomeScreen.tsx's activeLgu.
+  const activeLgu = selectedLgu || guestLgu || { id: 'liliw-laguna', name: 'Liliw, Laguna', latitude: 14.1350, longitude: 121.4363 };
   const mapRef = useRef<MapView>(null);
   const insets = useSafeAreaInsets();
 
@@ -153,14 +159,14 @@ export function MapExplorerScreen() {
 
   // ── Load facilities ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!selectedLgu) return;
+    if (!activeLgu) return;
     const fetchFacilities = async () => {
       setLoading(true);
       try {
         const { data, error } = await supabase
           .from('lgu_facilities')
           .select('*')
-          .eq('lgu_id', selectedLgu.id);
+          .eq('lgu_id', activeLgu.id);
         if (!error && data) setFacilities(data);
       } catch (err) {
         console.error('Error fetching facilities:', err);
@@ -169,13 +175,13 @@ export function MapExplorerScreen() {
       }
     };
     fetchFacilities();
-  }, [selectedLgu]);
+  }, [activeLgu]);
 
   // ── Entrance zoom animation: runs every time this tab is focused ─────────
   useFocusEffect(
     useCallback(() => {
-      const lat = selectedLgu?.latitude  || 14.1350;
-      const lng = selectedLgu?.longitude || 121.4363;
+      const lat = activeLgu?.latitude  || 14.1350;
+      const lng = activeLgu?.longitude || 121.4363;
 
       // Reset UI state when returning to tab
       setSelectedPoi(null);
@@ -194,7 +200,7 @@ export function MapExplorerScreen() {
       }, 100);
 
       return () => clearTimeout(timer);
-    }, [selectedLgu])
+    }, [activeLgu])
   );
 
   // ── Panel toggle animation ───────────────────────────────────────────────
@@ -276,21 +282,21 @@ export function MapExplorerScreen() {
 
   // ── Region / boundary ────────────────────────────────────────────────────
   const initialRegion = useMemo(() => {
-    const lat = selectedLgu?.latitude  || 14.1350;
-    const lng = selectedLgu?.longitude || 121.4363;
+    const lat = activeLgu?.latitude  || 14.1350;
+    const lng = activeLgu?.longitude || 121.4363;
     return { latitude: lat, longitude: lng, latitudeDelta: 0.022, longitudeDelta: 0.022 };
-  }, [selectedLgu]);
+  }, [activeLgu]);
 
   const boundaryCoords = useMemo(() => {
-    if (selectedLgu?.boundary_geojson?.coordinates?.[0]) {
+    if (activeLgu?.boundary_geojson?.coordinates?.[0]) {
       try {
-        return selectedLgu.boundary_geojson.coordinates[0].map((c: any) => ({
+        return activeLgu.boundary_geojson.coordinates[0].map((c: any) => ({
           longitude: c[0], latitude: c[1],
         }));
       } catch {}
     }
-    const lat = selectedLgu?.latitude  || 14.1350;
-    const lng = selectedLgu?.longitude || 121.4363;
+    const lat = activeLgu?.latitude  || 14.1350;
+    const lng = activeLgu?.longitude || 121.4363;
     const off = 0.018;
     return [
       { latitude: lat + off, longitude: lng - off },
@@ -299,7 +305,7 @@ export function MapExplorerScreen() {
       { latitude: lat - off, longitude: lng - off },
       { latitude: lat + off, longitude: lng - off },
     ];
-  }, [selectedLgu]);
+  }, [activeLgu]);
 
   // ── Filtering ────────────────────────────────────────────────────────────
   const filteredFacilities = useMemo(() => {
@@ -420,7 +426,7 @@ export function MapExplorerScreen() {
           <View>
             <Text style={[styles.headerSubtitle, { color: T.textMuted }]}>AGAPP EXPLORER</Text>
             <Text style={[styles.headerTitle, { color: T.text }]}>
-              {selectedLgu?.name.replace('Municipality of ', '') || 'Liliw'} Map
+              {activeLgu?.name?.replace('Municipality of ', '') || 'Liliw'} Map
             </Text>
           </View>
         </View>

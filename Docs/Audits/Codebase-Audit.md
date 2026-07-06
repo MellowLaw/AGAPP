@@ -6,6 +6,31 @@
 
 ---
 
+## 🔄 Update — 2026-07-06 (re-verifying the 2026-07-05 security sweep found one missed spot)
+
+User asked to confirm the 2026-07-05 security sweep (API deletion, notifications RLS)
+was actually still fixed, not just documented as fixed. Re-checked live rather than
+trusting the docs: `app.controllers.ts`/`app.module.ts` still show only the 2 guarded
+controllers; `schema.sql` still shows no client INSERT policy on `notifications` and
+the mark-as-read UPDATE policy present (a live DB cross-check via the Supabase MCP
+failed — connector unresponsive at the time — `schema.sql` is the synced source of
+truth so this is treated as confirmed, not blindly assumed). Personnel status tabs
+still real.
+
+One gap found: the sweep's "six admin pages" `lguIdFromName()` conversion missed a
+**seventh** spot — `apps/admin/src/app/super/lgus/page.tsx`'s `handleAdd()` — which
+had (and still had, until fixed just now) its own different, buggy slugify
+(`name.split(',')[0]...`, dropping everything after the first comma) writing directly
+into the `lgus.id` primary key. `"Pila, Laguna"` → `"pila"` instead of the
+`lguIdFromName()`-consistent `"pila-laguna"`, which would silently break every
+`lgu_id`-scoped query for a newly-added LGU. Fixed by switching to `lguIdFromName()`,
+same as the other six pages. Not a security issue — a data-consistency bug that only
+would have surfaced the next time someone added a new municipality through that
+screen. `tsc --noEmit` clean; verified the id-generation logic directly for all 5
+addable municipalities (no super-admin browser session was available to click through
+the live form — the browser had a personnel session, correctly blocked by
+`middleware.ts`'s role guard from reaching `/super`).
+
 ## 🔄 Update — 2026-07-06 (BOTH ML detectors — pothole + stray pets — LIVE and verified)
 
 The "biggest thesis risk" stub is now real, working code for both categories — actually

@@ -87,28 +87,26 @@ export function LoginScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email: cleanEmail, 
-        password 
+      // Profile creation lives in a DB trigger (handle_new_citizen_signup, on
+      // auth.users) now, not here — a client-side insert right after signUp()
+      // raced against session propagation (RLS 42501 the moment there's any
+      // gap, e.g. email confirmation enabled). The trigger reads full_name
+      // from this metadata and is atomic with the auth row, so it can't race.
+      const fullName = `${cleanFirstName} ${cleanLastName}`;
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: { data: { full_name: fullName } },
       });
       if (error) throw error;
-      
-      if (data.user) {
-        // Create user profile securely
-        const fullName = `${cleanFirstName} ${cleanLastName}`;
-        const { error: profileError } = await supabase.from('users').insert({
-          id: data.user.id,
-          email: cleanEmail,
-          name: fullName,
-          role: 'CITIZEN'
-        });
-        
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // If profile fails, they might need to complete it later, but auth succeeded.
-        } else {
-          Alert.alert('Success', 'Account created successfully!');
-        }
+
+      if (data.session) {
+        Alert.alert('Success', 'Account created successfully!');
+      } else {
+        // No session yet means the project requires email confirmation —
+        // the profile row still gets created by the trigger either way, but
+        // the citizen can't log in until they confirm.
+        Alert.alert('Check your email', 'Please confirm your email address, then sign in.');
       }
     } catch (err: any) {
       Alert.alert('Registration Failed', err.message);

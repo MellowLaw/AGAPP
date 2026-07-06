@@ -9,6 +9,7 @@ import { Search } from '@/components/ui/Search';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
+import { lguIdFromName } from '@/lib/lgu';
 import { CaretDown, Eye, Power, UserSwitch, Download } from '@phosphor-icons/react';
 
 interface Lgu {
@@ -114,7 +115,7 @@ export default function SuperLgusPage() {
   );
 
   const handleAdd = async (name: string) => {
-    const id = name.split(',')[0].toLowerCase().replace(/\s+/g, '-');
+    const id = lguIdFromName(name);
     const newLgu: Lgu = {
       id,
       name,

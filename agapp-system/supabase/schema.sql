@@ -672,6 +672,39 @@ CREATE POLICY "Users can update their own record" ON users
 CREATE POLICY "Users can insert their own record" ON users
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+-- Citizen signup profile creation (2026-07-06): a SECURITY DEFINER trigger on
+-- auth.users, not a client-side insert. The mobile app used to insert this
+-- row itself right after auth.signUp() — if there was any gap before a
+-- session existed (email confirmation enabled, or just propagation lag), that
+-- insert ran as anon and violated the INSERT policy above (auth.uid() = id is
+-- null for anon). This trigger is atomic with the auth row and bypasses
+-- RLS/timing entirely. Fires for every auth.users insert, so it always writes
+-- role='CITIZEN' — staff accounts are created via /api/create-staff instead
+-- (service role, writes both rows atomically, never goes through this path).
+CREATE OR REPLACE FUNCTION public.handle_new_citizen_signup()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''), split_part(NEW.email, '@', 1)),
+    'CITIZEN'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_citizen_signup();
+
 -- 2. Policies for Reports Table
 CREATE POLICY "Allow Citizens to read reports in their LGU" ON reports FOR SELECT USING (
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.lgu_id = reports.lgu_id)

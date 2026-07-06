@@ -20,6 +20,15 @@
 
 ## 🟠 Next (high value)
 
+- [ ] **Delete `apps/field-officer/`** — CUT per user decision 2026-07-06 (see
+      `Plan-Personnel-and-FieldOfficer.md`); until deleted, treat it as non-existent
+      (no features, no references). Removal checklist is in the plan's "Cleanup once
+      deletion happens" section. Keep the `lookup_claim_code`/`release_service_request`
+      RPCs — admin web uses them.
+- [ ] **Personnel-web trio (pending user go/no-go)** — real assignment + internal
+      notes + attach resolution proof; the manuscript's Fig. 34 / UAT Table 3 promise
+      these exact features. Full breakdown in `Plan-Personnel-and-FieldOfficer.md`.
+
 - [ ] **Admin dashboard chart ideas, being done one at a time (user-directed):**
       real turnaround time — done above; still to build: barangay hotspot ranking
       (unresolved reports by barangay, no schema change needed), citizen
@@ -46,6 +55,67 @@
 
 ## ✅ Done
 
+- [x] **Fixed three mobile bugs from co-dev's iOS test run (2026-07-06)** — user
+      reported (via Expo logs screenshot): citizen account creation broken, iOS map
+      pins not loading, and a nav crash, then asked to check login/logout too.
+      1. **Signup broken (`42501` RLS error).** `LoginScreen.tsx`'s `handleRegister`
+         inserted the `public.users` profile row client-side immediately after
+         `auth.signUp()`, with no check for whether a session actually existed yet.
+         Any gap before one does (email confirmation enabled, or just propagation
+         lag) means the insert runs as anon — `auth.uid() = id` in the INSERT policy
+         evaluates false since `auth.uid()` is null for anon, hence
+         `new row violates row-level security policy for table "users"`. Fixed the
+         root cause, not just the symptom: moved profile creation into a
+         `SECURITY DEFINER` trigger `handle_new_citizen_signup()` on `auth.users`
+         (migration `citizen_signup_profile_trigger`, applied live + `schema.sql`
+         synced) — atomic with the auth row, immune to RLS/session timing
+         regardless of email-confirmation settings. Confirmed the guard trigger
+         `guard_verification_columns` only fires on `UPDATE`, not `INSERT`, so no
+         conflict. `LoginScreen.tsx` now passes `full_name` via `signUp()`'s
+         `options.data` (trigger reads it) and no longer inserts `users` itself;
+         also fixed the success message to distinguish "account created" (session
+         present) from "check your email to confirm" (session null) instead of
+         always claiming success.
+      2. **Guest tapping the Home notification bell crashed the navigator**
+         (`The action 'NAVIGATE' with payload {"name":"Notifications"} was not
+         handled by any navigator`). Root cause: `HomeScreen.tsx`'s bell button had
+         no session check, but `AppNavigator.tsx` only registers the
+         `Notifications` screen in the branch where `session && selectedLgu` are
+         both truthy — guests hit a screen that doesn't exist in their tree. Fixed
+         by gating the bell the same way every other tab already does (`AuthGate`
+         pattern): guests get a "Sign in to view your notifications" prompt instead
+         of a crash.
+      3. **iOS map showed no pins.** `MapExplorerScreen.tsx` read only `selectedLgu`
+         (set after login+profile) despite the Map tab being intentionally
+         guest-accessible per `AuthGate`'s own copy ("browse Home, News, and the Map
+         without an account"). No `guestLgu` fallback meant `facilities` never
+         fetched for a guest — likely the same root cause as bug #1 in the actual
+         test session (broken signup → no profile → guest state → empty map, not a
+         platform-specific Apple Maps rendering bug). Fixed by adding the same
+         `activeLgu = selectedLgu || guestLgu || {...fallback}` pattern already
+         established in `HomeScreen.tsx`, replacing every `selectedLgu` reference
+         in the file's facilities fetch, region/boundary calculation, and header
+         title.
+      4. **Login/logout checked and confirmed working** — `handleLogin`
+         (`signInWithPassword`) and `AuthContext.signOut()` (`supabase.auth.signOut()`
+         + full local state reset) were both already correct; not part of the bug.
+      Verified: `tsc --noEmit` clean in `apps/mobile` after all three fixes; the new
+      trigger confirmed live via `pg_trigger` (`tgenabled = 'O'`).
+- [x] **Fixed: `super/lgus` "Add LGU" used a different, buggy hand-rolled slugify
+      (2026-07-06)** — found while re-verifying the 2026-07-05 security sweep's claim
+      that "six admin pages" were all converted to `lguIdFromName()`. A seventh spot,
+      `apps/admin/src/app/super/lgus/page.tsx`'s `handleAdd()`, was missed: it derived
+      the new LGU's id with `name.split(',')[0].toLowerCase().replace(/\s+/g,'-')`,
+      which drops everything after the first comma. For `"Pila, Laguna"` this produced
+      `"pila"` and wrote that as the literal `lgus.id` primary key — inconsistent with
+      `lguIdFromName()`'s `"pila-laguna"` used by every other lookup in the app, which
+      would have silently broken that LGU's data (reports/requests/facilities queries
+      scoped by `lgu_id`) the moment someone added a new municipality through this
+      screen. Fixed by importing and using `lguIdFromName()` like the other six pages.
+      Not a security issue — a data-consistency bug. Verified: `tsc --noEmit` clean;
+      confirmed the id-generation logic directly (`Pila, Laguna` → `pila-laguna` etc.
+      for all 5 addable municipalities) since no super-admin browser session was
+      available to click through the live form.
 - [x] **Fixed: ML "not detected" result was invisible in both admin report views
       (2026-07-06)** — user tested a real pothole report after the ML rollout below and
       saw no AI indicator at all, reported as "still no implementation of the ai/ml."

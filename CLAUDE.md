@@ -25,7 +25,7 @@ The **actual system is in `agapp-system/`**. Other top-level folders are docs:
 |---|---|---|
 | `apps/mobile` | Expo SDK 54, RN 0.81, **React 19**, TS | Citizen app (reports, services, forum, map, chatbot, ID verification) |
 | `apps/admin` | Next.js 14 (App Router), **React 18**, Tailwind | LGU + super-admin dashboard |
-| `apps/field-officer` | Expo SDK 54, RN 0.81 | Officer task app (minimal) |
+| `apps/field-officer` | Expo SDK 54, RN 0.81 | ⚠️ DEPRECATED 2026-07-06 — slated for deletion; treat as non-existent, never build for it or cite it (see `Docs/Planning/Plan-Personnel-and-FieldOfficer.md`) |
 | `apps/api` | NestJS 10 + Express | Chatbot + push only (plus the guarded `verify-image` ML slot) |
 | `packages/shared` | TS + Zod | Shared types (currently under-used) |
 | `supabase/` | Postgres + PostGIS | Schema, seed, RLS, storage, migrations (pgvector removed) |

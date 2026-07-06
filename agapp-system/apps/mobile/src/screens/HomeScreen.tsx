@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export function HomeScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
-  const { profile, selectedLgu, guestLgu } = useAuth();
+  const { session, profile, selectedLgu, guestLgu } = useAuth();
   const [activeTab, setActiveTab] = useState<'for_you' | 'updates' | 'activity'>('for_you');
   const [news, setNews] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
@@ -127,7 +127,19 @@ export function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerCircleBtn, { backgroundColor: T.cardAlt, borderColor: T.border }]}
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={() => {
+              // 'Notifications' only exists in the navigator when logged in
+              // with an LGU selected (see AppNavigator's session/selectedLgu
+              // branches) — guests hit "NAVIGATE not handled" without this gate.
+              if (!session || !selectedLgu) {
+                Alert.alert('Sign in required', 'Sign in to view your notifications.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+                ]);
+                return;
+              }
+              navigation.navigate('Notifications');
+            }}
           >
             <Ionicons name="notifications-outline" size={20} color={T.text} />
             {unreadCount > 0 && (
