@@ -1,6 +1,6 @@
 # AGAPP — To-Do
 
-> **Updated:** 2026-07-04 · Living list. Synthesized from the
+> **Updated:** 2026-07-05 · Living list. Synthesized from the
 > [Codebase-Audit](../Audits/Codebase-Audit.md) and current work.
 
 ## 🔴 Now (active)
@@ -28,32 +28,107 @@
       queue ("X reports overdue right now"), personnel workload chart (needs
       `service_requests.assigned_personnel` to actually be set when staff click
       "Start Processing" — it exists in the schema but nothing writes to it yet).
-- [ ] ⏸️ **Pothole ML — explicitly DEFERRED, do not implement yet** (user direction,
-      2026-07-03). The fake hardcoded values are gone; the model now plugs into ONE
-      boundary: `apps/mobile/src/utils/mlAnalysis.ts` (on-device) or the API's
-      `POST /reports/verify-image` (server-side), both currently returning
-      null = "not analyzed". Admin's "AI Verified" badge lights up automatically
-      once real `ml_confidence`/`ml_verified` are written — nothing else needs to
-      change when this is picked back up. See
-      [Plan-ML-Pothole-Detection](../Planning/Plan-ML-Pothole-Detection.md).
-      If a usable model/dataset exists for the other categories (drainage, poles,
-      stray pets), the same boundary supports them — pothole first.
+- [ ] **Stray-pets reporting UI — `Plan-StrayPets-Reporting.md`'s "Last Seen" framing +
+      AI-badge wording** — a frontend-only task (relabel stray-report cards as
+      "Last Seen: [barangay] · [relative time]", stray-specific AI badge text). The ML
+      side is now DONE (see below); this UI polish is independent and unblocked.
 - [ ] Reconcile model name: code says "YOLOv11", paper says "YOLOv8n".
-- [ ] Decide audit logging: move into DB triggers (clients bypass the NestJS API).
-      Confirmed dead code, not a live bug: `apps/api/src/app.controllers.ts`
-      `writeAuditLog()` hardcodes `ip_address: '127.0.0.1'` and demo user ids
-      (`usr-super`/`usr-liliw-admin`) — but the LGU provision/subscription/feature-flags
-      endpoints that call it are never hit by the admin frontend (which writes directly
-      to Supabase's `lgus` table, confirmed via grep of `super/lgus/page.tsx`); `audit_logs`
-      has 0 rows in the live DB. Don't patch the hardcoded values in place — if audit
-      logging is ever revived, do it via the DB-trigger approach above instead of fixing
-      this unreachable NestJS path.
+- [ ] Decide audit logging: implement via DB triggers if wanted (clients talk directly
+      to Supabase, so API-side logging can never see their actions). The old dead
+      `writeAuditLog()` path (hardcoded `127.0.0.1` + demo user ids) was **deleted
+      2026-07-05** along with the dead API controllers that called it — there is no
+      audit logging code left at all; `audit_logs` table remains, empty, for a future
+      trigger-based implementation.
 - [ ] Replace client-generated reference numbers (`Math.random`) with DB sequences —
       DB side **done** (sequences + BEFORE INSERT trigger deployed 2026-06-30);
       mobile screens updated to omit `reference_number` and read it back via `.select()`.
 
 ## ✅ Done
 
+- [x] **Stray-pets ML: deployed, wired, and VERIFIED LIVE (2026-07-06)** — no
+      training needed (stock COCO-pretrained YOLOv8n already detects dog/cat).
+      Deployed the stock `yolov8n.pt` to Roboflow Hosted as a vessel project
+      (`mrlaws-workspace/agapp-stray-pets`, version 2) — most of the Roboflow-side
+      setup (create project, upload+annotate 10 filler images, generate version,
+      set active model) was automated directly via the Roboflow MCP; the only
+      user-run step was a 3-cell Kaggle notebook to download the stock weights and
+      call `deploy()`. `apps/api` `verify-image` refactored to a small `ML_MODELS`
+      map keyed by category: pothole uses its single-class model (any detection =
+      valid); `stray_animal` calls the COCO model and **keeps only `dog`/`cat`
+      predictions** (people/cars in a stray photo don't validate it — the anti-troll
+      check). `apps/mobile/utils/mlAnalysis.ts` now sends `stray_animal` to the API
+      too. New env var `ROBOFLOW_STRAYPETS_MODEL_URL` (in `.env` +
+      documented in `.env.example`). **Verified live via the real endpoint:** a dog
+      photo → `dog` detected 0.49 → `mlVerified:true`; a people/bus photo → filtered
+      to zero dog/cat → `mlVerified:false` (correctly rejects a non-animal photo).
+      Both apps typecheck clean, API boots clean.
+      **Kaggle gotcha logged for reuse:** don't call `YOLO("yolov8n.pt")` in your own
+      cell just to re-save the file — the old pinned `ultralytics==8.0.196` +
+      modern PyTorch `weights_only` default fights you (unpickling errors, and
+      monkey-patching `torch.load` recurses on cell re-runs). The file is already a
+      finished artifact; just `urllib.request.urlretrieve` it and hand it to
+      Roboflow's `deploy()`, which loads it correctly itself.
+- [x] **Pothole ML: trained, deployed, wired, and VERIFIED LIVE end-to-end
+      (2026-07-06)** — the admin "AI Verified" badge is real now, not a stub.
+      `best.pt` (YOLOv8n, RSDD + New Pothole Detection, ~15.4k imgs) deployed to
+      Roboflow Hosted (project `mrlaws-workspace/agapp-y5jbd`). Code side:
+      `apps/api` `ReportController.verifyImage` calls it for real (guarded, `401`
+      without auth confirmed); `apps/mobile/utils/mlAnalysis.ts` calls that
+      endpoint instead of stubbing nulls; `ReportsScreen.tsx` passes the
+      *uploaded* photo URL, not the local device URI (bug fixed in passing).
+      **Three real bugs found and fixed during deployment/testing, not just
+      planning:**
+      1. Roboflow's `deploy()` needs the specific pinned `ultralytics==8.0.196`
+         — a newer version installed via plain `pip install ultralytics` gets
+         rejected with a version-mismatch prompt.
+      2. `deploy()` expects weights at `<model_path>/weights/best.pt` by
+         default (Ultralytics' standard run-folder layout) — fixed by passing
+         `filename="best.pt"` explicitly since the uploaded checkpoint had no
+         `weights/` wrapper folder, plus copying out of Kaggle's read-only
+         `/kaggle/input/` into `/kaggle/working/` first (Roboflow's export
+         needs to *write* a `model_artifacts.json` sidecar alongside the weights).
+      3. **The actual live-testing blocker:** a fresh Roboflow project's
+         deployment has no "selected model" by default even after a successful
+         model upload (dashboard showed "Current Model: None") — found and
+         fixed directly via the Roboflow MCP (`project_deployment_set_model`),
+         confirmed via `project_deployment_get` (`"status":"deployable"`).
+      4. Confidence threshold is a **0–1 fraction, not 0–100** — the NestJS code
+         initially had `confidence=40`; fixed to `confidence=0.4` after Roboflow's
+         own (masked) error response revealed the real request shape.
+      5. `apps/api/.env`'s `ROBOFLOW_POTHOLE_MODEL_URL` was left as the literal
+         `.env.example` placeholder (`your-project-slug`) — this, not the API
+         key, was why the first live test 404'd. Confirmed real value:
+         `https://serverless.roboflow.com/agapp-y5jbd/1`.
+      **Verified with a real test image from the training set:** two potholes
+      correctly detected at 0.63/0.61 confidence, response shape matches the
+      NestJS parsing logic exactly. Next real pothole report with a photo gets
+      genuine `ml_confidence`/`ml_verified` — nothing else to build.
+
+- [x] **2026-07-05 security sweep (while the pothole model trains on Kaggle)** — full
+      details in the Codebase-Audit's 2026-07-05 block. Highlights:
+      1. **API attack surface deleted:** only `POST /api/chatbot/ask` was ever called by
+         any client, yet 7 controllers (~20 endpoints) were exposed with NO auth guard on
+         a service-role key — unauthenticated RLS-bypassing writes once deployed. All dead
+         controllers deleted (auth, lgus, reports CRUD, services, forum, audit-logs);
+         kept chatbot + a now-guarded `verify-image` ML slot. Dropped
+         `@google/generative-ai` dep, `GEMINI_API_KEY`, orphaned `storage.service.ts`,
+         and the fake-IP `writeAuditLog()`. API boots clean with exactly 2 guarded routes.
+      2. **notifications RLS hardened** (migration `notifications_rls_hardening`):
+         the `WITH CHECK (true)` INSERT policy (anyone could forge notifications for
+         anyone) dropped — notify_* triggers are SECURITY DEFINER now; and the MISSING
+         UPDATE policy added, fixing mobile mark-as-read which had been silently
+         updating 0 rows forever. Also dropped the 3 public-bucket listing policies
+         (advisor 0025; buckets hold 0 objects, nothing calls .list()).
+      3. **Personnel reports tabs fixed:** fake "Assigned to me / My office" (no-op AND
+         unimplementable — schema has no per-personnel assignment) → real status tabs
+         (All/Open/In Progress/Done), verified filtering live (9/4/2/3).
+      4. **Legacy cleanup:** 6 admin pages' hand-rolled LGU slugify → `lguIdFromName()`;
+         unused `LoadingSpinner.tsx` deleted; hardcoded `lguName` prop removed from
+         personnel reports. CLAUDE.md architecture facts corrected (API = chatbot + push
+         only; forum moderation = DB trigger).
+      Still-open honest stubs listed at the end of the audit block (ProfileScreen dead
+      buttons, forum follow/copy-link no-ops, news attachments `[]`, assignment history
+      not persisted).
 - [x] **`MISTRAL_API_KEY` configured in `apps/api/.env`** — verified present with a value
       (2026-07-04, key-name check only, value never read). Chatbot LLM fallback is live.
 - [x] **`verification_setup.sql` confirmed fully applied to the live DB** — all pieces

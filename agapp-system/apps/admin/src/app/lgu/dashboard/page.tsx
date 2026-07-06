@@ -9,6 +9,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import { ReportsMap, type ReportPin } from '@/components/map';
 import { Warning, FileText, CheckCircle, ArrowRight, MapPin, IdentificationBadge } from '@phosphor-icons/react';
 
@@ -66,7 +67,7 @@ export default function DashboardPage() {
   const params = useSearchParams();
   const lguParam = params?.get('lguName') || 'Liliw, Laguna';
   const reportsHref = lguParam ? `/lgu/reports?lguName=${encodeURIComponent(lguParam)}` : '/lgu/reports';
-  const lguId = lguParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
+  const lguId = lguIdFromName(lguParam);
   const [reportRows, setReportRows] = useState<any[]>([]);
   const [serviceRows, setServiceRows] = useState<any[]>([]);
   const [pendingVerifications, setPendingVerifications] = useState(0);

@@ -53,10 +53,22 @@ const mapDbCategoryToLabel = (category: string): string => {
   }
 };
 
+type StatusTab = 'all' | 'open' | 'in_progress' | 'done';
+
+const TAB_STATUSES: Record<StatusTab, Report['status'][] | null> = {
+  all: null,
+  open: ['pending', 'acknowledged'],
+  in_progress: ['in_progress'],
+  done: ['resolved', 'rejected'],
+};
+
 export default function PersonnelReportsPage() {
   const [items, setItems] = useState<Report[]>([]);
   const [active, setActive] = useState<Report | null>(null);
-  const [tab, setTab] = useState<'assigned' | 'office' | 'all'>('assigned');
+  // Status tabs, not "Assigned to me / My office" — reports have no per-personnel
+  // assignment in the schema (users aren't linked to offices), so those tabs could
+  // never filter anything. Status is the real triage axis for a work queue.
+  const [tab, setTab] = useState<StatusTab>('all');
   const [q, setQ] = useState('');
   const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
@@ -119,8 +131,9 @@ export default function PersonnelReportsPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const statuses = TAB_STATUSES[tab];
     return items.filter(i =>
-      (tab === 'all' || tab === 'assigned' || tab === 'office') &&
+      (!statuses || statuses.includes(i.status)) &&
       (i.id + i.category + i.location).toLowerCase().includes(q.toLowerCase())
     );
   }, [items, q, tab]);
@@ -159,7 +172,7 @@ export default function PersonnelReportsPage() {
   };
 
   return (
-    <DashboardLayout role="lgu-personnel" lguName="Liliw, Laguna" title="Issue Reports">
+    <DashboardLayout role="lgu-personnel" title="Issue Reports">
       <ToastContainer />
       {loading && (
         <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-md">
@@ -176,9 +189,10 @@ export default function PersonnelReportsPage() {
           <Card>
             <CardHeader title="Reports" action={<Search value={q} onChange={setQ} className="w-64" />} />
             <div className="flex items-center gap-2 px-2 mb-3">
-              <button onClick={() => setTab('assigned')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='assigned'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>Assigned to me</button>
-              <button onClick={() => setTab('office')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='office'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>My office</button>
               <button onClick={() => setTab('all')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='all'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>All</button>
+              <button onClick={() => setTab('open')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='open'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>Open</button>
+              <button onClick={() => setTab('in_progress')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='in_progress'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>In Progress</button>
+              <button onClick={() => setTab('done')} className={`px-3 py-1.5 rounded-full text-sm ${tab==='done'?'bg-text-primary text-bg':'bg-surface border border-theme text-text-primary'}`}>Done</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-2">
               {filtered.map(r => (

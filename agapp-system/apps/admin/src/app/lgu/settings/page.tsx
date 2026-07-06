@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import { 
   Gear,
   User,
@@ -39,10 +40,7 @@ export default function SettingsPage() {
 
   // Retrieve LGU Identifier
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = useMemo(
-    () => lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-'),
-    [lguNameParam]
-  );
+  const lguId = useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
 
   // General LGU Details States
   const [lguName, setLguName] = useState('');

@@ -35,23 +35,18 @@ WITH CHECK (
   AND (storage.extension(name) = 'jpg' OR storage.extension(name) = 'jpeg' OR storage.extension(name) = 'png')
 );
 
--- Policy: Allow public to view report photos
-CREATE POLICY "Allow public to view report photos"
-ON storage.objects FOR SELECT
-TO anon
-USING (bucket_id = 'report-photos');
+-- NOTE (2026-07-05): the three "Allow public to view …" SELECT policies that
+-- used to cover the public buckets (report-photos, service-attachments,
+-- facility-images) were DROPPED. Public buckets serve object URLs without any
+-- storage.objects SELECT policy — those policies only enabled LISTING every
+-- file in the bucket (Supabase advisor warning 0025), and no app code calls
+-- .list()/.download() on these buckets. Don't re-add them.
 
 -- Policy: Allow authenticated users to upload to service-attachments
 CREATE POLICY "Allow authenticated uploads to service-attachments"
 ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (bucket_id = 'service-attachments');
-
--- Policy: Allow public to view service attachments
-CREATE POLICY "Allow public to view service attachments"
-ON storage.objects FOR SELECT
-TO anon
-USING (bucket_id = 'service-attachments');
 
 -- Policy: Allow users to delete their own uploads
 CREATE POLICY "Allow users to delete own uploads"
@@ -84,12 +79,6 @@ WITH CHECK (
     WHERE u.id = auth.uid() AND u.role IN ('LGU_ADMIN', 'SUPER_ADMIN')
   )
 );
-
--- Policy: Facility images are publicly viewable (mobile map shows them)
-CREATE POLICY "Allow public to view facility images"
-ON storage.objects FOR SELECT
-TO anon
-USING (bucket_id = 'facility-images');
 
 -- Policy: Admins can delete facility images (cleanup when a facility is removed)
 CREATE POLICY "Allow admin deletes on facility-images"

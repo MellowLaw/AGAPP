@@ -173,6 +173,11 @@ CREATE OR REPLACE TRIGGER trg_lgu_services_touch_updated_at
 -- below must always set it, or the insert fails with 23502 (this was a
 -- real, previously-silent bug fixed on 2026-07-02: every citizen status
 -- notification had been failing since these triggers were first created).
+-- NOTE 2 (2026-07-05): every notify_* trigger function is SECURITY DEFINER so
+-- the insert bypasses RLS — that's what allowed removing the wide-open
+-- "System can insert notifications" WITH CHECK (true) policy (any logged-in
+-- user could forge notifications for anyone). Keep new notification triggers
+-- SECURITY DEFINER + pinned search_path, and never re-add a client INSERT policy.
 CREATE OR REPLACE FUNCTION notify_report_status_change()
 RETURNS trigger AS $$
 DECLARE
@@ -200,7 +205,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION notify_service_status_change()
 RETURNS trigger AS $$
@@ -230,7 +235,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE TRIGGER trigger_notify_report_status
   AFTER UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION notify_report_status_change();
@@ -446,7 +451,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE TRIGGER trigger_notify_staff_forum_post_flagged
   AFTER INSERT OR UPDATE ON forum_posts FOR EACH ROW EXECUTE FUNCTION notify_staff_forum_post_flagged();
@@ -471,7 +476,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE TRIGGER trigger_notify_staff_forum_comment_flagged
   AFTER INSERT OR UPDATE ON forum_comments FOR EACH ROW EXECUTE FUNCTION notify_staff_forum_comment_flagged();
@@ -755,7 +760,15 @@ CREATE POLICY "Users can read their own notifications" ON notifications FOR SELE
   auth.uid() = user_id
 );
 
-CREATE POLICY "System can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
+-- NO client INSERT policy on purpose (the old `WITH CHECK (true)` one let any
+-- logged-in user forge notifications for anyone, incl. fake staff notices —
+-- removed 2026-07-05). The only writers are the notify_* triggers (SECURITY
+-- DEFINER, bypass RLS) and the API push service (service key, bypasses RLS).
+
+-- Citizens mark their own notifications read (mobile NotificationsScreen).
+-- Without this UPDATE policy, mark-as-read silently updated 0 rows.
+CREATE POLICY "Users can update their own notifications" ON notifications
+FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Staff notification bell: a staff row is visible to a user whose role (+ lgu,
 -- except the cross-LGU super admin rollup) matches the row's audience.

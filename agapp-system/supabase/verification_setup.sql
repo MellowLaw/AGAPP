@@ -303,7 +303,11 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- SECURITY DEFINER because notifications has no client INSERT policy (2026-07-05
+-- hardening) — the citizen whose insert fires this trigger couldn't write the
+-- notification row otherwise.
+REVOKE EXECUTE ON FUNCTION notify_staff_new_verification() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS trigger_notify_staff_new_verification ON verification_requests;
 CREATE TRIGGER trigger_notify_staff_new_verification

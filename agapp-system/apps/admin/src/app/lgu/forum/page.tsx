@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { TextArea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import {
   ChatCircle,
   User,
@@ -37,10 +38,7 @@ export default function ForumPage() {
   const params = useSearchParams();
 
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = React.useMemo(
-    () => lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-'),
-    [lguNameParam]
-  );
+  const lguId = React.useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
 
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);

@@ -10,6 +10,7 @@ import { TextArea } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import { 
   Newspaper,
   Plus,
@@ -87,7 +88,7 @@ export default function NewsPage() {
 
   const params = useSearchParams();
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
+  const lguId = lguIdFromName(lguNameParam);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {

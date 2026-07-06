@@ -10,6 +10,7 @@ import { ServiceStatusBadge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import {
   User,
   Calendar,
@@ -81,7 +82,7 @@ export default function ServicesPage() {
 
   const params = useSearchParams();
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-');
+  const lguId = lguIdFromName(lguNameParam);
 
   const fetchRequests = async () => {
     setLoading(true);

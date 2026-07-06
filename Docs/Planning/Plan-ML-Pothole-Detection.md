@@ -1,177 +1,387 @@
-# Plan — ML Detection (Pothole + Stray Pets)
+# Plan — ML Detection (Pothole + Stray Pets) — Step-by-Step Execution Guide
 
-> **Status:** 🔵 Strategy + actionable dataset/training/connection guide · not started in code · _living doc._
-> **Updated:** 2026-07-04
-> **Scope:** Two detectors — **pothole** (road damage) and **stray pets** (dog/cat) —
-> used to help the admin judge whether a citizen report's photo is **valid** (does the
-> photo actually contain the thing being reported). Drives the existing admin
-> "AI Verified" badge (`reports.ml_confidence` / `reports.ml_verified`).
+> **Status:** 🟢 BOTH detectors LIVE (2026-07-06) — pothole (fine-tuned) and stray pets
+> (stock COCO dog/cat, filtered) both deployed to Roboflow Hosted, wired into
+> `verify-image`, and verified end-to-end with real photos.
+> **Updated:** 2026-07-06
+> **Scope:** Two detectors — **pothole** (train a model) and **stray pets** (dog/cat —
+> start with a pretrained model, zero training). Both feed the existing admin
+> "AI Verified" badge via `reports.ml_confidence` / `ml_verified`.
 
----
+## ✅ Pothole — LIVE, verified end-to-end with a real test image (2026-07-06)
 
-## 0. Honest framing (read first)
+- **Model trained on Kaggle** (RSDD CC BY 4.0 + New Pothole Detection CC0, ~15.4k
+  images merged, YOLOv8n, `patience=20` early stop). `best.pt` verified as a genuine,
+  correctly-labeled checkpoint (`DetectionModel` architecture, `names={0:'pothole'}`).
+- **Deployed to Roboflow Hosted**: project `mrlaws-workspace/agapp-y5jbd`, model
+  selected as the active deployment. Confirmed inference URL:
+  `https://serverless.roboflow.com/agapp-y5jbd/1`.
+- **Code wiring done, typechecks/boots clean, verified live:**
+  - `apps/api/src/app.controllers.ts` `ReportController.verifyImage` — real Roboflow
+    call for `category === 'pothole'`, guarded (`@UseGuards(SupabaseAuthGuard)`,
+    confirmed: unauthenticated call → `401`). Missing env config → nulls, never
+    fabricates a value. Native Node 22 `fetch`, no new dep. Confidence sent as a
+    **0–1 fraction** (not 0–100 — an initial `confidence=40` was wrong).
+  - `apps/mobile/src/utils/mlAnalysis.ts` — `analyzeReportPhoto()` calls
+    `POST /reports/verify-image` for real (was a local stub). Same
+    `Authorization: Bearer <access_token>` pattern as `ChatbotScreen.tsx`.
+  - `apps/mobile/src/screens/ReportsScreen.tsx` — **bug fixed in passing**: was
+    passing the photo's local device URI to the ML boundary instead of the
+    uploaded Supabase public URL — would've silently broken once inference needed
+    a fetchable URL. Fixed.
+- **End-to-end test result:** fed the deployed model a real pothole photo from the
+  training set — correctly detected **two potholes at 0.63/0.61 confidence**,
+  response shape matches the NestJS parsing logic exactly. Nothing left to build.
 
-- **Goal = photo-validity verification, NOT stray-vs-owned classification.** No
-  legitimate dataset can teach a model "stray vs. pet" — that's context (collar, leash,
-  owner nearby), not appearance. Promise only: *"the photo verifiably contains a
-  pothole / a dog or cat."* That's exactly what the `verify-image` boundary + the
-  "AI Verified" badge were built for, and it's defensible in the manuscript.
-- **Drainage/canal and damaged-pole reports: no ML for now** (per your direction).
-  Only pothole + stray-pets get a model. The boundary already no-ops the rest.
-- **Train once, deploy either way.** Training a YOLOv8n model produces `best.pt`.
-  From that one file you can go on-device (TFLite) *or* server-side (ONNX / Roboflow
-  hosted). The training below is shared; only §4 (connection) differs.
+### 🪲 Real bugs hit during deploy — useful if you ever retrain/redeploy
+1. Roboflow's `deploy()` requires the exact pinned `ultralytics==8.0.196` — a fresh
+   `pip install ultralytics` grabs a newer version and gets rejected with a
+   version-mismatch prompt (say **n**, reinstall the pinned version, **restart the
+   kernel** so the old import doesn't linger, then retry).
+2. `deploy()` defaults to expecting weights at `<model_path>/weights/best.pt`
+   (Ultralytics' standard run-folder shape) — if your checkpoint doesn't have that
+   `weights/` wrapper, pass `filename="best.pt"` explicitly instead of restructuring
+   folders.
+3. Roboflow's export **writes** a `model_artifacts.json` sidecar next to the
+   weights — this fails with a read-only filesystem error if `model_path` points
+   into Kaggle's `/kaggle/input/` (always read-only). Copy the checkpoint into
+   `/kaggle/working/` first, deploy from there.
+4. **The actual blocker on first live test:** a freshly created Roboflow project's
+   deployment has **no "selected model" by default**, even after a model
+   successfully finishes training/uploading — the Deployments page shows
+   "Current Model: None" until you explicitly pick one. Fixable via the Roboflow
+   MCP's `project_deployment_set_model`, or manually via the dashboard's Models tab.
+5. Double-check `.env` isn't still holding the literal `.env.example` **placeholder
+   text** (`your-project-slug`) — this, not a bad API key, caused the first live
+   test to 404 with "resource not found."
 
----
-
-## 1. Datasets — all verified downloadable + licensed (2026-07-04)
-
-### Pothole
-| Dataset | What / size | License | Download |
-|---|---|---|---|
-| **RDD2022** (backbone, cited benchmark) | 47,420 road images, 6 countries; **pothole = class D40**, 6,544 pothole instances in 3,674 images | **CC BY-SA 4.0** ✅ (verified) | figshare: https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547 (click "Download all" — ~11 GB; the pothole subset is what you keep) |
-| **Kaggle "Potholes-Detection-YOLOv8"** (easy, YOLO-ready) | Pothole images already in YOLOv8 label format | Kaggle open (check the dataset's stated license on the page) | https://www.kaggle.com/datasets/anggadwisunarto/potholes-detection-yolov8 |
-| **Roboflow Universe pothole sets** (YOLO-ready, in-browser) | e.g. "RDD" ~9,888 pothole imgs; "Road Safety" ~3,319 | Per-dataset — **check each one's license before use** | https://universe.roboflow.com/search?q=class:pothole |
-| **Local Liliw/Nagcarlan (self-collected)** — the accuracy booster | 200–400 phone photos of real local roads, annotated free in Roboflow | Yours | You capture; this is what makes it work on PH roads in the demo, and is a legit thesis contribution |
-
-> **Why local matters:** PH asphalt, lighting, and pothole shape differ from
-> Japan/Norway imagery. A Cebu YOLOv8 pothole study did exactly this (≈800 self-captured
-> Cebu road photos + an online set) — https://www.joig.net/2024/JOIG-V12N4-417.pdf.
-> There is **no public PH-specific pothole dataset with a clear license** (checked), so
-> self-collection is the intended path, not a shortcut.
-
-### Stray pets (dog / cat)
-| Option | What | License | Download |
-|---|---|---|---|
-| **COCO-pretrained YOLOv8n (baseline, ZERO training)** | Ultralytics `yolov8n.pt` already detects `dog` + `cat` out of the box with high accuracy | AGPL-3.0 (model) | `pip install ultralytics` → `YOLO('yolov8n.pt')`. For "is there a dog/cat in this photo," this alone may be enough. |
-| **Oxford-IIIT Pet** (fine-tuning) | ~7,390 images, 37 breeds (25 dog + 12 cat), head bounding boxes + trimaps | **CC BY-SA 4.0** ✅ (verified, commercial/research OK) | https://www.robots.ox.ac.uk/~vgg/data/pets/ → `images.tar.gz` + `annotations.tar.gz` (direct) |
-| **Roboflow "Stray Animal Detection"** (YOLO-ready) | ~859 dog/cat street images + a pretrained model | Per-dataset — check license | https://universe.roboflow.com/rep-rxi6f/stray-animal-detection |
-
-> **Recommendation for stray pets:** start with the **COCO-pretrained baseline** — it
-> likely satisfies the validity goal with no training at all. Only fine-tune on Oxford
-> Pet / Roboflow if the demo shows misses on PH street scenes (and to have a training
-> methodology to write about).
-
----
-
-## 2. Where to train (you can run your PC 24/7)
-
-**Primary: Google Colab (free T4 GPU).** YOLOv8n on a few thousand images trains in
-~1–3 hours — well inside Colab free's ~12h session cap. Your 24/7 PC keeps the browser
-tab alive so it doesn't idle-disconnect. Use the official Roboflow notebook (handles
-dataset download + training + export):
-- https://colab.research.google.com/github/roboflow-ai/notebooks/blob/main/notebooks/train-yolov8-object-detection-on-custom-dataset.ipynb
-
-**Dataset hosting/annotation: Roboflow (free workspace).** Upload RDD2022 pothole
-subset + your local photos, annotate/merge, and **export in "YOLOv8" format** — it
-generates the `data.yaml` the Colab notebook needs. This is where your self-collected
-Liliw images get labeled.
-
-**Roboflow Train (optional, one-click cloud):** trains on Roboflow's servers using
-limited free "training credits" (~3). Fine for a first model, but Colab is unlimited and
-free — prefer Colab for iteration, keep Roboflow for dataset + (optionally) deployment.
-
-**Local PC training (only if your PC has an NVIDIA GPU):** `pip install ultralytics`
-then `yolo detect train model=yolov8n.pt data=data.yaml epochs=100 imgsz=640`. Unlimited
-time, fully offline — good if you're iterating a lot. CPU-only works for the nano model
-but is slow; Colab's free GPU is easier.
-
-**Standardize on YOLOv8n** (nano) — matches the manuscript, exports cleanly to
-TFLite/ONNX, tiny. (Also resolves the stale "YOLOv11 vs YOLOv8n" mismatch — old code
-comments say YOLOv11; the paper says YOLOv8n; **use YOLOv8n everywhere**.)
+## ✅ Stray pets — LIVE (2026-07-06)
+Stock COCO-pretrained `yolov8n.pt` (detects `dog`=16 / `cat`=15 out of the box, zero
+training) deployed to Roboflow Hosted as vessel project `mrlaws-workspace/agapp-stray-pets`
+version 2. `verify-image` now handles `stray_animal` via the `ML_MODELS` category map,
+**filtering predictions to dog/cat only** — a photo is "verified" iff it verifiably
+contains a dog or cat (breed/identity irrelevant; the anti-troll validity check from
+`Plan-StrayPets-Reporting.md`). New env var `ROBOFLOW_STRAYPETS_MODEL_URL`. Verified live:
+dog photo → `dog` @0.49 → `mlVerified:true`; a people/bus photo → filtered to zero
+dog/cat → `mlVerified:false`. §3 below is the original recipe (kept for reference).
+**Deploy gotcha:** don't `YOLO()`-load the stock weights in your own Kaggle cell just to
+re-save them — the pinned `ultralytics==8.0.196` + modern PyTorch `weights_only` default
+throws unpickling errors, and monkey-patching `torch.load` recurses on cell re-runs. The
+file is already a finished artifact: `urllib.request.urlretrieve` the official
+`yolov8n.pt` and hand the folder straight to Roboflow's `deploy()`, which loads it right.
 
 ---
 
-## 3. Training output → what you get
+## ▶️ YOU ARE HERE (2026-07-05) — datasets downloaded, go straight to Colab
 
-From Colab/local you get `runs/detect/train/weights/best.pt`. From that:
-- **TFLite (on-device path):** `yolo export model=best.pt format=tflite int8=True` → a
-  small (<5 MB target) quantized model.
-- **ONNX (server path):** `yolo export model=best.pt format=onnx`.
-- **Roboflow hosted (easiest server path):** upload `best.pt` to your Roboflow project
-  (`project.version(N).deploy(model_type="yolov8", model_path="runs/detect/train/")`)
-  and it's served at a URL instantly.
+The user has already chosen + downloaded **two** pothole datasets (in `Datasets/`, YOLOv8
+format). §2 below (search-and-pick) is DONE — these are the concrete picks:
 
-Capture **precision / recall / mAP** from training — the manuscript needs these numbers.
+| Dataset | Folder | Images (train/val/test) | Classes | Pothole idx | License |
+|---|---|---|---|---|---|
+| **RSDD** | `RSDD.v6i.yolov8` | 4299 / 1227 / 614 | 4 (crocodile/lateral/longitudinal crack, pothole) | **3** | **CC BY 4.0** ⚠️ attribution required |
+| **New Pothole Detection** (Smartathon) | `New pothole detection.v2i.yolov8` | 6091 / 2094 / 1055 | 1 (Pothole) | **0** | Public Domain / CC0 |
+
+Combined ≈ **15,400 images** — solid for YOLOv8n.
+Citations/licenses saved in **[ML-Dataset-Citations.md](ML-Dataset-Citations.md)** — copy
+into the paper (RSDD's CC BY 4.0 legally requires the attribution).
+
+**⚠️ Critical: do NOT naively merge the folders.** RSDD is 4-class (pothole = index 3);
+the Smartathon set is 1-class (pothole = index 0). Dumping them together makes RSDD's
+index-0 "crocodile crack" masquerade as "pothole." You must **keep only RSDD's pothole
+class and remap it to 0**, then merge. The script below does exactly that.
+
+**You do NOT need to re-upload to Roboflow, and you do NOT need Roboflow's augmentation.**
+(There's no Roboflow MCP connected on my side anyway.) Since you already picked the data,
+the leanest path is: **download both fresh inside Colab via the Roboflow SDK** (Google's
+fast network — skips uploading 3.7 GB from home), merge with the script, train. YOLOv8's
+built-in augmentation covers the domain-gap mitigation; bump the HSV/brightness args if
+you want more.
+
+### Colab cells (run in order, T4 runtime)
+
+```python
+# 1. Setup
+!pip -q install ultralytics roboflow pyyaml
+from roboflow import Roboflow
+from google.colab import drive; drive.mount('/content/drive')   # so weights survive
+rf = Roboflow(api_key="YOUR_ROBOFLOW_KEY")   # app.roboflow.com → Settings → API key
+# Download the SAME two public datasets straight into Colab (workspace/project/version
+# come from each data.yaml — verified 2026-07-05):
+rf.workspace("rdd").project("rsdd").version(6).download("yolov8", location="/content/RSDD")
+rf.workspace("smartathon").project("new-pothole-detection").version(2).download("yolov8", location="/content/NPD")
+```
+
+```python
+# 2. Merge → single class "pothole" (RSDD pothole idx 3 → 0; NPD already 0)
+import os, glob, shutil, yaml
+RSDD, NPD, OUT = "/content/RSDD", "/content/NPD", "/content/pothole_merged"
+RSDD_POTHOLE_IDX = 3
+KEEP_RSDD_NEGATIVES = True   # crack-only images become backgrounds (helps avoid false positives)
+
+for s in ["train","valid","test"]:
+    os.makedirs(f"{OUT}/{s}/images", exist_ok=True); os.makedirs(f"{OUT}/{s}/labels", exist_ok=True)
+
+def ingest(src, split, prefix, keep_idx):
+    idir, ldir = f"{src}/{split}/images", f"{src}/{split}/labels"
+    if not os.path.isdir(idir): return 0
+    n = 0
+    for img in glob.glob(f"{idir}/*"):
+        stem, ext = os.path.splitext(os.path.basename(img))
+        lbl, out = f"{ldir}/{stem}.txt", []
+        if os.path.exists(lbl):
+            for line in open(lbl):
+                p = line.split()
+                if not p: continue
+                if keep_idx is None or int(p[0]) == keep_idx:   # None = already pothole-only
+                    out.append("0 " + " ".join(p[1:]))
+        if keep_idx is not None and not out and not KEEP_RSDD_NEGATIVES:
+            continue
+        shutil.copy(img, f"{OUT}/{split}/images/{prefix}_{stem}{ext}")
+        open(f"{OUT}/{split}/labels/{prefix}_{stem}.txt","w").write("\n".join(out))
+        n += 1
+    return n
+
+for s in ["train","valid","test"]:
+    a = ingest(NPD,  s, "npd",  None)              # NPD: single-class, keep all as pothole
+    b = ingest(RSDD, s, "rsdd", RSDD_POTHOLE_IDX)  # RSDD: keep only class 3, remap to 0
+    print(s, "NPD:", a, "RSDD:", b)
+
+yaml.dump({"train": f"{OUT}/train/images", "val": f"{OUT}/valid/images",
+           "test": f"{OUT}/test/images", "nc": 1, "names": ["pothole"]},
+          open(f"{OUT}/data.yaml","w"))
+print("merged ->", OUT)
+```
+
+```python
+# 3. Train (saves to Drive so it survives a VM reset)
+!yolo detect train model=yolov8n.pt data=/content/pothole_merged/data.yaml \
+     epochs=100 imgsz=640 patience=20 \
+     project=/content/drive/MyDrive/agapp-runs name=pothole
+# optional domain-gap boost: add  hsv_v=0.5 hsv_s=0.7 degrees=5
+```
+
+```python
+# 4. Metrics for the manuscript (screenshot these — the VM disappears)
+!yolo detect val model=/content/drive/MyDrive/agapp-runs/pothole/weights/best.pt \
+     data=/content/pothole_merged/data.yaml
+# grab: mAP50, mAP50-95, precision, recall + runs .../pothole/ (confusion_matrix.png, results.png)
+```
+
+```python
+# 5. Sanity predict — hits on potholes, silence on clean roads
+!yolo detect predict model=/content/drive/MyDrive/agapp-runs/pothole/weights/best.pt \
+     source="A_TEST_IMAGE_URL_OR_FOLDER" conf=0.4
+```
+
+**Then:** hand me `best.pt` (or deploy it to Roboflow hosted and give me the endpoint+key)
+→ I wire Step 7 (`verify-image` → badge). Stray pets = the 10-min §3 baseline, no training.
+Everything below is the original reference guide.
 
 ---
 
-## 4. How to connect it to AGAPP (the "so we can use it" part)
+## 0. Honest framing (read first, matters for the manuscript)
 
-AGAPP already has the wiring stubs in place. Two deployment paths — **you can train once
-and do either or both.**
-
-### Path A — Server-side (RECOMMENDED to get a working "AI Verified" badge fastest)
-Runs after the citizen submits, on the photo already uploaded to Supabase Storage,
-and writes the result back so the admin badge lights up. No app-bundle bloat, no native
-module pain.
-
-**Where it plugs in:** `apps/api` (NestJS) `POST /reports/verify-image` — the endpoint
-already exists and currently returns nulls. The mobile app already uploads the report
-photo to the `report-photos` bucket and gets a public URL.
-
-**Flow:** mobile submits report → calls `verify-image` with `{ photoUrl, category }`
-→ API runs the pothole model if `category==='pothole'`, the dog/cat model if
-`category==='stray_animal'`, else no-op → API writes `ml_confidence` + `ml_verified`
-onto the `reports` row → admin `lgu/reports` "AI Verified ({conf}%)" badge appears.
-
-Two sub-options for the actual inference:
-- **A1 — Roboflow Hosted Inference (simplest, no model hosting).** After deploying
-  `best.pt` to Roboflow, call it from NestJS:
-  `POST https://serverless.roboflow.com/<MODEL_ENDPOINT>/<VERSION>?api_key=<KEY>` with
-  the image. Free tier is per-call (fine for a capstone demo). SDK/curl docs:
-  https://docs.roboflow.com/inference/hosted-api · repo: https://github.com/roboflow/inference
-  ⚠️ Needs internet + a Roboflow API key in `apps/api/.env` (server-only, never public).
-- **A2 — Self-hosted ONNX in NestJS (no external calls, no per-call limit).** Bundle the
-  exported `.onnx` and run it with `onnxruntime-node`. More setup, but fully in-house and
-  offline-capable on the server. Better if you dislike depending on Roboflow's uptime/quota.
-
-### Path B — On-device TFLite (matches the manuscript's Chapter 2 claim exactly)
-Runs in the phone at capture time, offline, no server. This is what the paper currently
-commits to ("on-device YOLOv8n, TFLite INT8, <5 MB").
-
-**Where it plugs in:** `apps/mobile/src/utils/mlAnalysis.ts` — the boundary is already
-there (`analyzeReportPhoto(category, imageUri)` returns `{confidence, verified}`; today
-it returns nulls). Load the TFLite model via **`react-native-fast-tflite`** and return
-real values for `pothole` / `stray_animal`.
-⚠️ **Requires a custom Expo dev client** — Expo Go can't load native TFLite modules.
-This is the finicky, time-boxed part; budget for it.
-
-### Recommendation
-Train once in Colab. **Do Path A1 first** (Roboflow hosted → NestJS → badge) — fastest
-route to a real, demoable "AI Verified" result across the admin panel. If time allows and
-you want the paper's on-device claim intact, add **Path B**. Whatever actually ships,
-state it accurately in the manuscript (don't claim on-device if only the server runs).
+- **Goal = photo-validity verification, NOT stray-vs-owned classification.** The model
+  answers "does this photo actually contain a pothole / a dog or cat" — that's what the
+  `verify-image` boundary and the admin badge were built for, and it's defensible.
+- **No local data ⇒ state it as a limitation, not a secret.** Foreign road imagery
+  (Japan/India/Norway…) differs from PH roads. Mitigation used here: (1) prefer the
+  **India + China subsets** of RDD2022 (visually closest to PH road conditions),
+  (2) merge 2+ independent pothole datasets for diversity, (3) heavy augmentation
+  (brightness/blur/noise) in Roboflow. In the manuscript, write: *"trained on publicly
+  licensed multi-country road-damage datasets; generalization to Philippine roads is
+  evaluated qualitatively and noted as a limitation / future work (local data collection)."*
+  That sentence turns a weakness into a documented research decision.
+- **Drainage/canal + damaged poles: no ML** (per your direction). The boundary already
+  no-ops those categories.
 
 ---
 
-## 5. Manuscript reconciliation (thesis integrity)
-- **Model name:** paper says YOLOv8n; old code comments say "YOLOv11". Use **YOLOv8n**
-  everywhere.
-- **Dataset:** paper cites RDD2020; **RDD2022 is the licensed successor/superset** — cite
-  RDD2022 (Arya et al., 2024, *Geoscience Data Journal*,
-  https://rmets.onlinelibrary.wiley.com/doi/10.1002/gdj3.260). CC BY-SA 4.0 requires
-  attribution + share-alike — cite it and you're compliant.
-- **Deployment wording:** if you ship server-side (Path A) instead of on-device (Path B),
-  soften the "fully on-device" wording. Server-side is still *real* ML — only the
-  location changes.
-- **Stray pets:** frame as *photo-validity verification via a COCO-pretrained (optionally
-  Oxford-Pet-fine-tuned) YOLOv8n dog/cat detector*, not stray classification.
+## 1. The decision tree (what you actually build)
+
+| Detector | Approach | Training needed? |
+|---|---|---|
+| **Stray pets (dog/cat)** | COCO-pretrained YOLOv8n out of the box — it already detects `dog` (class 16) and `cat` (class 15) | **None.** Do this first — it's a 10-minute win. |
+| **Pothole** | Fine-tune YOLOv8n on free pothole datasets | Yes — the guide below (~1 afternoon + 1–3 h GPU time). |
 
 ---
 
-## 6. Build steps (when we start)
-1. Roboflow workspace: upload RDD2022 pothole subset + local Liliw photos; annotate; export YOLOv8 format.
-2. Colab: train YOLOv8n (pothole). Capture precision/recall/mAP. Repeat for dog/cat only if the COCO baseline underperforms.
-3. Export `best.pt` → (A1) deploy to Roboflow hosted, or (A2) ONNX, or (B) TFLite INT8.
-4. Path A: implement inference call in `apps/api` `verify-image`; write `ml_confidence`/`ml_verified` to the report; trigger it after submit. Verify the admin "AI Verified" badge lights up on a real pothole photo and stays absent on a random photo.
-5. (Optional) Path B: integrate TFLite in `mlAnalysis.ts` via `react-native-fast-tflite` + custom dev client.
+## 2. STEP-BY-STEP — Pothole model
 
-## Sources
-- RDD2022 dataset — https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547 · license via https://datasetninja.com/road-damage-detector · paper https://rmets.onlinelibrary.wiley.com/doi/10.1002/gdj3.260
-- Oxford-IIIT Pet — https://www.robots.ox.ac.uk/~vgg/data/pets/
-- Roboflow stray animal — https://universe.roboflow.com/rep-rxi6f/stray-animal-detection · pothole sets https://universe.roboflow.com/search?q=class:pothole
-- Kaggle pothole YOLOv8 — https://www.kaggle.com/datasets/anggadwisunarto/potholes-detection-yolov8
-- Colab notebook — https://colab.research.google.com/github/roboflow-ai/notebooks/blob/main/notebooks/train-yolov8-object-detection-on-custom-dataset.ipynb
-- Roboflow hosted inference — https://docs.roboflow.com/inference/hosted-api · https://github.com/roboflow/inference
-- Cebu PH YOLOv8 pothole study — https://www.joig.net/2024/JOIG-V12N4-417.pdf
+### Step 1 — Create free accounts (10 min)
+1. **Roboflow** (dataset hosting/merging/augmentation/deploy): https://app.roboflow.com → sign up → create a **Public workspace** (free tier requires public; fine for a capstone) → create project: type **Object Detection**, name e.g. `agapp-pothole`, single class `pothole`.
+2. **Google account** for Colab (you have one).
+3. *(Optional but recommended)* **Kaggle**: https://www.kaggle.com — one dataset lives there, and Kaggle Notebooks are the backup GPU (Step 4 alternative).
+
+### Step 2 — Get the datasets (what to download & what to search)
+
+**2a. Primary (easiest, YOLO-ready): Roboflow Universe.**
+- Go to **https://universe.roboflow.com/search?q=class%3Apothole** (that exact search =
+  "datasets containing a `pothole` class").
+- What to look for on each result page: **image count** (prefer > 3,000), **license**
+  (shown on the dataset page — use CC BY 4.0 / CC BY-SA / Public Domain; skip
+  "unknown"), and preview images that look like real streets (not only close-ups).
+- Known-good picks verified 2026-07-04: the **"RDD"-derived sets (~9,888 pothole
+  images)** and **"Road Safety" (~3,319)** from that search.
+- On a chosen dataset: **Download Dataset → Format: YOLOv8** → either download the zip
+  or (better) click **"Fork/Clone to workspace"** so it lands directly in your Roboflow
+  project for merging.
+
+**2b. Add a second source for diversity (pick ONE of these):**
+- **Kaggle "Potholes Detection YOLOv8"** — already in YOLOv8 label format:
+  https://www.kaggle.com/datasets/anggadwisunarto/potholes-detection-yolov8
+  → `Download` button (needs free login) → you get `images/` + `labels/` + `data.yaml`.
+- **RDD2022 (the citable academic benchmark)** — 47,420 images, 6 countries; potholes
+  are **class `D40`** (6,544 instances). License **CC BY-SA 4.0** ✅.
+  Download: https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547
+  → download only the **India** and **China (MotorBike)** country zips (~2–4 GB, not the
+  full 11 GB) — closest visual match to PH roads. ⚠️ Labels are Pascal-VOC XML, and you
+  only want `D40` — Roboflow handles this: upload the images+XML to your project and it
+  converts automatically; then in the project's class management **remap/keep only
+  `D40` → `pothole`** and delete the other damage classes.
+  *If the XML conversion feels like too much work, skip RDD2022 for training and just
+  **cite it** in the manuscript as the benchmark family your Universe datasets derive
+  from (many of them are RDD-derived anyway — check the dataset description).*
+
+**2c. Merge in Roboflow:** with 2 sources uploaded/forked into the one `agapp-pothole`
+project, make sure every annotation maps to the single class `pothole`
+(Classes tab → rename/merge). Target: **5,000–12,000 images total.** More ≠ better past
+that point on a nano model.
+
+### Step 3 — Generate the training version (Roboflow, 15 min)
+1. Project → **Versions → Create New Version**.
+2. Train/valid/test split: **70/20/10**.
+3. Preprocessing: Resize → **640×640** (fit within).
+4. Augmentations (this is the no-local-data mitigation — be generous):
+   **Brightness ±25%**, **Exposure ±15%**, **Blur up to 1.5px**, **Noise up to 3%**.
+   Skip rotation beyond ±10° (roads are horizontal) and skip mosaic (YOLO adds it itself).
+5. **Generate** → on the version page click **Export Dataset → YOLOv8 → "show download
+   code"** → copy the ~4-line Python snippet (contains your API key). You'll paste it
+   into Colab.
+
+### Step 4 — Train (Google Colab free, ~1–3 h on a T4)
+1. Open the official notebook: https://colab.research.google.com/github/roboflow-ai/notebooks/blob/main/notebooks/train-yolov8-object-detection-on-custom-dataset.ipynb
+   → **File → Save a copy in Drive**.
+2. **Runtime → Change runtime type → T4 GPU.**
+3. Run the cells in order; where the notebook downloads its demo dataset, **replace with
+   your Step-3 snippet**. The core cells boil down to:
+   ```python
+   !pip install ultralytics roboflow
+   from roboflow import Roboflow
+   rf = Roboflow(api_key="PASTE_FROM_STEP_3")
+   dataset = rf.workspace("YOUR_WS").project("agapp-pothole").version(1).download("yolov8")
+   ```
+   ```python
+   !yolo detect train model=yolov8n.pt data={dataset.location}/data.yaml \
+        epochs=100 imgsz=640 patience=20
+   ```
+4. **Free-tier survival tips:** your 24/7 PC keeps the tab alive (prevents idle
+   disconnect); sessions can still die (~up to 12 h cap, sometimes less) — if it dies,
+   re-run with `resume=True`, or mount Drive first and set `project=/content/drive/MyDrive/agapp-runs`
+   so weights survive the VM. YOLOv8**n** at this dataset size finishes well inside one session.
+5. **Record for the manuscript** (from the final output + `runs/detect/train/`):
+   **mAP50, mAP50-95, precision, recall**, the confusion matrix image, and
+   `results.png` training curves. Screenshot/save them NOW — the VM disappears.
+6. Your model = `runs/detect/train/weights/best.pt`. Download it / copy to Drive.
+
+> **Alternative GPU (if Colab throttles you): Kaggle Notebooks.** Free ~30 GPU-hours/week
+> (T4/P100), same `!yolo detect train ...` commands, and the Kaggle pothole dataset from
+> Step 2b attaches natively (**+ Add Input** on the notebook). Colab is primary because the
+> Roboflow snippet workflow is smoothest; Kaggle is the better fallback quota-wise.
+> **Roboflow Train** (one-click, in-browser) also works but burns your ~3 free training
+> credits — keep those for emergencies.
+
+### Step 5 — Sanity-check before deploying (30 min)
+In the same Colab:
+```python
+!yolo predict model=runs/detect/train/weights/best.pt source="SOME_TEST_IMAGE_URLS" conf=0.4
+```
+Eyeball ~10 images: a few obvious potholes from the test split, plus a few street photos
+WITHOUT potholes (predictions on arbitrary internet images for qualitative evaluation is
+fine — the no-self-capture rule was about training data). You want: hits on real potholes,
+silence on clean roads. If it fires on every road crack, raise `conf` to 0.5–0.6 — that
+threshold choice goes in the manuscript too.
+
+### Step 6 — Deploy (Path A1: Roboflow Hosted — fastest to a working badge)
+1. Back in Colab: upload your weights to the Roboflow project version:
+   ```python
+   project.version(1).deploy(model_type="yolov8", model_path="runs/detect/train/")
+   ```
+2. Roboflow serves it at a URL instantly. Test with curl/Python:
+   `POST https://serverless.roboflow.com/agapp-pothole/1?api_key=KEY&image=IMAGE_URL`
+   Docs: https://docs.roboflow.com/inference/hosted-api
+3. ⚠️ The API key goes in **`apps/api/.env`** (server-only) when we wire it — never in
+   mobile/admin code.
+
+### Step 7 — Hand off to me (the AGAPP wiring)
+When you have (a) the hosted endpoint + key, or (b) a `best.pt`/`.onnx` file, say so —
+I wire it into the existing stub: **`apps/api` `POST /reports/verify-image`**
+(mobile already calls it with `{photoUrl, category}` after submit) → API calls the
+model for `pothole` / `stray_animal` categories → writes `ml_confidence`/`ml_verified`
+on the report → the admin "AI Verified (…%)" badge lights up with zero UI changes.
+(Self-hosted ONNX in NestJS = Path A2 if you'd rather not depend on Roboflow's uptime;
+on-device TFLite = Path B, matches the manuscript's on-device claim but needs a custom
+Expo dev client — time-box it, do A1 first.)
+
+---
+
+## 3. STEP-BY-STEP — Stray pets (dog/cat) — the 10-minute one
+
+**Do this before/while the pothole model trains.** No dataset, no training:
+
+1. In any Colab cell:
+   ```python
+   !pip install ultralytics
+   from ultralytics import YOLO
+   model = YOLO("yolov8n.pt")            # COCO-pretrained, downloads automatically
+   results = model.predict("TEST_IMAGE", classes=[15, 16], conf=0.4)  # 15=cat, 16=dog
+   ```
+2. Test on ~10 street-dog/cat photos from the web. COCO's dog/cat detection is strong —
+   for "does this photo contain a dog or cat" it will very likely pass as-is.
+3. **Only if** it visibly misses street animals: fine-tune on
+   **Oxford-IIIT Pet** (CC BY-SA 4.0 ✅, ~7,390 images: https://www.robots.ox.ac.uk/~vgg/data/pets/)
+   or the Roboflow "Stray Animal Detection" set (~859 street images:
+   https://universe.roboflow.com/rep-rxi6f/stray-animal-detection — check its license on
+   the page) using the exact same Steps 3–6 as the pothole guide.
+4. Deploy: same Roboflow flow — or simplest of all, the API can run `yolov8n.pt`
+   directly with `classes=[15,16]` filtering (no second hosted model needed). Decide at
+   wiring time.
+5. **Manuscript framing:** *photo-validity via COCO-pretrained YOLOv8n dog/cat
+   detection* — never claim stray-vs-owned classification.
+
+---
+
+## 4. Manuscript reconciliation (unchanged essentials)
+- Model name: **YOLOv8n everywhere** (paper said YOLOv8n; stale code comments said
+  YOLOv11 — those are already gone).
+- Cite **RDD2022** (Arya et al., 2024, *Geoscience Data Journal*,
+  https://rmets.onlinelibrary.wiley.com/doi/10.1002/gdj3.260) — CC BY-SA 4.0 requires
+  attribution; citing it satisfies that. Cite Roboflow Universe datasets per their pages.
+- If you ship server-side (A1/A2), soften the paper's "fully on-device" wording.
+- Add the **no-local-data limitation sentence** from §0 — examiners respect a stated
+  limitation far more than a discovered one.
+
+---
+
+## 5. Checklist (print this)
+- [ ] Roboflow account + `agapp-pothole` project (class: `pothole`)
+- [ ] Fork 1 Universe pothole dataset (>3k imgs, clear license) + 1 second source (Kaggle or RDD2022 India/China `D40`)
+- [ ] Merge classes → single `pothole`; 5–12k images
+- [ ] Version: 70/20/10, 640×640, brightness/exposure/blur/noise augs → Export YOLOv8 snippet
+- [ ] Colab T4: train yolov8n 100 epochs → save `best.pt` + metrics to Drive
+- [ ] Record mAP50 / mAP50-95 / precision / recall / confusion matrix (manuscript!)
+- [ ] Sanity predict: hits on potholes, silence on clean roads
+- [ ] Deploy to Roboflow hosted → test the URL
+- [ ] Stray pets: verify COCO `yolov8n.pt` classes 15/16 on street photos (no training)
+- [ ] Tell me → I wire `verify-image` + env key → badge goes live
+
+## Sources (all verified 2026-07-04)
+- RDD2022 — figshare download: https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547 · paper: https://rmets.onlinelibrary.wiley.com/doi/10.1002/gdj3.260 · license CC BY-SA 4.0
+- Roboflow Universe pothole search: https://universe.roboflow.com/search?q=class%3Apothole
+- Kaggle YOLOv8 pothole set: https://www.kaggle.com/datasets/anggadwisunarto/potholes-detection-yolov8
+- Oxford-IIIT Pet (CC BY-SA 4.0): https://www.robots.ox.ac.uk/~vgg/data/pets/
+- Roboflow stray-animal set: https://universe.roboflow.com/rep-rxi6f/stray-animal-detection
+- Official training notebook: https://colab.research.google.com/github/roboflow-ai/notebooks/blob/main/notebooks/train-yolov8-object-detection-on-custom-dataset.ipynb
+- Roboflow hosted inference docs: https://docs.roboflow.com/inference/hosted-api
+- PH precedent (Cebu YOLOv8 pothole study, for the manuscript's related-work section): https://www.joig.net/2024/JOIG-V12N4-417.pdf

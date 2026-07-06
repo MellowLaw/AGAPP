@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { lguIdFromName } from '@/lib/lgu';
 import { ReportsMap } from '@/components/map';
 import {
   Warning,
@@ -133,10 +134,7 @@ export default function ReportsPage() {
   const [assignHistory, setAssignHistory] = useState<Record<string, { office: string; at: string }[]>>({});
 
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
-  const lguId = React.useMemo(
-    () => lguNameParam.toLowerCase().replace(/,/g, '').replace(/\s+/g, '-'),
-    [lguNameParam]
-  );
+  const lguId = React.useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
 
   // Citizen legitimacy info for the selected report. RLS: an LGU admin can
   // read users in their own LGU, so this lookup works here; a null citizen_id

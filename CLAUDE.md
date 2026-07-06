@@ -26,9 +26,9 @@ The **actual system is in `agapp-system/`**. Other top-level folders are docs:
 | `apps/mobile` | Expo SDK 54, RN 0.81, **React 19**, TS | Citizen app (reports, services, forum, map, chatbot, ID verification) |
 | `apps/admin` | Next.js 14 (App Router), **React 18**, Tailwind | LGU + super-admin dashboard |
 | `apps/field-officer` | Expo SDK 54, RN 0.81 | Officer task app (minimal) |
-| `apps/api` | NestJS 10 + Express | Chatbot, forum moderation, push |
+| `apps/api` | NestJS 10 + Express | Chatbot + push only (plus the guarded `verify-image` ML slot) |
 | `packages/shared` | TS + Zod | Shared types (currently under-used) |
-| `supabase/` | Postgres + PostGIS + pgvector | Schema, seed, RLS, storage, migrations |
+| `supabase/` | Postgres + PostGIS | Schema, seed, RLS, storage, migrations (pgvector removed) |
 
 ## Running (from `agapp-system/`)
 
@@ -45,9 +45,13 @@ cd apps/mobile && npx expo start --lan     # mobile on a phone (same Wi-Fi)
 
 ## Architecture facts (important)
 
-- **All three client apps talk directly to Supabase.** The NestJS API is mostly
-  bypassed — only the chatbot, forum moderation, and push actually flow through it.
-  Consequence: most actions don't create audit logs (logging lives in API controllers).
+- **All three client apps talk directly to Supabase.** The NestJS API carries ONLY the
+  chatbot (`POST /api/chatbot/ask`) and the push service (realtime listener), plus the
+  guarded `POST /api/reports/verify-image` ML slot. All other controllers (auth, lgus,
+  reports CRUD, services, forum, audit-logs) were dead code that no client called AND
+  were unguarded on a service-role key — deleted 2026-07-05. Forum moderation is the DB
+  trigger `check_forum_profanity()`, not the API. Consequence: no audit logs exist; if
+  ever wanted, implement via DB triggers (see TODO), not API controllers.
 - Auth: Supabase Auth. Admin login is real (`signInWithPassword`); RLS depends on it.
 - LGU ids are slugs like `liliw-laguna`. Map id↔name via `apps/admin/src/lib/lgu.ts`.
 

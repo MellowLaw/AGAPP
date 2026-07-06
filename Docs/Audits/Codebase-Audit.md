@@ -1,10 +1,150 @@
 # AGAPP System — Full Codebase Audit
 
 > **Scope:** `agapp-system/` monorepo (mobile, admin, field-officer, api, shared, supabase)
-> **Date:** 2026-06-17 · Last updated: 2026-07-04
+> **Date:** 2026-06-17 · Last updated: 2026-07-06
 > **Purpose:** Ground-truth status of every folder/file — what's done, what's stubbed, what's broken, what's not connected. Use this instead of the AI-generated requirements doc, which is partly inaccurate.
 
 ---
+
+## 🔄 Update — 2026-07-06 (BOTH ML detectors — pothole + stray pets — LIVE and verified)
+
+The "biggest thesis risk" stub is now real, working code for both categories — actually
+tested with real photos, confirmed returning real detections. Pothole = a fine-tuned model;
+stray pets = a stock COCO dog/cat detector filtered to the anti-troll validity check.
+
+- **Model:** YOLOv8n trained on Kaggle from two online-only datasets (RSDD, CC BY 4.0,
+  4-class → filtered to its `pothole` class; New Pothole Detection / Smartathon, CC0,
+  1-class), merged to ~15.4k images. `best.pt` downloaded and **verified structurally
+  valid** (genuine zip-based PyTorch checkpoint, `DetectionModel` architecture,
+  `names={0:'pothole'}` embedded — not corrupted, not a placeholder). Metrics/citations
+  captured for the manuscript in `Docs/Planning/ML-Dataset-Citations.md`.
+- **Inference path:** Roboflow Hosted, chosen over self-hosted ONNX specifically to
+  avoid `onnxruntime-node`'s native-binary install friction on Windows — the API makes
+  a plain HTTPS call, no Python/ONNX runtime inside the Node process.
+- **Code wiring shipped and verified (typechecks clean, API boots clean, guard tested
+  live — unauthenticated call to `verify-image` → `401`):**
+  - `apps/api/src/app.controllers.ts` `ReportController.verifyImage` — real Roboflow
+    call for `category === 'pothole'` only; every other category (incl. `stray_animal`)
+    still returns nulls by design. Missing `ROBOFLOW_API_KEY`/`ROBOFLOW_POTHOLE_MODEL_URL`
+    → nulls, logged warning, never a fabricated confidence. Uses Node 22's native
+    `fetch` — no new dependency.
+  - `apps/mobile/src/utils/mlAnalysis.ts` — `analyzeReportPhoto()` now calls
+    `POST /reports/verify-image` for real (was a local stub). Same
+    `Authorization: Bearer <access_token>` pattern as `ChatbotScreen.tsx`; any
+    failure (network/API/config) → `NOT_ANALYZED`, never blocks submission.
+  - **Bug fixed in passing:** `apps/mobile/src/screens/ReportsScreen.tsx` was passing
+    the photo's *local device URI* into the ML boundary — harmless while stubbed, but
+    would have silently broken the instant real inference needed a fetchable URL
+    (a server can't reach a phone's local filesystem). Now passes the already-uploaded
+    Supabase public URL (the same one written to `reports.photo_url`).
+- **Deployed and verified live** — project `mrlaws-workspace/agapp-y5jbd` on Roboflow
+  Hosted, `.env` has real `ROBOFLOW_API_KEY` + `ROBOFLOW_POTHOLE_MODEL_URL`
+  (`https://serverless.roboflow.com/agapp-y5jbd/1`). Fed it a real pothole photo from
+  the training set: correctly detected **two potholes at 0.63/0.61 confidence**,
+  response shape matches the NestJS parsing logic exactly. Nothing left to build.
+- **Five real bugs found and fixed during deploy/testing (not just planning):**
+  1. Roboflow's `deploy()` needs the exact pinned `ultralytics==8.0.196` — a freshly
+     `pip install`ed newer version gets rejected with a version-mismatch prompt.
+  2. `deploy()` defaults to expecting weights at `<model_path>/weights/best.pt`
+     (Ultralytics' standard run-folder shape) — fixed via the `filename="best.pt"`
+     override param, since the uploaded checkpoint had no `weights/` subfolder.
+  3. Roboflow's export needs to **write** a `model_artifacts.json` sidecar next to
+     the weights — failed with a read-only filesystem error until the checkpoint was
+     copied from Kaggle's read-only `/kaggle/input/` into writable `/kaggle/working/`.
+  4. **The actual blocker on first live test:** a freshly created Roboflow project's
+     deployment has no "selected model" by default even after a successful model
+     upload/train — dashboard showed "Current Model: None." Found and fixed directly
+     via the Roboflow MCP server (`project_deployment_set_model`), confirmed via
+     `project_deployment_get` flipping to `"status":"deployable"`.
+  5. `apps/api/.env`'s `ROBOFLOW_POTHOLE_MODEL_URL` was left as the literal
+     `.env.example` placeholder text (`your-project-slug`) — this, not the API key,
+     was why the first real test 404'd ("resource not found"). Also caught and fixed
+     the confidence-scale bug in the same pass: Roboflow wants **0–1**, the code had
+     `confidence=40` (assuming 0–100) — confirmed via Roboflow's own error response
+     echoing its real request shape.
+- **Stray pets: also LIVE (2026-07-06).** Stock COCO-pretrained YOLOv8n deployed to
+  Roboflow Hosted as a vessel project (`mrlaws-workspace/agapp-stray-pets` v2) — no
+  training needed. `verify-image` refactored to an `ML_MODELS` category map; the
+  `stray_animal` branch calls the COCO model and **keeps only `dog`/`cat` predictions**
+  (the anti-troll validity check — a photo of people/cars doesn't validate a stray
+  report). New env var `ROBOFLOW_STRAYPETS_MODEL_URL`. Verified live: dog photo →
+  `dog` @0.49 → `mlVerified:true`; people/bus photo → filtered to empty → false.
+  Most of the Roboflow-side plumbing (project, filler images + annotations, version,
+  active-model selection) was done directly via the Roboflow MCP; only a 3-cell Kaggle
+  notebook (download stock weights → `deploy()`) needed the user. **Gotcha logged in
+  TODO:** don't `YOLO()`-load the stock weights in your own cell (old ultralytics +
+  new PyTorch `weights_only` fights you); just download the file and hand it to
+  `deploy()`.
+  A companion `Plan-StrayPets-Reporting.md` covers the remaining frontend polish
+  (user's idea, sound):
+  reframe stray-report cards as "Last Seen: [barangay] · [relative time]" since
+  animals move, and use the AI check purely as an anti-troll validity flag — no
+  breed/identity classification. Independent frontend task, doesn't block on the ML
+  decision. Recommended v2 add-on noted: a stray-category hotspot filter on the
+  existing Leaflet report map (real animal-control workflows care about recurring
+  locations, not single sightings) — explicitly deferred a heavier "multi-sighting
+  case" model (PawBoost/pet-finder style) as scope creep away from LGU incident
+  reporting.
+
+## 🔄 Update — 2026-07-05 (Security sweep: API attack surface deleted, notifications RLS hardened, legacy cleanup)
+
+Full sweep for bugs/holes/legacy while the pothole model trains on Kaggle. Supabase
+security advisors + fresh greps, everything below verified live.
+
+**🔴 API: ~20 unauthenticated service-role endpoints deleted.** Traced every client:
+the ONLY API call in the entire system is mobile's `POST /api/chatbot/ask` (admin uses
+its own Next.js routes; field-officer calls nothing). Yet `app.controllers.ts` exposed
+7 controllers (auth, lgus, reports CRUD, services, forum, chatbot, audit-logs) where
+**only chatbot had `@UseGuards`** — and the API runs on the **service-role key**
+(`sb_secret_`, RLS bypass). Every dead endpoint was an unauthenticated, RLS-bypassing
+write the moment the API gets deployed (provision LGUs, flip report statuses, delete
+forum posts…). Deleted all of them; kept `ChatbotController` and a trimmed
+`ReportController` holding only `POST /api/reports/verify-image` (the future ML slot,
+NOW guarded too). **Fallout removed with them:** `writeAuditLog()` (the fake-IP dead
+code — TODO item now moot), the Gemini forum-moderation path that never ran for real
+posts (mobile inserts directly; the real filter is the DB `check_forum_profanity()`
+trigger) → `@google/generative-ai` dep + `GEMINI_API_KEY` dropped, and the fully
+orphaned `storage.service.ts` (zero references anywhere). API typechecks clean and
+boots with exactly 2 routes, both guarded. CLAUDE.md architecture facts corrected.
+
+**🔴 notifications RLS: forgery hole closed + mark-as-read un-broken (migration
+`notifications_rls_hardening`).** Two real findings from the security advisors:
+- `System can insert notifications` was `WITH CHECK (true)` — ANY logged-in user could
+  forge notifications for anyone (fake staff notices, fake citizen alerts). It existed
+  because the notify_* trigger functions ran with INVOKER rights. All five are now
+  `SECURITY DEFINER` (+ EXECUTE revoked), the policy is DROPPED — no client path can
+  insert notifications at all. Verified: status-change trigger still writes rows.
+- There was **no UPDATE policy at all** — mobile's mark-as-read
+  (`NotificationsScreen.tsx` `update({is_read:true})`) has been silently updating **0
+  rows since the beginning**. Added `Users can update their own notifications`
+  (USING + WITH CHECK `auth.uid() = user_id`).
+- Also dropped the 3 broad public-bucket SELECT policies (report-photos,
+  service-attachments, facility-images) — they only enabled LISTING whole buckets
+  (advisor 0025); public URL serving doesn't need them and nothing calls `.list()`.
+  All three buckets currently hold 0 objects, so nothing could break.
+- `schema.sql` / `verification_setup.sql` / `storage_setup.sql` synced.
+- Advisor leftovers accepted as-is: `spatial_ref_sys` RLS (PostGIS system table),
+  postgis-in-public, `get_current_user_*` executable by authenticated (needed for RLS
+  policy evaluation), leaked-password toggle (still the standing manual TODO).
+
+**🟠 Personnel reports tabs finally real.** The "Assigned to me / My office / All" tabs
+were a no-op (bug #8 below) AND unimplementable — the schema has no per-personnel
+assignment (users aren't linked to offices). Replaced with honest **status tabs**
+(All / Open / In Progress / Done), verified live: 9/4/2/3 filtering correctly. Also
+removed that page's hardcoded `lguName="Liliw, Laguna"` prop (now reads the URL param
+like every other page).
+
+**🟡 Legacy/dead code:** six `/lgu/*` pages hand-rolled the LGU name→id slugify that
+`lib/lgu.ts` exists to centralize — all six now use `lguIdFromName()` (dashboard, news,
+forum, services, settings, reports; admin typechecks clean). Deleted the never-imported
+`components/ui/LoadingSpinner.tsx` (`Modal.tsx`, once flagged unused, is now genuinely
+used by 4 pages — kept). Git tree confirmed clean of junk (no tracked `.expo/`,
+`tsbuildinfo`, logs).
+
+**Still-open honest stubs (user-visible, not fixed this pass — listed for next time):**
+mobile ProfileScreen's consent toggle/badges/help buttons (dead UI), forum
+follow/copy-link/image-upload (no-ops), admin news attachments drop-zone (always
+inserts `[]`), report assignment history (component state only, never persisted).
 
 ## 🔄 Update — 2026-07-04 later (Admin notifications REAL: important-only bell + nav "new" badges; mock cleanup)
 
@@ -626,9 +766,16 @@ agapp-system/  (npm workspaces monorepo)
 └── supabase/           schema.sql, seed.sql, storage_setup.sql
 ```
 
-**Critical architectural fact:** Despite the README describing a NestJS-centric backend, **three of the four apps bypass the API and query Supabase directly.** The only thing that actually flows through the NestJS API is the chatbot (`/api/chatbot/ask`) and Gemini-based forum moderation. This is the single biggest architectural inconsistency in the project.
+**Critical architectural fact:** all three client apps query Supabase directly. As of
+2026-07-05 the NestJS API's code finally matches that reality: it exposes exactly two
+routes — `POST /api/chatbot/ask` (mobile chatbot) and `POST /api/reports/verify-image`
+(the future ML slot) — both guarded, plus the push service (realtime listener). The
+seven-controller REST surface that duplicated Supabase CRUD was deleted (dead + unguarded
+on a service-role key — see the 2026-07-05 block). The old "biggest architectural
+inconsistency" note is resolved by deletion, not by routing writes through the API.
 
-Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** that duplicates every NestJS endpoint — but `npm run dev:api` runs `src/main.ts` (NestJS), so `server.ts` is **dead code**. Worse, the working `/api/services/:id/pdf` endpoint only exists in that dead Express file, not in NestJS.
+_(Historical: `apps/api/src/server.ts`, an ~810-line legacy Express duplicate, was
+deleted 2026-06-30; the PDF generator followed 2026-07-03.)_
 
 ### Stack (actual)
 - **Mobile / Field Officer** — Expo SDK 54, React Native 0.81, React 19, React Navigation v7, `expo-camera`, `expo-location`, `expo-secure-store`, `react-native-maps`, Supabase JS v2
@@ -671,10 +818,11 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 - Offline sync queue (AsyncStorage) with 30s auto-retry
 - Profile + manual force-sync
 
-### ⚙️ API (NestJS, the live one)
-- Chatbot: keyword-scored FAQ matching → **Mistral** fallback (swapped from Gemini 2026-07-01) → graceful "no answer / support ticket"
-- Forum moderation: local profanity/PII/URL filter + Gemini safety check
-- Audit log writer — ⚠️ confirmed dead code 2026-07-04: its calling endpoints are never hit by the real clients (`audit_logs` = 0 rows); revive via DB triggers instead (see TODO)
+### ⚙️ API (NestJS, the live one — trimmed to reality 2026-07-05)
+- Chatbot: keyword-scored FAQ matching → **Mistral** fallback (swapped from Gemini 2026-07-01) → graceful "no answer / support ticket" — guarded
+- `POST /api/reports/verify-image` — ✅ real for `category==='pothole'` since 2026-07-06 (Roboflow Hosted call, pending only the Roboflow-side deploy + env keys); still nulls for every other category — guarded
+- ~~Forum moderation (Gemini)~~ — deleted 2026-07-05; was dead code (mobile posts directly to Supabase; the real filter is the DB `check_forum_profanity()` trigger)
+- ~~Audit log writer~~ — deleted 2026-07-05 along with the dead controllers that called it
 - `SupabaseAuthGuard` (validates JWT via `supabase.auth.getUser`)
 - `PushService`: listens to `notifications` table via Supabase realtime → sends via Expo SDK
 
@@ -694,7 +842,8 @@ Also note: `apps/api/src/server.ts` is an **~810-line legacy Express server** th
 
 | Item | Where | Reality |
 |---|---|---|
-| **On-device pothole ML (YOLO)** | `mobile/src/utils/mlAnalysis.ts` + API `verify-image` | Honest stub since 2026-07-03: fake hardcoded `0.95/true` values and "YOLOv11" claims removed; both boundaries return null ("not analyzed") until a real model exists. **Deferred by explicit user direction** — plan in [Plan-ML-Pothole-Detection](../Planning/Plan-ML-Pothole-Detection.md). |
+| ~~**Pothole ML (server-side)**~~ | `apps/api` `ReportController.verifyImage` | ✅ **Fully live as of 2026-07-06** — calls the deployed YOLOv8n model via Roboflow Hosted inference; verified with a real photo returning real predictions (0.63/0.61 confidence). Zero gaps left. See [Plan-ML-Pothole-Detection](../Planning/Plan-ML-Pothole-Detection.md). |
+| ~~**Stray-pets ML**~~ | `apps/api` `ReportController.verifyImage` | ✅ **Live as of 2026-07-06** — stock COCO YOLOv8n on Roboflow Hosted, filtered to dog/cat. Verified: dog photo → true, non-animal photo → false. |
 | ~~**PDF generation**~~ | 🗑️ Removed 2026-07-03 | Was legacy from before the eServices QR-pickup redesign (no in-app payment, checklist-only requirements, pickup verified by QR not a printed form). Never mounted as a live route; deleted along with `pdf-lib` dep. |
 | ~~**QR codes**~~ | ✅ Real since 2026-07-03 | QR now encodes the opaque `claim_code`, rendered client-side (`react-native-qrcode-svg`) — no external qrserver.com dependency; release flows through SECURITY DEFINER RPCs. |
 | **Push notifications** | `mobile/src/utils/push.ts` | Skips registration entirely in Expo Go (SDK 54). Only works in standalone EAS builds. |
@@ -720,7 +869,7 @@ everything here has since been fixed in the dated update blocks above.)_
 5. ~~**`UserMenu.handleSignOut`**~~ — moot; `UserMenu.tsx` deleted in the 2026-07-04 redesign. Sign-out now lives in `Sidebar.tsx` and correctly calls `supabase.auth.signOut()`.
 6. ~~**Liliw hardcoding in boundary check**~~ — ✅ fixed 2026-06-30 (uses `selectedLgu` coords/name).
 7. ~~**React Hooks violation**~~ — ✅ fixed 2026-06-30 (`useBottomTabBarHeight` try/catch removed in both screens).
-8. **🟡 Personnel reports tab filter is a no-op** — `admin/src/app/personnel/reports/page.tsx` condition `tab === 'assigned' || tab === 'office'` is always true → tab switching does nothing. **Still open (last unverified item on this list).**
+8. ~~**Personnel reports tab filter is a no-op**~~ — ✅ fixed 2026-07-05: the fake "Assigned to me / My office" tabs (unimplementable — no per-personnel assignment exists in the schema) replaced with real status tabs (All/Open/In Progress/Done), verified filtering live. **The original bug list is now fully closed.**
 9. ~~**Client-generated reference numbers**~~ — ✅ fixed 2026-06-30 (DB sequences + `BEFORE INSERT` trigger, `REP-YYYY-NNNN`).
 10. ~~**Dead `admin/src/app/lgu/page.tsx`**~~ — ✅ trimmed 2026-06-30 to a redirect-only file.
 11. ~~**Dead auth components**~~ — ✅ deleted (2026-06-30, then `LoginLayout.tsx` 2026-07-03; whole `components/auth/` dir gone).
@@ -731,7 +880,7 @@ everything here has since been fixed in the dated update blocks above.)_
 
 ## 🔌 Systems NOT connected / integration gaps
 
-1. **The NestJS API is 90% orphaned.** Mobile, admin, and field-officer all hit Supabase directly. The API's report/service/LGU/forum CRUD endpoints are effectively unused. **Consequence: most citizen & admin actions never create audit logs**, because audit logging only happens inside API controllers. Either route writes through the API, or move audit logging into Supabase triggers.
+1. ~~**The NestJS API is 90% orphaned.**~~ ✅ Resolved by deletion 2026-07-05 — the orphaned (and unguarded, service-role-key) CRUD surface is gone; the API now exposes only what's actually used (chatbot + verify-image + push). Audit logging, if ever wanted, goes in DB triggers (open TODO).
 2. ~~**PDF generation disconnected**~~ — moot; deleted 2026-07-03 (superseded by QR pickup).
 3. ~~**Chatbot RAG / faq_embeddings**~~ ✅ Resolved 2026-06-30. The chatbot is keyword FAQ + Gemini by design (the roadmap's "RAG + pgvector" was never adopted). The unused `faq_embeddings` table, `match_faqs` RPC, and `vector` extension were dropped; the Gemini fallback was hardened against prompt injection (see the 2026-06-30 update block).
 4. **Push notifications end-to-end untested** — backend listener exists, mobile registration is inert in Expo Go. Needs a standalone build to verify.
@@ -779,7 +928,7 @@ _(Reconciled 2026-07-04 — nearly all done; see [TODO](../Tasks/TODO.md) for th
 | `src/screens/LguSelectScreen.tsx` | ✅ Real |
 | `src/screens/HomeScreen.tsx` | ✅ Real (mock-landmark fallback deleted 2026-07-04 — it was dead code, never rendered) |
 | `src/screens/ServicesScreen.tsx` | ✅ Real — live `lgu_services` catalog (2026-07-03); ref# from DB trigger; QR is claim-code-based |
-| `src/screens/ReportsScreen.tsx` | ✅ Real submit (fake ML removed 2026-07-03 → null boundary; Liliw hardcoding fixed 2026-06-30) |
+| `src/screens/ReportsScreen.tsx` | ✅ Real submit; ML boundary now calls the real API for pothole (2026-07-06, uploaded-URL bug fixed in passing); Liliw hardcoding fixed 2026-06-30 |
 | `src/screens/TrackingDetailScreen.tsx` | ✅ Real — data-shape bug fixed 2026-06-30; realtime status timeline + client-side claim QR (2026-07-03) |
 | `src/screens/ForumScreen.tsx` | ✅ Real CRUD + realtime; follow/copy-link/image-upload stubbed; hooks-rule violation |
 | `src/screens/ChatbotScreen.tsx` | ✅ Real backend call; mic stubbed; hooks-rule violation |
@@ -796,7 +945,7 @@ _(Reconciled 2026-07-04 — nearly all done; see [TODO](../Tasks/TODO.md) for th
 | `src/app/layout.tsx` | ✅ Real |
 | `src/app/lgu/page.tsx` | ✅ Redirect-only (dead 400-line stub trimmed 2026-06-30) |
 | `src/app/lgu/{dashboard,forum,news,reports,services,settings,eservices-catalog,facilities,verifications}/page.tsx` | ✅ Real (news attachments + assignment-history persistence still partial) |
-| `src/app/personnel/{dashboard,reports}/page.tsx` | ✅ Real (reports tab filter is a no-op bug — still open) |
+| `src/app/personnel/{dashboard,reports}/page.tsx` | ✅ Real (fake assigned/office tabs replaced with working status tabs 2026-07-05) |
 | `src/app/personnel/settings/page.tsx` | ✅ Real since 2026-07-02 (was the "Ana Reyes" mockup) |
 | `src/app/super/{page,analytics,lgus,settings}/page.tsx` | ✅ Real (turnaround time computed from real `updated_at` since 2026-07-02) |
 | `src/app/api/{create-staff,demo-login}/route.ts` | ✅ Real server-side routes (create-staff auth-hardened 2026-07-03) |
@@ -804,7 +953,7 @@ _(Reconciled 2026-07-04 — nearly all done; see [TODO](../Tasks/TODO.md) for th
 | `src/components/layout/{DashboardLayout,Sidebar,PageHeader,StatusRow}.tsx` | ✅ Real — the 2026-07-04 chrome. Sidebar = hover-expand rail w/ nav badges; PageHeader replaced Header+DashboardHero; StatusRow holds the real notification bell |
 | `src/components/layout/{NotificationBell,NavBadgeContext}.tsx` | ✅ NEW 2026-07-04 — important-only bell (stored + computed groups) and the per-section "new since last visit" badge provider |
 | ~~`src/components/layout/{Header,UserMenu,DashboardHero}.tsx`~~ | 🗑️ Deleted 2026-07-04 (header bar removed; chrome moved into Sidebar + PageHeader) |
-| `src/components/ui/*` | ✅ All real and token-themed (2026-07-04) |
+| `src/components/ui/*` | ✅ All real and token-themed (2026-07-04); unused `LoadingSpinner.tsx` deleted 2026-07-05 |
 | `src/components/map/*` | ✅ Real Leaflet components (2026-07-02) — import ONLY via the `index.tsx` dynamic barrel |
 | `src/lib/{supabase,lgu,turnaround,importantNotices}.ts` | ✅ Real — ssr browser client; LGU id↔name map; avg turnaround; bell aging thresholds/queries (NEW 2026-07-04) |
 
@@ -825,13 +974,13 @@ _(Reconciled 2026-07-04 — nearly all done; see [TODO](../Tasks/TODO.md) for th
 ### `apps/api/` (NestJS)
 | File | Status |
 |---|---|
-| `src/main.ts` | ✅ The actual entry (`npm run dev:api`) |
-| `src/app.module.ts` | ✅ Registers 7 controllers + SupabaseService + PushService |
-| `src/app.controllers.ts` | ✅ Rewritten 2026-06-30: all mock-db imports removed; returns `503` if Supabase unavailable |
-| `src/supabase.service.ts` | ✅ Lazy client init (warns if env missing) |
+| `src/main.ts` | ✅ The actual entry (`npm run dev:api`); global ValidationPipe |
+| `src/app.module.ts` | ✅ Registers 2 controllers (Report=verify-image, Chatbot) + SupabaseService + PushService (7-controller surface deleted 2026-07-05) |
+| `src/app.controllers.ts` | ✅ Trimmed 2026-07-05 to chatbot + guarded verify-image only — everything else was dead AND unguarded on the service-role key. `verify-image` does real Roboflow inference for pothole since 2026-07-06. |
+| `src/supabase.service.ts` | ✅ Lazy client init (warns if env missing) — uses the `sb_secret_` service key (RLS bypass), which is exactly why every exposed route must be guarded |
 | `src/supabase-auth.guard.ts` | ✅ JWT validation |
 | `src/push/push.service.ts` | ✅ Realtime listener → Expo push |
-| `src/storage.service.ts` | ✅ base64 upload to Storage buckets |
+| ~~`src/storage.service.ts`~~ | 🗑️ Deleted 2026-07-05 — zero references anywhere (fully orphaned) |
 | ~~`src/pdf-generator.ts`~~ | 🗑️ Deleted 2026-07-03 — legacy eServices form-PDF generator, superseded by the QR-pickup redesign (no in-app payment, checklist-only, QR verification) |
 | ~~`src/generate-sample-pdfs.ts`~~ | 🗑️ Deleted 2026-07-03 — standalone script for the removed PDF generator |
 | ~~`src/mock-db.ts`~~ | 🗑️ Deleted 2026-06-30 — 422-line mock data, was never needed with real Supabase |

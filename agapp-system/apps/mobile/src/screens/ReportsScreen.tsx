@@ -24,7 +24,7 @@ const REPORT_CATEGORIES = [
 
 export function ReportsScreen({ navigation }: any) {
   const { T } = useTheme();
-  const { selectedLgu, profile } = useAuth();
+  const { selectedLgu, profile, session } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [category, setCategory] = useState('pothole');
   const [description, setDescription] = useState('');
@@ -217,8 +217,11 @@ export function ReportsScreen({ navigation }: any) {
     // 7. Insert report record (reference_number is set by DB trigger,
     //    status defaults to 'Submitted')
     try {
-      // ML boundary: returns nulls ("not analyzed") until the pothole model exists.
-      const ml = await analyzeReportPhoto(category, imageUri);
+      // ML boundary: needs the UPLOADED public URL (not the local file URI) — the
+      // server-side model fetches the image over HTTP, it can't reach the phone's
+      // local filesystem. Returns nulls ("not analyzed") for any category without
+      // a deployed model, or if the check fails for any reason.
+      const ml = await analyzeReportPhoto(category, publicUrl, session?.access_token);
 
       const { data: inserted, error } = await supabase.from('reports').insert({
         lgu_id: selectedLgu.id,
