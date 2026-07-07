@@ -5,6 +5,13 @@
 
 ## 🔴 Now (active)
 
+- [ ] **Device-test the reporting overhaul (2026-07-06)** — camera-only capture, automatic
+      GPS with denied/loading states, and the stamped-photo review step were all built and
+      typecheck clean, but never run on a physical device/simulator (none available in this
+      environment). See `Plan-Reporting-Camera-GPS-Hardening.md`'s verification section for
+      the exact checklist (camera-only, GPS auto-fetch + Settings button, stamp preview/
+      retake/confirm, submitted photo caption matches DB coordinates).
+
 - [ ] **Add `SUPABASE_SERVICE_ROLE_KEY` to `apps/admin/.env.local`** — required for the
       staff creation flow (`/api/create-staff` route). Get value from Supabase dashboard
       → Project Settings → API → service_role key. Without it, "Add Staff" throws 500.
@@ -55,6 +62,29 @@
 
 ## ✅ Done
 
+- [x] **Reporting flow hardened: camera-only, automatic GPS, stamped photo (2026-07-06)**
+      — `Plan-Reporting-Camera-GPS-Hardening.md` implemented in sequence in
+      `ReportsScreen.tsx`. (1) **Camera-only:** deleted `choosePhoto()`/gallery picker
+      entirely — only a live camera capture is accepted, closing the "upload an old/fake
+      photo" exploit. (2) **Automatic GPS:** `useFocusEffect` fetches location on mount +
+      every re-focus (no more tap-to-fetch); a tri-state status card shows fetching/locked/
+      denied, with a **Settings** button (`Linking.openSettings()`) on denial; submit
+      explains and retries instead of silently failing. (3) **Stamped photo:** installed
+      `react-native-view-shot` (dropped `expo-image-manipulator` from the original plan —
+      it can't draw text, so it wasn't actually needed); built an **on-screen** review step
+      (photo + caption bar for reverse-geocoded place/coordinates/timestamp, with Retake/
+      Use-This-Photo buttons) rather than the originally-planned off-screen hidden capture,
+      since an unrendered view is a known source of blank-image bugs in that library — this
+      is also a small UX upgrade (a natural confirm step). `takePhoto()` refuses to open the
+      camera at all until GPS is locked, so a stamp can never be created without real
+      coordinates; a failed capture falls back to the unstamped photo instead of leaving the
+      submit button dead. Framing note carried into the plan doc: the stamp is documentary/
+      reviewer-convenience, not a security control — the real anti-fraud chain is
+      camera-only + live GPS + the existing 15km geofence + the ML check.
+      Verified: `tsc --noEmit` clean (exit 0) after every step; confirmed `captureRef`'s
+      actual installed type signature accepts a `RefObject` directly; full read-through for
+      dangling references and stale-closure risks. **Not yet run on a physical device/
+      simulator** (none available this session) — see the 🔴 Now item above.
 - [x] **Fixed three mobile bugs from co-dev's iOS test run (2026-07-06)** — user
       reported (via Expo logs screenshot): citizen account creation broken, iOS map
       pins not loading, and a nav crash, then asked to check login/logout too.

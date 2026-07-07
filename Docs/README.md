@@ -26,6 +26,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-StrayPets-Reporting](Planning/Plan-StrayPets-Reporting.md) — "Last Seen" sighting framing (open) + AI validity badge (shipped 2026-07-06, both ML categories)
 - [Plan-eServices-QR-Pickup](Planning/Plan-eServices-QR-Pickup.md) — document requests + QR pickup (built)
 - [Plan-Personnel-and-FieldOfficer](Planning/Plan-Personnel-and-FieldOfficer.md) — DECIDED: field-officer app CUT (delete later, never use as context); personnel-web trio under consideration
+- [Plan-Reporting-Camera-GPS-Hardening](Planning/Plan-Reporting-Camera-GPS-Hardening.md) — mobile report flow: camera-only, auto-GPS, stamped photo (shipped 2026-07-06, not yet device-tested)
 
 **Tasks**
 - [TODO](Tasks/TODO.md) — prioritized outstanding work
