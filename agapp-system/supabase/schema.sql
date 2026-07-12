@@ -678,9 +678,15 @@ CREATE POLICY "Users can insert their own record" ON users
 -- session existed (email confirmation enabled, or just propagation lag), that
 -- insert ran as anon and violated the INSERT policy above (auth.uid() = id is
 -- null for anon). This trigger is atomic with the auth row and bypasses
--- RLS/timing entirely. Fires for every auth.users insert, so it always writes
--- role='CITIZEN' — staff accounts are created via /api/create-staff instead
--- (service role, writes both rows atomically, never goes through this path).
+-- RLS/timing entirely.
+--
+-- IMPORTANT (regression fix 2026-07-06): this trigger fires on EVERY auth.users
+-- insert, including admin.createUser() from the /api/create-staff route. That
+-- route inserts its own users row with the real staff role; if this trigger
+-- raced a role='CITIZEN' row in first, the route's insert hit a duplicate-key
+-- error and every staff creation 500'd. So it MUST skip whenever the auth
+-- user was created with a 'role' in user_metadata (the staff path always sets
+-- one; citizen self-signup sets only 'full_name'). Do not remove that guard.
 CREATE OR REPLACE FUNCTION public.handle_new_citizen_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -688,6 +694,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- Staff signup path (create-staff route) sets 'role' in user_metadata and
+  -- inserts its own users row — don't race a CITIZEN row in ahead of it.
+  IF NEW.raw_user_meta_data ? 'role' THEN
+    RETURN NEW;
+  END IF;
+
   INSERT INTO public.users (id, email, name, role)
   VALUES (
     NEW.id,
@@ -706,8 +718,17 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_citizen_signup();
 
 -- 2. Policies for Reports Table
-CREATE POLICY "Allow Citizens to read reports in their LGU" ON reports FOR SELECT USING (
-  EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.lgu_id = reports.lgu_id)
+-- SELECT split (2026-07-06, sweep §2): the old single "read any report in my
+-- LGU" policy let ANY citizen read EVERY report in their LGU (name, exact GPS,
+-- photo) — a PII leak. Split into own-rows (citizens) + LGU-scoped (staff), so
+-- the admin/personnel pages still read their LGU's reports but citizens see only
+-- their own.
+CREATE POLICY "Citizens read their own reports" ON reports FOR SELECT USING (
+  auth.uid() = citizen_id
+);
+CREATE POLICY "Staff read reports in their LGU" ON reports FOR SELECT USING (
+  EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid()
+            AND u.role IN ('LGU_ADMIN', 'LGU_PERSONNEL') AND u.lgu_id = reports.lgu_id)
 );
 CREATE POLICY "Allow Super Admin to read all reports" ON reports FOR SELECT USING (
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'SUPER_ADMIN')
@@ -733,9 +754,144 @@ CREATE POLICY "Allow LGU admins/personnel to view and modify service requests" O
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL') AND u.lgu_id = service_requests.lgu_id)
 );
 
+-- ── Insert-forgery guards (2026-07-06, sweep §1) ──────────────────────────
+-- The citizen INSERT policies above only check `auth.uid() = citizen_id`, so a
+-- hand-rolled REST insert (bypassing the app) could forge status, tenant
+-- (lgu_id), identity (citizen_name), and lifecycle columns (Resolved status;
+-- claim_code / released_* on requests). These BEFORE INSERT triggers FORCE
+-- those fields to safe values on real client inserts. Forcing (not rejecting)
+-- is deliberate — for the legitimate app the forced values equal what it
+-- already sends, so it's a pure no-op that cannot break reporting; only a
+-- forger's tampered values get overwritten. Gated on `auth.uid() IS NOT NULL`
+-- so service-role/seed inserts (null auth.uid()) pass through untouched.
+-- ml_confidence / ml_verified are intentionally NOT forced (the app still
+-- writes them client-side) — locking those needs ML writes to move server-side
+-- first; tracked as a follow-up in Docs/Audits/Sweep-2026-07-06-Findings.md §1.
+CREATE OR REPLACE FUNCTION public.guard_citizen_report_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_lgu text; v_name text;
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    v_lgu  := (SELECT lgu_id FROM users WHERE id = auth.uid());
+    v_name := (SELECT name   FROM users WHERE id = auth.uid());
+    NEW.citizen_id := auth.uid();
+    IF v_lgu  IS NOT NULL THEN NEW.lgu_id       := v_lgu;  END IF;
+    IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
+    NEW.status := 'Submitted';
+    NEW.is_low_credibility := false;
+    NEW.assigned_office := NULL; NEW.assigned_office_id := NULL;
+    NEW.sla_tier := NULL; NEW.sla_due_date := NULL;
+    NEW.rating := NULL; NEW.feedback := NULL;
+    NEW.status_history := '[]'::jsonb;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS reports_guard_citizen_insert ON reports;
+CREATE TRIGGER reports_guard_citizen_insert BEFORE INSERT ON reports
+  FOR EACH ROW EXECUTE FUNCTION public.guard_citizen_report_insert();
+
+CREATE OR REPLACE FUNCTION public.guard_citizen_request_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_lgu text; v_name text;
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    v_lgu  := (SELECT lgu_id FROM users WHERE id = auth.uid());
+    v_name := (SELECT name   FROM users WHERE id = auth.uid());
+    NEW.citizen_id := auth.uid();
+    IF v_lgu  IS NOT NULL THEN NEW.lgu_id       := v_lgu;  END IF;
+    IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
+    NEW.status := 'Submitted';
+    NEW.office_id := NULL; NEW.qr_code_url := NULL;
+    NEW.claim_code := NULL; NEW.claim_code_used_at := NULL;
+    NEW.released_at := NULL; NEW.released_by := NULL;
+    NEW.assigned_personnel := NULL; NEW.reject_reason := NULL;
+    NEW.status_history := '[]'::jsonb;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS service_requests_guard_citizen_insert ON service_requests;
+CREATE TRIGGER service_requests_guard_citizen_insert BEFORE INSERT ON service_requests
+  FOR EACH ROW EXECUTE FUNCTION public.guard_citizen_request_insert();
+
+-- Citizen rating RPC (2026-07-06, sweep §3): there is no citizen UPDATE policy on
+-- reports (a blanket one would re-open the insert-forgery the guards above close),
+-- so rating goes through this scoped SECURITY DEFINER function — it can only set
+-- rating/feedback on the caller's OWN Resolved report. Mobile TrackingDetailScreen
+-- calls supabase.rpc('rate_report', ...) instead of a direct .update().
+CREATE OR REPLACE FUNCTION public.rate_report(p_report_id uuid, p_rating int, p_feedback text DEFAULT NULL)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF p_rating IS NULL OR p_rating < 1 OR p_rating > 5 THEN
+    RAISE EXCEPTION 'Rating must be between 1 and 5.';
+  END IF;
+  UPDATE reports
+     SET rating = p_rating, feedback = NULLIF(TRIM(COALESCE(p_feedback, '')), '')
+   WHERE id = p_report_id AND citizen_id = auth.uid() AND status = 'Resolved';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Report not found, not yours, or not yet resolved.';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.rate_report(uuid, int, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.rate_report(uuid, int, text) TO authenticated;
+
+-- Audit logging (2026-07-06): DB-trigger audit trail (RA 10173) — the old
+-- app-layer writer was dead code (clients hit Supabase directly). Logs staff
+-- status changes on reports + service_requests: actor (auth.uid() -> users),
+-- from->to status, row, timestamp. SECURITY DEFINER + an EXCEPTION handler that
+-- swallows failures so audit logging can NEVER roll back the real update.
+-- ip_address = 'db-trigger' (a trigger can't see the client IP — honest, unlike
+-- the old hardcoded 127.0.0.1).
+CREATE OR REPLACE FUNCTION public.audit_report_status_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_email text; v_role text;
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    BEGIN
+      SELECT email, role INTO v_email, v_role FROM users WHERE id = auth.uid();
+      INSERT INTO audit_logs (lgu_id, user_id, user_email, user_role, action, ip_address, details, "timestamp")
+      VALUES (NEW.lgu_id, auth.uid(), COALESCE(v_email, 'system'), COALESCE(v_role, 'system'),
+              'report.status_change', 'db-trigger',
+              json_build_object('report_id', NEW.id, 'reference_number', NEW.reference_number,
+                                'from', OLD.status, 'to', NEW.status)::text, now());
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS reports_audit_status ON reports;
+CREATE TRIGGER reports_audit_status AFTER UPDATE ON reports
+  FOR EACH ROW EXECUTE FUNCTION public.audit_report_status_change();
+
+CREATE OR REPLACE FUNCTION public.audit_request_status_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_email text; v_role text;
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    BEGIN
+      SELECT email, role INTO v_email, v_role FROM users WHERE id = auth.uid();
+      INSERT INTO audit_logs (lgu_id, user_id, user_email, user_role, action, ip_address, details, "timestamp")
+      VALUES (NEW.lgu_id, auth.uid(), COALESCE(v_email, 'system'), COALESCE(v_role, 'system'),
+              'service_request.status_change', 'db-trigger',
+              json_build_object('request_id', NEW.id, 'reference_number', NEW.reference_number,
+                                'from', OLD.status, 'to', NEW.status)::text, now());
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS service_requests_audit_status ON service_requests;
+CREATE TRIGGER service_requests_audit_status AFTER UPDATE ON service_requests
+  FOR EACH ROW EXECUTE FUNCTION public.audit_request_status_change();
+
 -- 3.5 Policies for LGU Services Catalog (admin-editable, citizens browse active rows only)
-CREATE POLICY "Allow all authenticated to read active services" ON lgu_services FOR SELECT USING (
-  is_active = true OR get_current_user_role() = ANY (ARRAY['LGU_ADMIN', 'LGU_PERSONNEL', 'SUPER_ADMIN'])
+-- (2026-07-06, sweep §2): active rows stay public (the citizen catalog), but the
+-- staff-reads-everything branch (incl. inactive drafts) is scoped to the caller's
+-- own LGU so staff can't read other LGUs' draft catalogs.
+CREATE POLICY "Read active services or own-LGU staff" ON lgu_services FOR SELECT USING (
+  is_active = true
+  OR (get_current_user_role() IN ('LGU_ADMIN', 'LGU_PERSONNEL') AND lgu_id = get_current_user_lgu())
+  OR get_current_user_role() = 'SUPER_ADMIN'
 );
 
 CREATE POLICY "Allow LGU_ADMIN to manage own LGU services" ON lgu_services FOR ALL USING (
@@ -751,8 +907,16 @@ CREATE POLICY "Allow SUPER_ADMIN to manage all services" ON lgu_services FOR ALL
 );
 
 -- 4. Policies for Forum Posts
-CREATE POLICY "Allow viewing approved forum posts" ON forum_posts FOR SELECT USING (
+-- (2026-07-06, sweep §2): approved-post reads scoped to the caller's LGU (was
+-- unscoped — any authenticated user could read any LGU's posts), plus an
+-- explicit own-posts policy so a citizen can see their own pending/unapproved
+-- post (the old policy set never allowed that).
+CREATE POLICY "Read approved posts in my LGU" ON forum_posts FOR SELECT USING (
   is_approved = true
+  AND lgu_id = (SELECT u.lgu_id FROM users u WHERE u.id = auth.uid())
+);
+CREATE POLICY "Citizens read their own posts" ON forum_posts FOR SELECT USING (
+  auth.uid() = citizen_id
 );
 CREATE POLICY "Allow LGU Admins to review unapproved posts" ON forum_posts FOR SELECT USING (
   EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = forum_posts.lgu_id)
@@ -849,14 +1013,18 @@ ALTER TABLE forum_comments ENABLE ROW LEVEL SECURITY;
 -- forum_posts.lgu_id, matching the admin's own lgu_id. (Was previously
 -- unscoped: any LGU_ADMIN could read/moderate every LGU's comments — fixed
 -- 2026-07-03, same bug class as the users-table PII leak fixed 2026-07-01.)
-CREATE POLICY "Allow viewing approved forum comments" ON forum_comments FOR SELECT USING (
+-- (2026-07-06, sweep §2): approved-comment reads scoped to the caller's LGU
+-- (was `is_approved = true` unscoped). Citizens' own comments + admin moderation
+-- are covered by the own-comments policy below and the moderate-comments FOR ALL
+-- policy further down, so this SELECT policy no longer needs those OR branches.
+CREATE POLICY "Read approved comments in my LGU" ON forum_comments FOR SELECT USING (
   is_approved = true
-  OR citizen_id = auth.uid()
-  OR EXISTS (
-    SELECT 1 FROM users u
-    JOIN forum_posts p ON p.id = forum_comments.post_id
-    WHERE u.id = auth.uid() AND u.role = 'LGU_ADMIN' AND u.lgu_id = p.lgu_id
-  )
+  AND EXISTS (SELECT 1 FROM forum_posts p
+              WHERE p.id = forum_comments.post_id
+                AND p.lgu_id = (SELECT u.lgu_id FROM users u WHERE u.id = auth.uid()))
+);
+CREATE POLICY "Citizens read their own comments" ON forum_comments FOR SELECT USING (
+  auth.uid() = citizen_id
 );
 
 CREATE POLICY "Allow Citizens to insert comments" ON forum_comments FOR INSERT WITH CHECK (

@@ -1,7 +1,9 @@
 # Plan — Stray-Pets Reporting ("Last Seen" + AI validity)
 
-> **Status:** 🟡 Partially shipped — v1 item 2 (AI badge wording) is done; item 1
-> ("Last Seen" relabel) and item 3 (shared `timeAgo()`) are still not started.
+> **Status:** 🟢 v1 fully shipped (2026-07-06) — item 2 (AI badge wording), item 1
+> ("Last Seen" relabel for stray_animal reports, admin + mobile), and item 3 (shared
+> `timeAgo()`/`getRelativeTime()` helpers) all done. Not yet device-tested. v2 add-ons
+> (hotspot map filter, citizen urgency flag) remain optional/not started.
 > **Updated:** 2026-07-06
 > **Scope:** How stray-animal reports are framed and shown (admin + mobile), and how the
 > COCO dog/cat detector's result is surfaced. Purely presentational + one optional ML

@@ -1,4 +1,5 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Mistral } from '@mistralai/mistralai';
 import { SupabaseService } from './supabase.service';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
@@ -55,6 +56,8 @@ const ML_MODELS: Record<string, { urlEnv: string; keepClasses?: string[] }> = {
 export class ReportController {
   @Post('verify-image')
   @UseGuards(SupabaseAuthGuard)
+  // Tighter than the global default: each call is a billed Roboflow inference.
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   async verifyImage(@Body() body: { photoUrl?: string; category?: string }) {
     const NOT_ANALYZED = { mlConfidence: null, mlVerified: null, isLowCredibility: false };
     const { photoUrl, category } = body || {};
@@ -67,6 +70,23 @@ export class ReportController {
     if (!apiKey || !modelUrl) {
       console.warn(`[ReportController] ROBOFLOW_API_KEY/${cfg.urlEnv} not set — verify-image returning nulls for ${category}`);
       return NOT_ANALYZED;
+    }
+
+    // Only ever relay photoUrl to Roboflow if it's a public URL in this
+    // project's own Supabase storage — otherwise a caller could point
+    // photoUrl at any arbitrary URL and burn paid Roboflow quota on
+    // attacker-chosen images. Derive the allowed prefix from the origin
+    // (not string concatenation) so a trailing slash on SUPABASE_URL
+    // doesn't produce a double-slash and reject legitimate URLs.
+    try {
+      const base = new URL(process.env.SUPABASE_URL || '').origin;
+      const allowedPrefix = `${base}/storage/v1/object/public/`;
+      if (!photoUrl.startsWith(allowedPrefix)) {
+        console.warn(`[ReportController] verify-image rejected photoUrl outside Supabase storage: ${photoUrl}`);
+        return NOT_ANALYZED;
+      }
+    } catch {
+      // SUPABASE_URL unset/unparseable — fail safe without crashing the request.
     }
 
     try {
@@ -131,6 +151,8 @@ export class ChatbotController {
 
   @Post('ask')
   @UseGuards(SupabaseAuthGuard)
+  // Tighter than the global default: each call may hit the billed Mistral fallback.
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
   async askChatbot(@Body() body: ChatbotAskDto) {
     const { query, lguId, history } = body;
 

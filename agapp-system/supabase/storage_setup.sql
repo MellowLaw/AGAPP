@@ -27,12 +27,16 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Policy: Allow authenticated users to upload to report-photos
+-- Path-ownership (2026-07-06, sweep §4): the object path's first folder must be
+-- the uploader's own uid — mobile uploads `${profile.id}/ts.jpg`, so this is a
+-- no-op for legit uploads but blocks writing into another user's folder prefix.
 CREATE POLICY "Allow authenticated uploads to report-photos"
 ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'report-photos'
   AND (storage.extension(name) = 'jpg' OR storage.extension(name) = 'jpeg' OR storage.extension(name) = 'png')
+  AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 -- NOTE (2026-07-05): the three "Allow public to view …" SELECT policies that
@@ -43,10 +47,16 @@ WITH CHECK (
 -- .list()/.download() on these buckets. Don't re-add them.
 
 -- Policy: Allow authenticated users to upload to service-attachments
+-- Path-ownership (2026-07-06, sweep §4): first folder = uploader's uid. No
+-- client currently uploads here, so this is future-proofing on the same
+-- `${uid}/...` convention as report-photos.
 CREATE POLICY "Allow authenticated uploads to service-attachments"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (bucket_id = 'service-attachments');
+WITH CHECK (
+  bucket_id = 'service-attachments'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
 
 -- Policy: Allow users to delete their own uploads
 CREATE POLICY "Allow users to delete own uploads"
@@ -69,6 +79,9 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Policy: Only LGU admins / super admins may upload facility images
+-- Path-ownership (2026-07-06, sweep §4): an LGU_ADMIN may only upload into their
+-- own LGU's folder (`${lguId}/...`); super admins may upload anywhere. Blocks a
+-- Liliw admin from writing into Nagcarlan's facility-image folder prefix.
 CREATE POLICY "Allow admin uploads to facility-images"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -77,6 +90,10 @@ WITH CHECK (
   AND EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role IN ('LGU_ADMIN', 'SUPER_ADMIN')
+  )
+  AND (
+    get_current_user_role() = 'SUPER_ADMIN'
+    OR (storage.foldername(name))[1] = get_current_user_lgu()
   )
 );
 

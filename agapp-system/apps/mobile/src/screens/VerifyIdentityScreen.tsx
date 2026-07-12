@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, Image, Modal, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { globalStyles, ACCENT } from '../theme';
 import { supabase } from '../../supabaseClient';
+import { useToast } from '../components/Toast';
 import {
   ID_TYPES, getBarangays, getVerificationStatus, statusLabel,
 } from '../utils/verification';
@@ -19,6 +20,7 @@ type Step = 0 | 1 | 2 | 3;
 
 export function VerifyIdentityScreen({ navigation }: any) {
   const { T } = useTheme();
+  const { showToast } = useToast();
   const { profile, selectedLgu, refreshProfile } = useAuth();
 
   const [step, setStep] = useState<Step>(0);
@@ -41,7 +43,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   ) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'We need camera access to capture your ID.');
+      showToast('We need camera access to capture your ID.', 'error');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -59,7 +61,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const pickFromLibrary = async (setter: (u: string) => void, aspect: [number, number] = [4, 3]) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'We need photo library access to pick your ID.');
+      showToast('We need photo library access to pick your ID.', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -94,15 +96,15 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
   const handleSubmit = async () => {
     if (!profile || !lguId) {
-      Alert.alert('Error', 'Missing account or LGU. Please re-select your municipality.');
+      showToast('Missing account or LGU. Please re-select your municipality.', 'error');
       return;
     }
     if (!idUri || !selfieUri) {
-      Alert.alert('Incomplete', 'Please capture both your ID and a selfie.');
+      showToast('Please capture both your ID and a selfie.', 'error');
       return;
     }
     if (!barangay.trim()) {
-      Alert.alert('Incomplete', 'Please select the barangay printed on your ID.');
+      showToast('Please select the barangay printed on your ID.', 'error');
       setStep(0);
       return;
     }
@@ -134,11 +136,11 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
       await refreshProfile();
 
-      Alert.alert(
-        'Submitted for review',
-        'Your ID and selfie have been securely uploaded. Your LGU will review your verification, usually within 1–2 business days.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      showToast(
+        'Submitted for review. Your ID and selfie have been securely uploaded. Your LGU will review your verification, usually within 1–2 business days.',
+        'success',
       );
+      navigation.goBack();
     } catch (err: any) {
       // Best-effort cleanup of anything we already uploaded.
       if (uploadedPaths.length > 0) {
@@ -150,11 +152,11 @@ export function VerifyIdentityScreen({ navigation }: any) {
       // account will trip row-level security here — explain it in plain terms.
       const raw = err?.message || '';
       const isRls = err?.code === '42501' || /row-level security|policy/i.test(raw);
-      Alert.alert(
-        'Submission failed',
+      showToast(
         isRls
-          ? 'The municipality you selected doesn’t match your account. Please re-select your LGU and try again.'
-          : raw || 'Please try again.',
+          ? 'Submission failed: the municipality you selected doesn’t match your account. Please re-select your LGU and try again.'
+          : `Submission failed: ${raw || 'Please try again.'}`,
+        'error',
       );
     } finally {
       setSubmitting(false);

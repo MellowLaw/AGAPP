@@ -15,6 +15,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 
 **Audits**
 - [Codebase-Audit](Audits/Codebase-Audit.md) — ground-truth state of every app/folder
+- [Sweep-2026-07-06-Findings](Audits/Sweep-2026-07-06-Findings.md) — 3-agent security/bug sweep: prioritized action plan (§1 insert-forgery is the big one; create-staff regression already fixed)
 
 **Planning**
 - [Roadmap](Planning/Roadmap.md) — overall phased build plan + intended tech stack
@@ -27,6 +28,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-eServices-QR-Pickup](Planning/Plan-eServices-QR-Pickup.md) — document requests + QR pickup (built)
 - [Plan-Personnel-and-FieldOfficer](Planning/Plan-Personnel-and-FieldOfficer.md) — DECIDED: field-officer app CUT (delete later, never use as context); personnel-web trio under consideration
 - [Plan-Reporting-Camera-GPS-Hardening](Planning/Plan-Reporting-Camera-GPS-Hardening.md) — mobile report flow: camera-only, auto-GPS, stamped photo (shipped 2026-07-06, not yet device-tested)
+- [Plan-Phone-Login-SMS](Planning/Plan-Phone-Login-SMS.md) — 🔵 future: phone-number + SMS OTP login; Semaphore (PH) via Supabase SMS hook is the cost-efficient pick
 
 **Tasks**
 - [TODO](Tasks/TODO.md) — prioritized outstanding work

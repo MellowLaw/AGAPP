@@ -25,13 +25,43 @@
       ~2 minutes, zero risk, not reachable via SQL/migrations. Keeps getting deferred —
       do this before any real users sign up.
 
+### From the 2026-07-06 security checklist review (remaining items)
+- [ ] **Finish mobile password reset** — the flow sends the email (`resetPasswordForEmail`)
+      but is called with no `redirectTo` and there's no deep-link handler, so the link
+      opens a web page, not the app. Needs a Supabase Auth redirect URL + an app deep-link
+      scheme (`app.json` + a handler) — requires a real build to test end-to-end.
+- [ ] **Set `ALLOWED_ORIGINS` in `apps/api/.env` for production** — CORS is now
+      env-configurable (defaults to open + a startup warning). Set it to the deployed
+      admin origin before going live. (Mobile is React Native / not CORS-bound.)
+- [ ] **"Approaching rate limit" indicator (optional UX)** — the API now returns 429 when
+      throttled; the mobile/admin clients could surface a friendly "slow down" message on
+      429 (and, if wanted, read the rate-limit headers to show remaining quota). Small,
+      client-side, low priority.
+- [ ] **Input-validation polish (not a security gap)** — injection is already impossible
+      (parameterized supabase-js + React output escaping, no `dangerouslySetInnerHTML`);
+      remaining work is consistent length/format validation across forms for data quality.
+- [ ] **Error monitoring (optional)** — no Sentry/APM today. A free Sentry project + SDK in
+      mobile/admin/api would give crash/error visibility for the defense; not load-bearing.
+      (Infra logs — Postgres/Auth/API — are already available in the Supabase Dashboard.)
+- See the full checklist assessment in the conversation / `Sweep-2026-07-06-Findings.md`
+      neighborhood; phone-login is captured separately in `Plan-Phone-Login-SMS.md`.
+
 ## 🟠 Next (high value)
 
-- [ ] **Delete `apps/field-officer/`** — CUT per user decision 2026-07-06 (see
-      `Plan-Personnel-and-FieldOfficer.md`); until deleted, treat it as non-existent
-      (no features, no references). Removal checklist is in the plan's "Cleanup once
-      deletion happens" section. Keep the `lookup_claim_code`/`release_service_request`
-      RPCs — admin web uses them.
+- [ ] **Finish sweep §1: move ML writes server-side** — the forcing triggers now stop
+      status/tenant/identity/pickup forgery, but `ml_verified`/`ml_confidence` are still
+      written client-side and thus forgeable (a citizen can fake the AI-verified badge).
+      Fix: have the `verify-image` API endpoint (service role) write them to the report
+      after insert, and force them NULL on client inserts. Needs API + mobile flow change
+      — deferred deliberately so the working ML badge isn't degraded before the server
+      path exists. See `Sweep-2026-07-06-Findings.md` §1.
+- [ ] **Sweep §4/§5 backlog (remaining)** — client-only submission cooldown (bypassable),
+      pre-checked RA 10173 consent checkbox, office-backed assignment (part of the personnel
+      trio). Storage path-ownership, `verify-image` URL validation, and audit-log writing
+      are now DONE (see below). Ranked in `Sweep-2026-07-06-Findings.md` §4–§5.
+- [ ] **Run `npm install` in `agapp-system/`** — prunes the deleted field-officer from
+      `package-lock.json` (and the removed Gemini dep). Cosmetic; do it next time you're
+      installing anyway.
 - [ ] **Personnel-web trio (pending user go/no-go)** — real assignment + internal
       notes + attach resolution proof; the manuscript's Fig. 34 / UAT Table 3 promise
       these exact features. Full breakdown in `Plan-Personnel-and-FieldOfficer.md`.
@@ -44,24 +74,87 @@
       queue ("X reports overdue right now"), personnel workload chart (needs
       `service_requests.assigned_personnel` to actually be set when staff click
       "Start Processing" — it exists in the schema but nothing writes to it yet).
-- [ ] **Stray-pets reporting UI — `Plan-StrayPets-Reporting.md`'s "Last Seen" framing**
-      (item 1 + the shared `timeAgo()` helper, item 3) — relabel stray-report cards'
-      "Location"/"Submitted" pair as "Last Seen: [barangay] · [relative time]" (admin +
-      mobile tracking screen). The AI-badge wording (item 2) is now DONE for both ML
-      categories (see below); this "Last Seen" relabel is the only remaining piece.
-- [ ] Reconcile model name: code says "YOLOv11", paper says "YOLOv8n".
-- [ ] Decide audit logging: implement via DB triggers if wanted (clients talk directly
-      to Supabase, so API-side logging can never see their actions). The old dead
-      `writeAuditLog()` path (hardcoded `127.0.0.1` + demo user ids) was **deleted
-      2026-07-05** along with the dead API controllers that called it — there is no
-      audit logging code left at all; `audit_logs` table remains, empty, for a future
-      trigger-based implementation.
-- [ ] Replace client-generated reference numbers (`Math.random`) with DB sequences —
-      DB side **done** (sequences + BEFORE INSERT trigger deployed 2026-06-30);
-      mobile screens updated to omit `reference_number` and read it back via `.select()`.
 
 ## ✅ Done
 
+- [x] **TODO cleanup pass — storage + verify-image hardening, stray-pets UI (2026-07-06)** —
+      knocked out the doable open items via subagents + DB. **Storage path-ownership** (DB,
+      sweep §4): `report-photos`/`service-attachments` uploads pinned to the uploader's own
+      UID folder, `facility-images` to the admin's own LGU (super-admin exempt) — verified
+      the deployed policy text matches the real upload paths (`${uid}/…`, `${lguId}/…`), so
+      legit uploads pass and cross-folder writes are blocked; `storage_setup.sql` synced.
+      **verify-image URL validation** (API subagent, `tsc` clean): rejects any `photoUrl`
+      not under this project's Supabase storage (quota-abuse guard), trailing-slash edge
+      handled. **Stray-pets "Last Seen" UI** (mobile+admin subagent, both `tsc` clean):
+      `Plan-StrayPets-Reporting.md` v1 items 1+3 — stray_animal reports now show "Last
+      Seen: [barangay] · [relative time]"; shared `timeAgo`/`getRelativeTime` helpers
+      lifted to lib/util; strictly gated on the raw `stray_animal` category so other
+      categories render byte-for-byte unchanged; plan doc marked v1-complete. **Stale items
+      removed:** YOLOv11 reconcile (0 refs left), audit-logging "decide" (implemented this
+      session), reference-number sequences (already done). **Deferred (documented, not
+      churned):** ML server-side write refactor (risky to the working badge), personnel
+      trio (needs go/no-go), dashboard charts (user-directed), mobile reset deep-link
+      (needs a build + dashboard config), Sentry (needs a DSN).
+- [x] **Security-checklist hardening — 5 fixes (2026-07-06, orchestrated w/ subagents)** —
+      from the user's checklist review. **(1) API rate limiting + CORS** (subagent, `tsc`
+      clean): `@nestjs/throttler@6.5.0` caps the two paid endpoints — chatbot 20/min,
+      verify-image 10/min (→ 429) — protecting Mistral/Roboflow quota; CORS is now an
+      env allowlist (`ALLOWED_ORIGINS`, defaults open + startup warning; set it in prod).
+      **(2) Audit logging** (DB, verified live): exception-safe `AFTER UPDATE` triggers on
+      `reports` + `service_requests` write actor (auth.uid()→users email/role) + status
+      from→to to `audit_logs` — the RA-10173 trail the manuscript promises, finally
+      populated; the EXCEPTION handler guarantees a failed audit write can't roll back the
+      real update; `schema.sql` synced. **(3) Admin "Forgot password?"** (subagent, `tsc`
+      clean): was a dead `href="#"`, now a real button → `resetPasswordForEmail` with the
+      existing banner for success/error feedback. **(4) Mobile themed toast** (subagent,
+      `tsc` clean): new `src/components/Toast.tsx` (`ToastProvider` + `useToast`, animated,
+      themed, variant success/error/info), mounted inside ThemeProvider→AuthProvider so
+      `useTheme`/`useSafeAreaInsets` resolve; 49/51 native `Alert.alert` calls across 7
+      screens converted — the 2 multi-button confirmations (location-required, sign-in-
+      required) correctly kept as `Alert` since a toast can't carry actions. **(5) Assessed
+      the rest:** data isolation (RLS/UUID-lock) confirmed sound; injection already
+      impossible (parameterized supabase-js + React escaping, no `dangerouslySetInnerHTML`);
+      API confirmed JWT-guarded (not world-open). Remaining smaller items (mobile reset
+      deep-link, prod CORS origin, 429 UX indicator, validation polish, optional Sentry)
+      logged under 🔴 Now. Phone-login captured as a future plan (`Plan-Phone-Login-SMS.md`).
+- [x] **Sweep §2 SELECT scoping + §3 rating applied + verified (2026-07-06)** — migration
+      `sweep_select_scoping_and_rating` (`patches/002_...sql` + `schema.sql` synced).
+      `reports` read split into own-rows (citizens) + LGU-scoped (staff) — closes the
+      PII/cross-citizen leak without blanking the admin pages; `lgu_services` draft reads +
+      `forum_posts`/`forum_comments` approved reads scoped to the caller's LGU; new scoped
+      `rate_report` SECURITY DEFINER RPC replaces the mobile's silently-failing direct
+      rating `.update()` (`TrackingDetailScreen.tsx` wired to `rpc('rate_report')`, checks
+      error; `tsc` clean). **Verified before trusting it** via role-simulated reads through
+      the Supabase MCP (`SET LOCAL role authenticated` + jwt claims, rolled-back tx) on real
+      data: Liliw admin still sees all 11 Liliw reports + 0 cross-LGU; citizen Jechris sees
+      only their own 1 report, 0 leaked. Forum stays LGU-scoped + own-posts visible.
+- [x] **Sweep fixes applied — insert-forgery guards + 3 code fixes (2026-07-06)** — from
+      `Sweep-2026-07-06-Findings.md`. **§1 (live migration `guard_citizen_insert_forgery`):**
+      BEFORE INSERT forcing triggers on `reports` + `service_requests` — pin
+      `citizen_id`/`lgu_id`/`citizen_name`, force `status='Submitted'`, null the lifecycle
+      columns (Resolved / claim_code / released_* forgery), gated on `auth.uid() IS NOT NULL`
+      so seed/service-role inserts pass through. No-op for the legit app (verified the
+      mobile insert payloads match every forced value), only forged fields get overwritten;
+      triggers confirmed installed + enabled; `schema.sql` synced. **ml_verified/ml_confidence
+      deliberately left forgeable** (still client-written) — closing that needs the
+      server-side-write refactor, kept as an open item so the working ML badge isn't broken
+      first. **§3 code fixes (sub-agent, `tsc` clean):** CSV formula-injection escaping on
+      the admin reports export; `.select('id')` guards so silent 0-row admin updates stop
+      showing false "success"; API auth guard fails **closed** on missing env instead of
+      open. **§2 SELECT scoping + rating RPC staged** (not applied — gates reads, needs
+      in-app verify) in `patches/002_...sql`. `verify_geofence` confirmed dead code.
+- [x] **Field-officer app deleted + create-staff regression fixed (2026-07-06)** — cut
+      per the earlier decision (`Plan-Personnel-and-FieldOfficer.md`): `git rm` of the
+      whole `apps/field-officer/` workspace + its orphaned `.env`; CLAUDE.md/memory/docs
+      updated; `lookup_claim_code`/`release_service_request` RPCs kept (admin web uses
+      them); `npm install` still needed to prune the lockfile (see above). **Also fixed a
+      CRITICAL self-inflicted regression found by the same-day sweep:** the
+      `handle_new_citizen_signup()` trigger added earlier today fired on the admin
+      create-staff route's `admin.createUser()` too, inserting a CITIZEN row that made
+      the route's own insert duplicate-key-fail → every staff creation 500'd. Fixed
+      (migration `fix_signup_trigger_skip_staff`): trigger now skips when `role` is in
+      `user_metadata` (staff path) and only runs for genuine citizen signup. `schema.sql`
+      synced; verified live.
 - [x] **Reporting flow hardened: camera-only, automatic GPS, stamped photo (2026-07-06)**
       — `Plan-Reporting-Camera-GPS-Hardening.md` implemented in sequence in
       `ReportsScreen.tsx`. (1) **Camera-only:** deleted `choosePhoto()`/gallery picker

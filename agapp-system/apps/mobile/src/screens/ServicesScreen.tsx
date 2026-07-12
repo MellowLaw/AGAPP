@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
+import { useToast } from '../components/Toast';
 
 const OFFICE_ICONS: Record<string, string> = {
   'BPLO': 'briefcase-outline',
@@ -20,6 +21,7 @@ const OFFICE_ICONS: Record<string, string> = {
 
 export function ServicesScreen({ navigation }: any) {
   const { T } = useTheme();
+  const { showToast } = useToast();
   const { selectedLgu, profile } = useAuth();
   const [catalog, setCatalog] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
@@ -58,11 +60,11 @@ export function ServicesScreen({ navigation }: any) {
 
   const submitApplication = async () => {
     if (!verified) {
-      Alert.alert('Verification Required', 'Please verify your identity before applying for services.');
+      showToast('Please verify your identity before applying for services.', 'error');
       return;
     }
     if (!fullName || !purpose) {
-      Alert.alert('Missing fields', 'Please fill in all required fields.');
+      showToast('Please fill in all required fields.', 'error');
       return;
     }
 
@@ -82,9 +84,9 @@ export function ServicesScreen({ navigation }: any) {
     }).select('reference_number').single();
 
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast(error.message, 'error');
     } else {
-      Alert.alert('Success', `Application submitted. Reference: ${inserted?.reference_number || 'N/A'}`);
+      showToast(`Application submitted. Reference: ${inserted?.reference_number || 'N/A'}`, 'success');
       setShowForm(false);
       setSelectedService(null);
       setPurpose('');

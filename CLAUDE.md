@@ -25,7 +25,7 @@ The **actual system is in `agapp-system/`**. Other top-level folders are docs:
 |---|---|---|
 | `apps/mobile` | Expo SDK 54, RN 0.81, **React 19**, TS | Citizen app (reports, services, forum, map, chatbot, ID verification) |
 | `apps/admin` | Next.js 14 (App Router), **React 18**, Tailwind | LGU + super-admin dashboard |
-| `apps/field-officer` | Expo SDK 54, RN 0.81 | ⚠️ DEPRECATED 2026-07-06 — slated for deletion; treat as non-existent, never build for it or cite it (see `Docs/Planning/Plan-Personnel-and-FieldOfficer.md`) |
+| ~~`apps/field-officer`~~ | — | 🗑️ DELETED 2026-07-06 — was a minimal Expo officer app, cut from the capstone (never in the manuscript; demo loop covered by personnel/admin web). Its `lookup_claim_code`/`release_service_request` RPCs stay (admin web uses them). Don't reintroduce it (see `Docs/Planning/Plan-Personnel-and-FieldOfficer.md`). |
 | `apps/api` | NestJS 10 + Express | Chatbot + push only (plus the guarded `verify-image` ML slot) |
 | `packages/shared` | TS + Zod | Shared types (currently under-used) |
 | `supabase/` | Postgres + PostGIS | Schema, seed, RLS, storage, migrations (pgvector removed) |
@@ -58,16 +58,15 @@ cd apps/mobile && npx expo start --lan     # mobile on a phone (same Wi-Fi)
 ## Gotchas
 
 - **`.env` files are required and not committed** (`apps/api/.env`, `apps/mobile/.env`,
-  `apps/field-officer/.env`, `apps/admin/.env.local`). Apps fail silently / show no
-  data without them.
+  `apps/admin/.env.local`). Apps fail silently / show no data without them.
 - **Realtime needs tables in the `supabase_realtime` publication.** It shipped empty, so
   every `postgres_changes` subscriber (push service, forum, notifications, tracking) was
   silently dead until fixed 2026-07-03. If a new realtime feature gets no events, check
   `pg_publication_tables` first — and the poller can lag a minute after `ALTER PUBLICATION`.
 - **Free-tier Supabase pauses when idle** — if everything "can't connect", check the
   project isn't INACTIVE and restore it.
-- **`@supabase/supabase-js` version split**: mobile/field-officer `2.108`, admin/api
-  `2.43`. Align before relying on newer client APIs.
+- **`@supabase/supabase-js` version split**: mobile `2.108`, admin/api `2.43`. Align
+  before relying on newer client APIs.
 - **React 18/19 split is held together by hoist-blockers** — mobile needs React 19
   (hoisted to root), admin needs React 18. npm ignores yarn's `nohoist`, so the root
   `package.json` pins `react`/`react-dom` 19.1.0 and maps `next`/`styled-jsx` to tiny

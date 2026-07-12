@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useToast } from '../components/Toast';
 
 type ViewState = 'list' | 'detail' | 'create';
 
@@ -30,6 +31,7 @@ const PRESET_IMAGES = [
 
 export function ForumScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
+  const { showToast } = useToast();
   const { profile, selectedLgu } = useAuth();
   
   // ── Swipeable Row component (swipe right → reply) ──────────────────────
@@ -218,16 +220,16 @@ export function ForumScreen({ navigation }: any) {
       setViewState('list');
       
       if (isApproved) {
-        Alert.alert('Thread Created', 'Your new topic was posted to the community forum.');
+        showToast('Your new topic was posted to the community forum.', 'success');
         fetchPosts();
       } else {
-        Alert.alert(
-          'Flagged for Moderation',
-          'Your post contains sensitive or inappropriate words and was flagged. LGU admins will review it soon.'
+        showToast(
+          'Flagged for Moderation: your post contains sensitive or inappropriate words and was flagged. LGU admins will review it soon.',
+          'info'
         );
       }
     } catch (err: any) {
-      Alert.alert('Create thread failed', err.message);
+      showToast(`Create thread failed: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -237,7 +239,7 @@ export function ForumScreen({ navigation }: any) {
     const textToSend = customText ?? newComment;
     if (!textToSend.trim() || !profile || !selectedPost) return;
     if (!verified) {
-      Alert.alert('Verification Required', 'Please verify your identity before replying in the forum.');
+      showToast('Please verify your identity before replying in the forum.', 'error');
       return;
     }
     const contentText = textToSend.trim();
@@ -268,13 +270,13 @@ export function ForumScreen({ navigation }: any) {
         // also update comments count locally in post detail view
         setSelectedPost((prev: any) => prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : null);
       } else {
-        Alert.alert(
-          'Comment Flagged',
-          'Your comment contains inappropriate words and has been submitted to LGU moderators for approval.'
+        showToast(
+          'Comment Flagged: your comment contains inappropriate words and has been submitted to LGU moderators for approval.',
+          'info'
         );
       }
     } catch (err: any) {
-      Alert.alert('Comment failed', err.message);
+      showToast(`Comment failed: ${err.message}`, 'error');
     }
   };
 
@@ -468,7 +470,7 @@ export function ForumScreen({ navigation }: any) {
                   color={isFollowing ? ACCENT : T.textMuted} 
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Link Copied', 'Thread link copied to clipboard.')}>
+              <TouchableOpacity onPress={() => showToast('Thread link copied to clipboard.', 'success')}>
                 <Ionicons name="link-outline" size={20} color={T.textMuted} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setSelectedPost(null); setViewState('list'); }} style={{ marginLeft: 4 }}>
@@ -704,7 +706,7 @@ export function ForumScreen({ navigation }: any) {
           </View>
           <TouchableOpacity style={[styles.newPostBtn, { backgroundColor: ACCENT }]} onPress={() => {
             if (!verified) {
-              Alert.alert('Verification Required', 'Please verify your identity before creating forum threads.');
+              showToast('Please verify your identity before creating forum threads.', 'error');
               return;
             }
             setViewState('create');

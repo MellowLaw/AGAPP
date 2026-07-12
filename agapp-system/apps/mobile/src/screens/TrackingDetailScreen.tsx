@@ -8,6 +8,8 @@ import { reportCategoryLabel } from '@agapp/shared';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import QRCode from 'react-native-qrcode-svg';
+import { useToast } from '../components/Toast';
+import { getRelativeTime } from '../utils/timeAgo';
 
 const SERVICE_STEPS = ['Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released'];
 
@@ -38,6 +40,7 @@ function ServiceTimeline({ status, T }: { status: string; T: any }) {
 export function TrackingDetailScreen({ route, navigation }: any) {
   const { id, type } = route.params;
   const { T } = useTheme();
+  const { showToast } = useToast();
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
@@ -104,10 +107,21 @@ export function TrackingDetailScreen({ route, navigation }: any) {
 
                 <Text style={[styles.label, { color: T.textMuted }]}>DESCRIPTION</Text>
                 <Text style={[styles.value, { color: T.text }]}>{data.description}</Text>
+                {/* Stray-animal reports are point-in-time sightings (animals
+                    move), so this frames as "Last Seen" + relative time instead
+                    of a plain, implicitly-live "Location" — see
+                    Docs/Planning/Plan-StrayPets-Reporting.md. Other categories
+                    keep the unchanged "LOCATION" / "GPS coordinates captured" line. */}
                 {(data.latitude && data.longitude) && (
                   <>
-                    <Text style={[styles.label, { color: T.textMuted }]}>LOCATION</Text>
-                    <Text style={[styles.value, { color: T.text }]}>GPS coordinates captured</Text>
+                    <Text style={[styles.label, { color: T.textMuted }]}>
+                      {data.category === 'stray_animal' ? 'LAST SEEN' : 'LOCATION'}
+                    </Text>
+                    <Text style={[styles.value, { color: T.text }]}>
+                      {data.category === 'stray_animal'
+                        ? `${data.barangay ? data.barangay + ' · ' : ''}${getRelativeTime(data.created_at)}`
+                        : 'GPS coordinates captured'}
+                    </Text>
                     <View style={{ height: 150, borderRadius: 12, overflow: 'hidden', marginTop: 8, borderWidth: 1, borderColor: T.border }}>
                       <MapView
                         style={{ flex: 1 }}
@@ -178,7 +192,13 @@ export function TrackingDetailScreen({ route, navigation }: any) {
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {[1,2,3,4,5].map(star => (
                   <TouchableOpacity key={star} onPress={() => {
-                    supabase.from('reports').update({ rating: star }).eq('id', id).then(() => {
+                    // Goes through the rate_report RPC, not a direct update:
+                    // citizens have no UPDATE policy on reports (adding one would
+                    // re-open the insert-forgery the §1 guards just closed), so
+                    // the old direct .update() silently matched 0 rows and never
+                    // persisted while still flipping the UI to "you rated this".
+                    supabase.rpc('rate_report', { p_report_id: id, p_rating: star }).then(({ error }) => {
+                      if (error) { showToast(`Rating failed: ${error.message}`, 'error'); return; }
                       setData({ ...data, rating: star });
                     });
                   }}>

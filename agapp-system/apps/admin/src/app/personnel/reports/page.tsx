@@ -9,6 +9,7 @@ import { Search } from '@/components/ui/Search';
 import { ArrowsClockwise, Check, Warning, X } from '@phosphor-icons/react';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { timeAgo } from '@/lib/timeAgo';
 
 interface Report {
   id: string;
@@ -18,6 +19,7 @@ interface Report {
   location: string;
   status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'rejected';
   time: string;
+  createdAtIso: string; // raw created_at, for relative-time framing (stray_animal "Last Seen")
   photoUrl: string | null;
   /** null = model never ran for this category; true/false = it ran and did/didn't confirm the subject. */
   aiVerified: boolean | null;
@@ -133,6 +135,7 @@ export default function PersonnelReportsPage() {
         location: row.barangay,
         status: mapDbStatusToUi(row.status || 'Submitted'),
         time: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+        createdAtIso: row.created_at || '',
         photoUrl: row.photo_url || null,
         aiVerified: row.ml_verified ?? null,
         aiConfidence: row.ml_confidence ?? null,
@@ -171,12 +174,15 @@ export default function PersonnelReportsPage() {
       rejected: 'Rejected'
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reports')
       .update({ status: dbStatusMap[status] })
-      .eq('id', active.dbId);
+      .eq('id', active.dbId)
+      .select('id');
 
-    if (error) {
+    // supabase-js returns error: null even when the UPDATE matched 0 rows
+    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
+    if (error || !data || data.length === 0) {
       console.error('Failed to update report status in database', error);
       setItems(prevItems);
       setActive(prevActive);
@@ -242,7 +248,19 @@ export default function PersonnelReportsPage() {
                 )}
                 <div className="text-sm text-text-primary">
                   <p><span className="text-text-muted">Category:</span> {active.category}</p>
-                  <p><span className="text-text-muted">Location:</span> {active.location}</p>
+                  {/* Stray-animal reports are point-in-time sightings (animals
+                      move), so this frames as "Last Seen" + relative time instead
+                      of a plain, implicitly-live "Location" — see
+                      Docs/Planning/Plan-StrayPets-Reporting.md. Other categories
+                      keep the unchanged "Location:" line. */}
+                  {active.dbCategory === 'stray_animal' ? (
+                    <p>
+                      <span className="text-text-muted">Last Seen:</span> {active.location}
+                      {active.createdAtIso && <span className="text-text-muted"> · {timeAgo(active.createdAtIso)}</span>}
+                    </p>
+                  ) : (
+                    <p><span className="text-text-muted">Location:</span> {active.location}</p>
+                  )}
                   <p><span className="text-text-muted">Status:</span> {active.status.replace('_',' ')}</p>
                 </div>
                 {/* AI Detection Badge — null means no model ran (older data, or a

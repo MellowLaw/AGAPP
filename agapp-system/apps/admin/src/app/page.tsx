@@ -40,6 +40,8 @@ export default function UnifiedLoginPage() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export default function UnifiedLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setResetStatus(null);
 
     if (isLocked) return;
 
@@ -143,6 +146,35 @@ export default function UnifiedLoginPage() {
     } catch (err: any) {
       setError(err?.message || 'An unexpected error occurred.');
       setIsLoading(false);
+    }
+  };
+
+  // "Forgot password?" — reuses the email already typed into the login form
+  // above. Frontend validation here is the same UX nicety as handleLogin's:
+  // Supabase Auth is still the source of truth on the server side.
+  const handleForgotPassword = async () => {
+    if (resetLoading || isLoading || isLocked) return;
+    setError('');
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) {
+      setResetStatus({ type: 'error', text: 'Enter your email address above first, then click "Forgot password?".' });
+      return;
+    }
+
+    setResetStatus(null);
+    setResetLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail);
+      if (resetError) {
+        setResetStatus({ type: 'error', text: resetError.message || 'Could not send the reset link. Please try again.' });
+      } else {
+        setResetStatus({ type: 'success', text: 'Password reset link sent — check your email.' });
+      }
+    } catch (err: any) {
+      setResetStatus({ type: 'error', text: err?.message || 'An unexpected error occurred.' });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -205,9 +237,16 @@ export default function UnifiedLoginPage() {
             Sign in to the admin portal to continue.
           </p>
 
-          {error && (
-            <div className="mb-5 px-4 py-3 bg-[#FDF1F0] border border-[#F6D6D3] rounded-[10px] text-sm text-[#B3261E]" role="alert">
-              {error}
+          {(error || resetStatus) && (
+            <div
+              className={`mb-5 px-4 py-3 border rounded-[10px] text-sm ${
+                error || resetStatus?.type === 'error'
+                  ? 'bg-[#FDF1F0] border-[#F6D6D3] text-[#B3261E]'
+                  : 'bg-[#EEF7F0] border-[#CBE8D3] text-[#1E7A3C]'
+              }`}
+              role="alert"
+            >
+              {error || resetStatus?.text}
             </div>
           )}
 
@@ -261,9 +300,14 @@ export default function UnifiedLoginPage() {
             </div>
 
             <div className="flex justify-end items-center mb-7">
-              <a href="#" className="text-[13.5px] font-bold text-[#262223] no-underline hover:text-[#F27983] transition-colors">
-                Forgot password?
-              </a>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetLoading}
+                className="text-[13.5px] font-bold text-[#262223] no-underline hover:text-[#F27983] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {resetLoading ? 'Sending…' : 'Forgot password?'}
+              </button>
             </div>
 
             <button

@@ -11,7 +11,6 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
-  Alert,
   Image,
   Keyboard,
   KeyboardEvent,
@@ -26,6 +25,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useToast } from '../components/Toast';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -103,6 +103,7 @@ const SHEET_EXPANDED  = 300;
 
 export function MapExplorerScreen() {
   const { T, isDarkMode } = useTheme();
+  const { showToast } = useToast();
   const { selectedLgu, guestLgu, profile } = useAuth();
   // Map is intentionally guest-accessible (see AppNavigator's AuthGate copy:
   // "browse Home, News, and the Map without an account") — but selectedLgu is
@@ -324,7 +325,7 @@ export function MapExplorerScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location access is required.');
+        showToast('Location access is required.', 'error');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -332,7 +333,7 @@ export function MapExplorerScreen() {
       setUserLocation(coord);
       mapRef.current?.animateToRegion({ ...coord, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 1000);
     } catch {
-      Alert.alert('Error', 'Unable to fetch your current location.');
+      showToast('Unable to fetch your current location.', 'error');
     } finally {
       setFetchingUserLoc(false);
     }

@@ -17,8 +17,9 @@ export class SupabaseAuthGuard implements CanActivate {
     const supabase = this.supabaseService.getClient();
 
     if (!supabase) {
-      // Mock mode fallback for local prototype simplicity
-      return true;
+      // Fail closed: a misconfigured/unreachable Supabase client must deny
+      // access, not silently let every request through unauthenticated.
+      throw new UnauthorizedException('Authentication service unavailable.');
     }
 
     try {

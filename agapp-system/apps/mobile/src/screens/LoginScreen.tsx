@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
 import { AgappLogo } from '../components/AgappLogo';
 import { ACCENT, globalStyles } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useToast } from '../components/Toast';
 
 export function LoginScreen({ navigation }: any) {
   const { T } = useTheme();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,23 +39,23 @@ export function LoginScreen({ navigation }: any) {
   const handleLogin = async () => {
     const cleanEmail = sanitize(email);
     if (!cleanEmail || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+      showToast('Please enter both email and password.', 'error');
       return;
     }
     if (!isValidEmail(cleanEmail)) {
-      Alert.alert('Invalid Input', 'Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ 
-        email: cleanEmail, 
-        password 
+      const { error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password
       });
       if (error) throw error;
     } catch (err: any) {
-      Alert.alert('Sign In Failed', err.message);
+      showToast(`Sign In Failed: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -65,23 +67,23 @@ export function LoginScreen({ navigation }: any) {
     const cleanLastName = sanitize(lastName);
 
     if (!privacyAccepted) {
-      Alert.alert('Privacy Notice', 'Please accept the Privacy Notice to continue.');
+      showToast('Please accept the Privacy Notice to continue.', 'error');
       return;
     }
     if (!cleanFirstName || !cleanLastName || !cleanEmail || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      showToast('Please fill in all fields.', 'error');
       return;
     }
     if (!isValidEmail(cleanEmail)) {
-      Alert.alert('Invalid Input', 'Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
     if (!isStrongPassword(password)) {
-      Alert.alert('Weak Password', 'Password must be at least 6 characters long.');
+      showToast('Password must be at least 6 characters long.', 'error');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      showToast('Passwords do not match.', 'error');
       return;
     }
 
@@ -101,15 +103,15 @@ export function LoginScreen({ navigation }: any) {
       if (error) throw error;
 
       if (data.session) {
-        Alert.alert('Success', 'Account created successfully!');
+        showToast('Account created successfully!', 'success');
       } else {
         // No session yet means the project requires email confirmation —
         // the profile row still gets created by the trigger either way, but
         // the citizen can't log in until they confirm.
-        Alert.alert('Check your email', 'Please confirm your email address, then sign in.');
+        showToast('Please confirm your email address, then sign in.', 'info');
       }
     } catch (err: any) {
-      Alert.alert('Registration Failed', err.message);
+      showToast(`Registration Failed: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -118,11 +120,11 @@ export function LoginScreen({ navigation }: any) {
   const handleForgotPassword = async () => {
     const cleanEmail = sanitize(email);
     if (!cleanEmail) {
-      Alert.alert('Missing email', 'Please enter your email to reset password.');
+      showToast('Please enter your email to reset password.', 'error');
       return;
     }
     if (!isValidEmail(cleanEmail)) {
-      Alert.alert('Invalid Input', 'Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
@@ -130,9 +132,9 @@ export function LoginScreen({ navigation }: any) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
       if (error) throw error;
-      Alert.alert('Success', 'Check your email for the password reset link.');
+      showToast('Check your email for the password reset link.', 'success');
     } catch (err: any) {
-      Alert.alert('Reset Failed', err.message);
+      showToast(`Reset Failed: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }

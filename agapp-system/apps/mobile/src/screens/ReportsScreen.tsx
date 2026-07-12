@@ -10,6 +10,7 @@ import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
 import { analyzeReportPhoto } from '../utils/mlAnalysis';
 import { reportCategoryLabel } from '@agapp/shared';
+import { useToast } from '../components/Toast';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +27,7 @@ const REPORT_CATEGORIES = [
 
 export function ReportsScreen({ navigation }: any) {
   const { T } = useTheme();
+  const { showToast } = useToast();
   const { selectedLgu, profile, session } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [category, setCategory] = useState('pothole');
@@ -76,13 +78,13 @@ export function ReportsScreen({ navigation }: any) {
   // first, since the stamp overlay needs real coordinates to draw.
   const takePhoto = async () => {
     if (!location) {
-      Alert.alert('Waiting for GPS', "We're still getting your location. Please wait a moment and try again.");
+      showToast("We're still getting your location. Please wait a moment and try again.", 'info');
       if (!loadingLoc) getLocation();
       return;
     }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'We need access to your camera to take a photo of the incident.');
+      showToast('We need access to your camera to take a photo of the incident.', 'error');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -118,7 +120,7 @@ export function ReportsScreen({ navigation }: any) {
       console.warn('Photo stamping failed, falling back to the unstamped photo', err);
       // Never leave the user stuck on a report they can't submit — fall back
       // to the raw photo (no location caption baked in) rather than block.
-      Alert.alert('Stamp Failed', 'Could not add the location stamp, but your photo is still attached.');
+      showToast('Could not add the location stamp, but your photo is still attached.', 'error');
       setImageUri(rawCaptureUri);
       setRawCaptureUri(null);
     } finally {
@@ -193,7 +195,7 @@ export function ReportsScreen({ navigation }: any) {
         const diff = Date.now() - lastReportTime;
         if (diff < 120000) { // 2 minutes cooldown
           const secsLeft = Math.ceil((120000 - diff) / 1000);
-          Alert.alert('Spam Protection', `Please wait ${secsLeft} seconds before submitting another report.`);
+          showToast(`Please wait ${secsLeft} seconds before submitting another report.`, 'info');
           return;
         }
       }
@@ -204,13 +206,13 @@ export function ReportsScreen({ navigation }: any) {
     // 2. Validate input and trim HTML
     const cleanDesc = description.trim().replace(/<[^>]*>/g, '');
     if (cleanDesc.length < 15) {
-      Alert.alert('Validation Error', 'Please write a descriptive explanation of the issue (minimum 15 characters).');
+      showToast('Please write a descriptive explanation of the issue (minimum 15 characters).', 'error');
       return;
     }
 
     // 3. Validate mandatory photo
     if (!imageUri) {
-      Alert.alert('Validation Error', 'Please attach a photo as evidence of the issue.');
+      showToast('Please attach a photo as evidence of the issue.', 'error');
       return;
     }
 
@@ -226,7 +228,7 @@ export function ReportsScreen({ navigation }: any) {
           ]
         );
       } else {
-        Alert.alert('Location Required', "We're still getting your GPS location. Please wait a moment and try again.");
+        showToast("We're still getting your GPS location. Please wait a moment and try again.", 'info');
         if (!loadingLoc) getLocation();
       }
       return;
@@ -236,9 +238,9 @@ export function ReportsScreen({ navigation }: any) {
     if (selectedLgu?.latitude && selectedLgu?.longitude) {
       const dist = getDistanceFromLatLonInKm(location.lat, location.lng, selectedLgu.latitude, selectedLgu.longitude);
       if (dist > 15) {
-        Alert.alert(
-          'Outside Municipal Boundary',
-          `Your coordinates (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}) are ${dist.toFixed(1)}km away from ${selectedLgu.name || 'the selected municipality'}. Reports can only be submitted within municipal boundaries.`
+        showToast(
+          `Outside Municipal Boundary: your coordinates (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}) are ${dist.toFixed(1)}km away from ${selectedLgu.name || 'the selected municipality'}. Reports can only be submitted within municipal boundaries.`,
+          'error'
         );
         return;
       }
@@ -255,7 +257,7 @@ export function ReportsScreen({ navigation }: any) {
       const arrayBuffer = await response.arrayBuffer();
 
       if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
-        Alert.alert('File Too Large', 'Selected image must be less than 5MB.');
+        showToast('Selected image must be less than 5MB.', 'error');
         setSubmitting(false);
         return;
       }
@@ -277,7 +279,7 @@ export function ReportsScreen({ navigation }: any) {
       
       publicUrl = urlData?.publicUrl;
     } catch (err: any) {
-      Alert.alert('Upload Error', `Failed to upload image: ${err.message}`);
+      showToast(`Failed to upload image: ${err.message}`, 'error');
       setSubmitting(false);
       return;
     }
@@ -313,7 +315,7 @@ export function ReportsScreen({ navigation }: any) {
         console.warn('AsyncStorage write error', e);
       }
 
-      Alert.alert('Success', `Report submitted. Reference: ${inserted?.reference_number || 'N/A'}`);
+      showToast(`Report submitted. Reference: ${inserted?.reference_number || 'N/A'}`, 'success');
       setDescription('');
       setImageUri(null);
       setRawCaptureUri(null);
@@ -322,7 +324,7 @@ export function ReportsScreen({ navigation }: any) {
       // the field blank until the citizen navigates away and back.
       getLocation();
     } catch (err: any) {
-      Alert.alert('Submission Error', err.message);
+      showToast(`Submission Error: ${err.message}`, 'error');
     } finally {
       setSubmitting(false);
     }

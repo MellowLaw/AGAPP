@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
+import { timeAgo } from '@/lib/timeAgo';
 import { ReportsMap } from '@/components/map';
 import {
   Warning,
@@ -40,6 +41,7 @@ interface ReportItem {
   submittedBy: string;
   citizenId: string | null; // reports.citizen_id (null if account deleted)
   submittedAt: string;   // human readable timestamp
+  createdAtIso: string;  // raw created_at, for relative-time framing (stray_animal "Last Seen")
   photoUrl: string | null;
   assignedOffice: string | null;
   /** null = model never ran ("not analyzed"); true/false = model ran and did/didn't confirm the subject. */
@@ -117,9 +119,10 @@ const mapReportRowToItem = (row: any): ReportItem => {
     status: mapDbStatusToUi(row.status || 'Submitted'),
     submittedBy: row.citizen_name || 'Citizen',
     citizenId: row.citizen_id || null,
-    submittedAt: row.created_at 
+    submittedAt: row.created_at
       ? new Date(row.created_at).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' }) + ' · ' + new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '',
+    createdAtIso: row.created_at || '',
     photoUrl: row.photo_url || null,
     assignedOffice: row.assigned_office || null,
     aiVerified: row.ml_verified ?? null,
@@ -220,9 +223,14 @@ export default function ReportsPage() {
   const startNum = filteredReports.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const endNum = Math.min(filteredReports.length, safePage * pageSize);
 
+  // Neutralize formula-injection: a cell starting with =, +, -, or @ is executed
+  // as a formula by Excel/Sheets even when quoted, and citizen_name (submittedBy)
+  // is attacker-controlled via mobile signup full_name.
+  const sanitizeCsvCell = (v: string): string => /^[=+\-@]/.test(v) ? `'${v}` : v;
+
   const handleExportCsv = () => {
     const cols = ['id','category','subType','location','status','submittedBy','submittedAt','assignedOffice'];
-    const rows = filteredReports.map(r => [r.id, r.category, r.subType, r.location, r.status, r.submittedBy, r.submittedAt, r.assignedOffice || ''].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
+    const rows = filteredReports.map(r => [r.id, r.category, r.subType, r.location, r.status, r.submittedBy, r.submittedAt, r.assignedOffice || ''].map(v => typeof v === 'string' ? '"'+sanitizeCsvCell(v).replace(/"/g,'""')+'"' : String(v)).join(','));
     const csv = [cols.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -246,12 +254,15 @@ export default function ReportsPage() {
     setReportsList(updated);
     setSelectedReport({ ...selectedReport, status: newStatus });
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reports')
       .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId);
+      .eq('id', selectedReport.dbId)
+      .select('id');
 
-    if (error) {
+    // supabase-js returns error: null even when the UPDATE matched 0 rows
+    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
+    if (error || !data || data.length === 0) {
       console.error('Failed to acknowledge report', error);
       setReportsList(prevList);
       setSelectedReport(prevSelected);
@@ -289,12 +300,15 @@ export default function ReportsPage() {
     setAssignHistory(newHistory);
     setAssignOpen(false);
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reports')
       .update({ assigned_office: officeLabel })
-      .eq('id', selectedReport.dbId);
+      .eq('id', selectedReport.dbId)
+      .select('id');
 
-    if (error) {
+    // supabase-js returns error: null even when the UPDATE matched 0 rows
+    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
+    if (error || !data || data.length === 0) {
       console.error('Failed to assign office', error);
       setReportsList(prevList);
       setSelectedReport(prevSelected);
@@ -320,12 +334,15 @@ export default function ReportsPage() {
     setReportsList(updated);
     setSelectedReport({ ...selectedReport, status: newStatus });
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reports')
       .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId);
+      .eq('id', selectedReport.dbId)
+      .select('id');
 
-    if (error) {
+    // supabase-js returns error: null even when the UPDATE matched 0 rows
+    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
+    if (error || !data || data.length === 0) {
       console.error('Failed to reject report', error);
       setReportsList(prevList);
       setSelectedReport(prevSelected);
@@ -349,12 +366,15 @@ export default function ReportsPage() {
     setReportsList(updated);
     setSelectedReport({ ...selectedReport, status: newStatus });
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reports')
       .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId);
+      .eq('id', selectedReport.dbId)
+      .select('id');
 
-    if (error) {
+    // supabase-js returns error: null even when the UPDATE matched 0 rows
+    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
+    if (error || !data || data.length === 0) {
       console.error('Failed to resolve report', error);
       setReportsList(prevList);
       setSelectedReport(prevSelected);
@@ -531,11 +551,23 @@ export default function ReportsPage() {
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Location</p>
+                    {/* Stray-animal reports are point-in-time sightings (animals
+                        move), so this field frames as "Last Seen" with a relative
+                        time instead of a plain, implicitly-live "Location" — see
+                        Docs/Planning/Plan-StrayPets-Reporting.md. Other categories
+                        are unaffected. */}
+                    <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">
+                      {selectedReport.dbCategory === 'stray_animal' ? 'Last Seen' : 'Location'}
+                    </p>
                     <div className="flex items-start gap-2">
                       <MapPin className="w-4 h-4 text-accent mt-0.5" />
                       <div>
-                        <p className="text-text-primary">{selectedReport.location}</p>
+                        <p className="text-text-primary">
+                          {selectedReport.location}
+                          {selectedReport.dbCategory === 'stray_animal' && selectedReport.createdAtIso && (
+                            <span className="text-text-primary/60"> · {timeAgo(selectedReport.createdAtIso)}</span>
+                          )}
+                        </p>
                         <p className="text-xs text-text-primary/70">{selectedReport.lat}° N, {selectedReport.lng}° E</p>
                       </div>
                     </div>
@@ -545,7 +577,12 @@ export default function ReportsPage() {
                     <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted</p>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-accent" />
-                      <span className="text-text-primary">{selectedReport.submittedAt}</span>
+                      <span className="text-text-primary">
+                        {selectedReport.submittedAt}
+                        {selectedReport.dbCategory === 'stray_animal' && selectedReport.createdAtIso && (
+                          <span className="text-text-primary/60"> · {timeAgo(selectedReport.createdAtIso)}</span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
