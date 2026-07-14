@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Search } from '@/components/ui/Search';
 import { Pagination } from '@/components/ui/Pagination';
 import { supabase } from '@/lib/supabase';
+import { TrendLineChart, type TrendDatum } from '@/components/charts/TrendLineChart';
 
 interface Row { lgu: string; month: string; reports: number; requests: number; }
 
@@ -15,6 +16,7 @@ export default function SuperAnalyticsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [rows, setRows] = useState<Row[]>([]);
+  const [trend, setTrend] = useState<TrendDatum[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -93,6 +95,40 @@ export default function SuperAnalyticsPage() {
       });
 
       setRows(aggregated);
+
+      // Monthly series summed across ALL LGUs (reusing the same reports/
+      // services rows already fetched above — no extra query), sorted
+      // chronologically via a sortable YYYY-MM key rather than the
+      // locale month label used for the per-LGU table above.
+      const monthSortKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = (d: Date) => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+      const trendBucket: Record<string, { label: string; reports: number; requests: number }> = {};
+
+      (reports || []).forEach((r: any) => {
+        if (!r.created_at) return;
+        const d = new Date(r.created_at);
+        const key = monthSortKey(d);
+        if (!trendBucket[key]) trendBucket[key] = { label: monthLabel(d), reports: 0, requests: 0 };
+        trendBucket[key].reports++;
+      });
+
+      (services || []).forEach((s: any) => {
+        if (!s.created_at) return;
+        const d = new Date(s.created_at);
+        const key = monthSortKey(d);
+        if (!trendBucket[key]) trendBucket[key] = { label: monthLabel(d), reports: 0, requests: 0 };
+        trendBucket[key].requests++;
+      });
+
+      const trendSeries = Object.keys(trendBucket)
+        .sort((a, b) => a.localeCompare(b))
+        .map((key) => ({
+          month: trendBucket[key].label,
+          reports: trendBucket[key].reports,
+          requests: trendBucket[key].requests,
+        }));
+
+      setTrend(trendSeries);
       setLoading(false);
     };
 
@@ -121,9 +157,21 @@ export default function SuperAnalyticsPage() {
 
   return (
     <DashboardLayout role="super-admin" title="Analytics">
+      <Card className="mb-6">
+        <CardHeader
+          title="Reports vs. Requests Over Time"
+          subtitle="Monthly totals summed across all LGUs"
+        />
+        {loading ? (
+          <div className="px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl">Loading trend…</div>
+        ) : (
+          <TrendLineChart data={trend} />
+        )}
+      </Card>
+
       <Card>
-        <CardHeader 
-          title="Cross-LGU Metrics" 
+        <CardHeader
+          title="Cross-LGU Metrics"
           action={
             <div className="flex items-center gap-2">
               <Search value={q} onChange={setQ} className="w-64" placeholder="Search LGU or month..." />

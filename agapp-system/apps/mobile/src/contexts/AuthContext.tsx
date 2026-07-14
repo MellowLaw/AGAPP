@@ -220,6 +220,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Best-effort: clear the push token while still authenticated (RLS
+    // requires it) so this device stops receiving notifications meant for
+    // whoever signs in next. A failure here must never block sign-out.
+    if (user) {
+      try {
+        await supabase.from('users').update({ expo_push_token: null }).eq('id', user.id);
+      } catch (err) {
+        console.warn('[AuthContext] Failed to clear push token on sign-out:', err);
+      }
+    }
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);

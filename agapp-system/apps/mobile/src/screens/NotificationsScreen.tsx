@@ -61,7 +61,8 @@ export function NotificationsScreen({ navigation }: any) {
       .from('notifications')
       .select('*')
       .eq('user_id', profile.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
     if (data) setNotifications(data);
   };
 

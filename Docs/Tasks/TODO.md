@@ -77,6 +77,53 @@
 
 ## ✅ Done
 
+- [x] **Mobile audit fixes — verification enforcement + perf + dead code (2026-07-06,
+      subagents + DB)** — from the mobile flow/security/optimization audit. **Server-side
+      (migration `verification_enforcement_cooldown_cancel`, verified, `schema.sql` synced):**
+      the #1 finding — verification was enforced client-side ONLY — is closed: the
+      report/request guard triggers + new forum post/comment guard triggers now RAISE if the
+      caller isn't `verified` (matches the app's gates; blocks raw-REST bypass) and add a 90s
+      submission-cooldown backstop; confirmed all active/demo citizens are `verified` so legit
+      submits still work. Also: profanity trigger now scans the post **title** (was
+      content-only); `cancel_report`/`cancel_request` RPCs + a `'Cancelled'` status let a
+      citizen withdraw their own still-Submitted item. **Mobile (2 subagents, both `tsc`
+      clean):** forum fetch bounded (`.limit(50)`) + realtime refetch debounced (was
+      full-refetch on every event); wired the fake "copy link" (expo-clipboard) and removed
+      the fake "follow" bell; notifications `.limit(50)`; chatbot redirect re-validated
+      client-side; sign-out now nulls `expo_push_token`; Profile "Privacy notice"/"Help" now
+      open real modals + removed the fake GPS-consent toggle; password min 6→8; ML timeout
+      15s→8s + "Checking photo…" label; upload-failure keeps data + retry; invalid
+      tracking/news id shows an empty state (was blank); Withdraw buttons on own Submitted
+      reports/requests. Full `apps/mobile` `tsc --noEmit` clean.
+- [x] **Super Admin overhaul: full-PH onboarding + comparison charts + needs-attention
+      (2026-07-06, orchestrated with subagents; verified live in the browser)** — 4 phases:
+      **(1) Foundation:** `lgus` got nullable `region`/`province` columns (migration +
+      `schema.sql` + shared `LGU` type, rebuilt); fixed the load-bearing id↔name round-trip
+      bug so wizard-added LGUs resolve correctly (login redirect now prefers the DB name
+      when it slugifies back to the id; `NotificationBell` prefers the URL `?lguName=`) —
+      the old hardcoded `ID_TO_NAME` map only knew the 2 seeded LGUs.
+      **(2) Full-PH location picker:** new `apps/admin/src/data/ph-locations.ts` — a
+      static MIT-licensed PSGC dataset (17 regions, 82 provinces, 1,634 cities/municipalities;
+      source cited in the file header; NCR handled as "Metro Manila"; no coords in source so
+      lat/lng stay 0 → set via Configure). Replaced the hardcoded 5-town `MUNICIPALITY_OPTIONS`
+      dropdown in `super/lgus/page.tsx` with a **4-step onboarding wizard** (Location →
+      Branding → optional First-Admin → Review): cascading Region→Province→City selects,
+      derives `name="City, Province"` + id, blocks duplicates; optional first-admin step
+      POSTs `/api/create-staff` (`LGU_ADMIN`) — **needs `SUPABASE_SERVICE_ROLE_KEY`**, and a
+      failure there doesn't roll back the LGU (skippable).
+      **(3) Comparison charts (Recharts 3.9.2, React-18 verified):** new
+      `apps/admin/src/components/charts/*` — LGU ranking bars with a metric toggle
+      (reports/requests/users/avg-response), status-breakdown stacked bars (reuses
+      `markers.ts` STATUS_COLORS), and a reports-vs-requests trend line on `/super/analytics`.
+      Fed from already-fetched data (no new queries); leaderboard table + CSV kept below.
+      **(4) Cross-LGU "Needs attention" panel** on `/super`: aggregates `importantNotices`
+      aging logic across all LGUs (overdue/stale reports+requests) + flags LGUs inactive 14+
+      days.
+      Verified live (super-admin demo login): dashboard renders all charts + the panel
+      ("15 flagged", Nagcarlan inactive) with zero console errors (recharts didn't introduce
+      a 2nd React instance); the wizard's picker cascades correctly (CALABARZON → 5 provinces
+      → Laguna → all 30 real municipalities). Full `apps/admin` `tsc --noEmit` clean.
+      Design plan: `~/.claude/plans/encapsulated-gliding-reddy.md`.
 - [x] **TODO cleanup pass — storage + verify-image hardening, stray-pets UI (2026-07-06)** —
       knocked out the doable open items via subagents + DB. **Storage path-ownership** (DB,
       sweep §4): `report-photos`/`service-attachments` uploads pinned to the uploader's own

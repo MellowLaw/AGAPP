@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, ACCENT, PASTELS } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from '../components/Toast';
+import * as Clipboard from 'expo-clipboard';
 
 type ViewState = 'list' | 'detail' | 'create';
 
@@ -92,7 +93,6 @@ export function ForumScreen({ navigation }: any) {
   const [newComment, setNewComment] = useState('');
   const [replyTarget, setReplyTarget] = useState<any | null>(null);
   const [showPresetsInChat, setShowPresetsInChat] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
   const verified = isVerified(profile);
   
   const commentScrollViewRef = useRef<ScrollView>(null);
@@ -102,14 +102,23 @@ export function ForumScreen({ navigation }: any) {
     if (!selectedLgu) return;
     fetchPosts();
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetchPosts = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchPosts();
+      }, 1500);
+    };
+
     const postsSubscription = supabase
       .channel('public:forum_posts_global')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_posts', filter: `lgu_id=eq.${selectedLgu.id}` }, () => {
-        fetchPosts();
+        debouncedFetchPosts();
       })
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(postsSubscription);
     };
   }, [selectedLgu]);
@@ -140,7 +149,8 @@ export function ForumScreen({ navigation }: any) {
         .select('*, forum_comments(id, is_approved)')
         .eq('lgu_id', selectedLgu.id)
         .or(`is_approved.eq.true,citizen_id.eq.${profile.id}`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       
@@ -463,14 +473,10 @@ export function ForumScreen({ navigation }: any) {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <TouchableOpacity onPress={() => setIsFollowing(!isFollowing)}>
-                <Ionicons 
-                  name={isFollowing ? "notifications" : "notifications-outline"} 
-                  size={20} 
-                  color={isFollowing ? ACCENT : T.textMuted} 
-                />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showToast('Thread link copied to clipboard.', 'success')}>
+              <TouchableOpacity onPress={async () => {
+                await Clipboard.setStringAsync(`agapp://forum/${selectedPost.id}`);
+                showToast('Thread link copied to clipboard.', 'success');
+              }}>
                 <Ionicons name="link-outline" size={20} color={T.textMuted} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setSelectedPost(null); setViewState('list'); }} style={{ marginLeft: 4 }}>

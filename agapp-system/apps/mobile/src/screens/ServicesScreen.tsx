@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,29 @@ export function ServicesScreen({ navigation }: any) {
   const [purpose, setPurpose] = useState('');
   const [copies, setCopies] = useState('1');
   const verified = isVerified(profile);
+
+  const withdrawRequest = (requestId: string) => {
+    Alert.alert(
+      'Withdraw application?',
+      'This will cancel your submitted application. This cannot be undone.',
+      [
+        { text: 'Keep application', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.rpc('cancel_request', { p_request_id: requestId });
+            if (error) {
+              showToast(error.message, 'error');
+            } else {
+              showToast('Application withdrawn.', 'success');
+              refreshRequests();
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const refreshRequests = async () => {
     if (!profile) return;
@@ -280,6 +303,14 @@ export function ServicesScreen({ navigation }: any) {
                     <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '600' }}>{r.reference_number}</Text>
                     <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{r.service_type}</Text>
                   </View>
+                  {r.status === 'Submitted' && (
+                    <TouchableOpacity
+                      style={[styles.withdrawBtn, { borderColor: T.border }]}
+                      onPress={(e) => { e.stopPropagation(); withdrawRequest(r.id); }}
+                    >
+                      <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>Withdraw</Text>
+                    </TouchableOpacity>
+                  )}
                   <View style={[styles.statusPill, { backgroundColor: r.status === 'Ready for Pickup' ? PASTELS.butter : PASTELS.sage }]}>
                     <Text style={styles.statusPillText}>{r.status}</Text>
                   </View>
@@ -303,5 +334,6 @@ const styles = StyleSheet.create({
   requestCard: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
   statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
   statusPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
+  withdrawBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, marginRight: 8 },
   metaLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
 });

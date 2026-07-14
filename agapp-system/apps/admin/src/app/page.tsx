@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Manrope } from 'next/font/google';
 import { ArrowRight, Eye, EyeSlash } from '@phosphor-icons/react';
 import { supabase } from '@/lib/supabase';
-import { lguNameFromId } from '@/lib/lgu';
+import { lguNameFromId, lguIdFromName } from '@/lib/lgu';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 
 // Scoped to this page only — the rest of the admin app uses Plus Jakarta Sans
@@ -80,7 +80,17 @@ export default function UnifiedLoginPage() {
     if (profile.role === 'SUPER_ADMIN') {
       router.push('/super');
     } else if (profile.role === 'LGU_ADMIN') {
-      const lguName = lguNameFromId(profile.lgu_id);
+      // The dashboard reads ?lguName= and converts it back to the id via
+      // lguIdFromName, so lguName MUST round-trip to profile.lgu_id. The
+      // hardcoded map covers the two seeded LGUs (whose DB name — "Municipality
+      // of Liliw" — does NOT round-trip); LGUs added via the onboarding wizard
+      // are stored as "City, Province", which DOES round-trip, so prefer the
+      // real DB name whenever it slugifies back to this id.
+      let lguName = lguNameFromId(profile.lgu_id);
+      const { data: lgu } = await supabase.from('lgus').select('name').eq('id', profile.lgu_id).single();
+      if (lgu?.name && lguIdFromName(lgu.name) === profile.lgu_id) {
+        lguName = lgu.name;
+      }
       router.push(`/lgu/dashboard?lguName=${encodeURIComponent(lguName)}`);
     } else if (profile.role === 'LGU_PERSONNEL') {
       router.push('/personnel/dashboard');

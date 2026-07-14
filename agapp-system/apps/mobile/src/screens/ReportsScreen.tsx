@@ -37,6 +37,7 @@ export function ReportsScreen({ navigation }: any) {
   const [loadingLoc, setLoadingLoc] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingPhoto, setCheckingPhoto] = useState(false);
   // Camera-only capture flow: a freshly taken photo sits here as "pending
   // review" — the user sees the stamped composite live on-screen and either
   // retakes or confirms, at which point captureRef() bakes it into imageUri.
@@ -50,6 +51,29 @@ export function ReportsScreen({ navigation }: any) {
     if (!profile) return;
     fetchReports();
   }, [profile]);
+
+  const withdrawReport = (reportId: string) => {
+    Alert.alert(
+      'Withdraw report?',
+      'This will cancel your submitted report. This cannot be undone.',
+      [
+        { text: 'Keep report', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.rpc('cancel_report', { p_report_id: reportId });
+            if (error) {
+              showToast(error.message, 'error');
+            } else {
+              showToast('Report withdrawn.', 'success');
+              fetchReports();
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const fetchReports = async () => {
     const { data } = await supabase
@@ -276,10 +300,12 @@ export function ReportsScreen({ navigation }: any) {
       const { data: urlData } = supabase.storage
         .from('report-photos')
         .getPublicUrl(fileName);
-      
+
       publicUrl = urlData?.publicUrl;
     } catch (err: any) {
-      showToast(`Failed to upload image: ${err.message}`, 'error');
+      // Keep the description/photo/location as-is so the citizen can just
+      // tap Submit again — they shouldn't have to redo the camera capture.
+      showToast(`Failed to upload photo: ${err.message}. Your report is still filled in — tap Submit Report to try again.`, 'error');
       setSubmitting(false);
       return;
     }
@@ -291,7 +317,9 @@ export function ReportsScreen({ navigation }: any) {
       // server-side model fetches the image over HTTP, it can't reach the phone's
       // local filesystem. Returns nulls ("not analyzed") for any category without
       // a deployed model, or if the check fails for any reason.
+      setCheckingPhoto(true);
       const ml = await analyzeReportPhoto(category, publicUrl, session?.access_token);
+      setCheckingPhoto(false);
 
       const { data: inserted, error } = await supabase.from('reports').insert({
         lgu_id: selectedLgu.id,
@@ -324,9 +352,12 @@ export function ReportsScreen({ navigation }: any) {
       // the field blank until the citizen navigates away and back.
       getLocation();
     } catch (err: any) {
-      showToast(`Submission Error: ${err.message}`, 'error');
+      // Keep the description/photo/location as-is so the citizen can just
+      // tap Submit again instead of redoing the whole report.
+      showToast(`Submission error: ${err.message}. Your report is still filled in — tap Submit Report to try again.`, 'error');
     } finally {
       setSubmitting(false);
+      setCheckingPhoto(false);
     }
   };
 
@@ -515,7 +546,7 @@ export function ReportsScreen({ navigation }: any) {
               disabled={submitting || !verified}
             >
               <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
-                {!verified ? 'Verify to Submit' : submitting ? 'Submitting...' : 'Submit Report'}
+                {!verified ? 'Verify to Submit' : checkingPhoto ? 'Checking photo…' : submitting ? 'Submitting...' : 'Submit Report'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -535,6 +566,14 @@ export function ReportsScreen({ navigation }: any) {
                     <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '600' }}>{r.reference_number}</Text>
                     <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{reportCategoryLabel(r.category)}</Text>
                   </View>
+                  {r.status === 'Submitted' && (
+                    <TouchableOpacity
+                      style={[styles.withdrawBtn, { borderColor: T.border }]}
+                      onPress={(e) => { e.stopPropagation(); withdrawReport(r.id); }}
+                    >
+                      <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>Withdraw</Text>
+                    </TouchableOpacity>
+                  )}
                   <View style={[styles.statusPill, { backgroundColor: PASTELS.blue }]}>
                     <Text style={styles.statusPillText}>{r.status}</Text>
                   </View>
@@ -560,6 +599,7 @@ const styles = StyleSheet.create({
   requestCard: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
   statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
   statusPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
+  withdrawBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, marginRight: 8 },
   mapContainer: { height: 150, borderRadius: 12, overflow: 'hidden', marginTop: 12, borderWidth: 1 },
   photoCard: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 14 },
   imageAttachedContainer: { flexDirection: 'row', alignItems: 'center' },

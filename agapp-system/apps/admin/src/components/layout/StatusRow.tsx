@@ -33,16 +33,6 @@ export function StatusRow() {
 
   return (
     <div className="inline-flex items-center gap-3 px-2 py-2 rounded-md">
-      <div className="flex items-center gap-2">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
-        </span>
-        <span className="text-[11px] font-mono font-semibold tracking-widest text-text-muted">SYS_LIVE</span>
-      </div>
-
-      <div className="h-4 w-px bg-theme" />
-
       <span className="text-sm font-mono font-bold text-text-primary tabular-nums">
         {timeLabel} <span className="text-[10px] font-medium text-text-faint">UTC+8</span>
       </span>

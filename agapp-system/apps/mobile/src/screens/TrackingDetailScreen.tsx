@@ -42,13 +42,16 @@ export function TrackingDetailScreen({ route, navigation }: any) {
   const { T } = useTheme();
   const { showToast } = useToast();
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const table = type === 'report' ? 'reports' : 'service_requests';
 
     const fetchDetail = async () => {
+      setLoading(true);
       const { data: item } = await supabase.from(table).select('*').eq('id', id).single();
       if (item) setData(item);
+      setLoading(false);
     };
     fetchDetail();
 
@@ -63,7 +66,31 @@ export function TrackingDetailScreen({ route, navigation }: any) {
     return () => { supabase.removeChannel(channel); };
   }, [id, type]);
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+        <View style={[globalStyles.screen, { backgroundColor: T.bg }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, backgroundColor: T.card, borderBottomWidth: 1, borderColor: T.border }}>
+            <Ionicons name="arrow-back" size={24} color={T.text} onPress={() => navigation.goBack()} />
+            <Text style={[globalStyles.serif, { color: T.text, fontSize: 22, marginLeft: 16 }]}>Details</Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+            {loading ? (
+              <Text style={{ color: T.textMuted, fontSize: 14 }}>Loading…</Text>
+            ) : (
+              <>
+                <Ionicons name="alert-circle-outline" size={40} color={T.textMuted} style={{ marginBottom: 12 }} />
+                <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>Not found</Text>
+                <Text style={{ color: T.textMuted, fontSize: 14, textAlign: 'center', marginTop: 6 }}>
+                  Not found, or you don't have access to this item.
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>

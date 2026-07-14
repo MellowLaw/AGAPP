@@ -108,7 +108,11 @@ export function NotificationBell() {
   }, [userId]);
 
   const lguQs = useMemo(() => {
-    const lguName = lguId ? lguNameFromId(lguId) : (params?.get('lguName') || '');
+    // Prefer the ?lguName= already in the URL — the login redirect sets it to a
+    // round-trippable name for ANY LGU (incl. wizard-added ones). lguNameFromId
+    // only knows the two seeded LGUs, so it's just a fallback when the param is
+    // absent.
+    const lguName = params?.get('lguName') || (lguId ? lguNameFromId(lguId) : '');
     return lguName ? `?lguName=${encodeURIComponent(lguName)}` : '';
   }, [lguId, params]);
 

@@ -29,8 +29,8 @@ export function LoginScreen({ navigation }: any) {
   };
 
   const isStrongPassword = (password: string) => {
-    // For production: At least 8 chars
-    return password.length >= 6;
+    // At least 8 chars
+    return password.length >= 8;
   };
 
   // Sanitize input (basic trimming to prevent accidental trailing spaces)
@@ -79,7 +79,7 @@ export function LoginScreen({ navigation }: any) {
       return;
     }
     if (!isStrongPassword(password)) {
-      showToast('Password must be at least 6 characters long.', 'error');
+      showToast('Password must be at least 8 characters long.', 'error');
       return;
     }
     if (password !== confirmPassword) {

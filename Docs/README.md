@@ -26,7 +26,8 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-Admin-Notifications](Planning/Plan-Admin-Notifications.md) — admin notification bell + nav badges (built, v1 + v1.1)
 - [Plan-StrayPets-Reporting](Planning/Plan-StrayPets-Reporting.md) — "Last Seen" sighting framing (open) + AI validity badge (shipped 2026-07-06, both ML categories)
 - [Plan-eServices-QR-Pickup](Planning/Plan-eServices-QR-Pickup.md) — document requests + QR pickup (built)
-- [Plan-Personnel-and-FieldOfficer](Planning/Plan-Personnel-and-FieldOfficer.md) — DECIDED: field-officer app CUT (delete later, never use as context); personnel-web trio under consideration
+- [Plan-Personnel-and-FieldOfficer](Planning/Plan-Personnel-and-FieldOfficer.md) — DECIDED: field-officer app CUT (deleted); personnel-web trio origin
+- [Plan-Personnel-Enhancement](Planning/Plan-Personnel-Enhancement.md) — office-based Personnel accounts + scoped UI + front-line trio; ease-of-use for non-technical clerks (draft)
 - [Plan-Reporting-Camera-GPS-Hardening](Planning/Plan-Reporting-Camera-GPS-Hardening.md) — mobile report flow: camera-only, auto-GPS, stamped photo (shipped 2026-07-06, not yet device-tested)
 - [Plan-Phone-Login-SMS](Planning/Plan-Phone-Login-SMS.md) — 🔵 future: phone-number + SMS OTP login; Semaphore (PH) via Supabase SMS hook is the cost-efficient pick
 

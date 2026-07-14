@@ -152,10 +152,12 @@ export function VerifyIdentityScreen({ navigation }: any) {
       // account will trip row-level security here — explain it in plain terms.
       const raw = err?.message || '';
       const isRls = err?.code === '42501' || /row-level security|policy/i.test(raw);
+      // Keep the captured ID/selfie photos and barangay/ID type in state so
+      // the citizen can just tap Submit again — no need to redo the capture.
       showToast(
         isRls
           ? 'Submission failed: the municipality you selected doesn’t match your account. Please re-select your LGU and try again.'
-          : `Submission failed: ${raw || 'Please try again.'}`,
+          : `Submission failed: ${raw || 'Please try again.'} Your ID and selfie are still attached — tap Submit for review to try again.`,
         'error',
       );
     } finally {

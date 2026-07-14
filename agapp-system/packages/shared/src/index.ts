@@ -54,6 +54,8 @@ export type SLATier = 'simple' | 'complex' | 'highly_technical';
 export interface LGU {
   id: string;
   name: string;
+  region?: string; // PSGC region, set by the super-admin onboarding wizard
+  province?: string; // PSGC province (or "Metro Manila" for NCR)
   logo: string; // Base64 or URL
   bannerUrl?: string;
   primaryColor: string; // hex

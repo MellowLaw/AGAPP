@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,7 +19,7 @@ const BADGE_STYLE: Record<VerificationStatus, { bg: string; icon: any; iconColor
 export function ProfileScreen({ navigation }: any) {
   const { T, isDarkMode, setIsDarkMode } = useTheme();
   const { profile, selectedLgu, signOut } = useAuth();
-  const [consentLocation, setConsentLocation] = useState(true);
+  const [infoModal, setInfoModal] = useState<null | 'privacy' | 'help'>(null);
 
   // Parse first name/initials
   const name = profile?.name || 'Citizen';
@@ -77,16 +77,6 @@ export function ProfileScreen({ navigation }: any) {
               <View style={[styles.toggleThumb, { transform: [{ translateX: isDarkMode ? 18 : 2 }] }]} />
             </View>
           </TouchableOpacity>
-
-          <View style={[styles.divider, { backgroundColor: T.border }]} />
-
-          <TouchableOpacity style={styles.menuRow} onPress={() => setConsentLocation(!consentLocation)}>
-            <View style={[styles.menuIcon, { backgroundColor: T.cardAlt }]}><Ionicons name="location-outline" size={18} color={T.text} /></View>
-            <Text style={[styles.menuLabel, { color: T.text }]}>GPS geofence access</Text>
-            <View style={[styles.toggleTrack, { backgroundColor: consentLocation ? '#F497A2' : T.chip }]}>
-              <View style={[styles.toggleThumb, { transform: [{ translateX: consentLocation ? 18 : 2 }] }]} />
-            </View>
-          </TouchableOpacity>
         </View>
 
         <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border, padding: 4 }]}>
@@ -100,8 +90,8 @@ export function ProfileScreen({ navigation }: any) {
           <View style={{ height: 1, marginLeft: 68, backgroundColor: T.border }} />
 
           {[
-            { icon: 'document-text-outline', label: 'Privacy notice (RA 10173)' },
-            { icon: 'help-circle-outline', label: 'Help & support' },
+            { icon: 'document-text-outline', label: 'Privacy notice (RA 10173)', onPress: () => setInfoModal('privacy') },
+            { icon: 'help-circle-outline', label: 'Help & support', onPress: () => setInfoModal('help') },
             { icon: 'log-out-outline',     label: 'Sign out', onPress: signOut },
           ].map((m, i, arr) => (
             <TouchableOpacity
@@ -120,6 +110,50 @@ export function ProfileScreen({ navigation }: any) {
           AGAPP · v1.0.0 · Compliant with RA 10173
         </Text>
       </ScrollView>
+
+      <Modal visible={infoModal !== null} transparent animationType="slide" onRequestClose={() => setInfoModal(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: T.border }]}>
+              <Text style={[globalStyles.serif, { color: T.text, fontSize: 18 }]}>
+                {infoModal === 'privacy' ? 'Privacy notice (RA 10173)' : 'Help & support'}
+              </Text>
+              <TouchableOpacity onPress={() => setInfoModal(null)}>
+                <Ionicons name="close" size={24} color={T.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+              {infoModal === 'privacy' ? (
+                <Text style={{ color: T.text, fontSize: 14, lineHeight: 22 }}>
+                  In compliance with the Data Privacy Act of 2012 (RA 10173), AGAPP collects
+                  and processes only the personal data needed to deliver LGU services to you:{'\n\n'}
+                  • Your name, email address, and barangay, for your citizen account and profile.{'\n'}
+                  • A government-issued ID photo and a selfie, used solely to verify your
+                  identity before you can submit reports or apply for services.{'\n'}
+                  • GPS coordinates and photos attached to a report, used to locate and
+                  document the issue you're reporting.{'\n\n'}
+                  This data is used only to deliver, verify, and process the services you
+                  request, and is shared only with the LGU staff responsible for handling
+                  your request. It is stored securely and is not sold or shared with third
+                  parties. You may contact your LGU's office to request access, correction,
+                  or deletion of your data, subject to what the law and recordkeeping
+                  requirements allow.
+                </Text>
+              ) : (
+                <Text style={{ color: T.text, fontSize: 14, lineHeight: 22 }}>
+                  Need help with your account, a report, or a service application?{'\n\n'}
+                  Visit your Municipal Hall, Monday to Friday, 8:00 AM – 5:00 PM, and speak
+                  with the office relevant to your concern (e.g. the Treasurer's Office,
+                  Civil Registrar, or MSWDO).{'\n\n'}
+                  You can also reach out through your LGU's official contact channels
+                  (posted at the Municipal Hall or on their official social media page) for
+                  questions about this app or your submitted reports and requests.
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -139,4 +173,10 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginLeft: 68 },
   toggleTrack: { width: 44, height: 26, borderRadius: 13, justifyContent: 'center' },
   toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, borderBottomWidth: 1,
+  },
 });

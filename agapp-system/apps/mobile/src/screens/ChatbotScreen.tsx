@@ -8,6 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { AgappLogo } from '../components/AgappLogo';
 import { useNavigation } from '@react-navigation/native';
 
+// Client-side mirror of the server's redirect allowlist (defense-in-depth; server already enforces this)
+const REDIRECT_SCREEN_ALLOWLIST = ['ReportsTab', 'ServicesTab', 'MapTab', 'Forum'];
+
 const ThinkingIndicator = ({ T }: { T: any }) => {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
@@ -247,7 +250,11 @@ export function ChatbotScreen() {
                         {m.redirect && (
                           <TouchableOpacity
                             style={[styles.redirectBtn, { backgroundColor: T.card, borderColor: T.border }]}
-                            onPress={() => navigation.navigate(m.redirect.screen)}
+                            onPress={() => {
+                              if (REDIRECT_SCREEN_ALLOWLIST.includes(m.redirect.screen)) {
+                                navigation.navigate(m.redirect.screen);
+                              }
+                            }}
                             activeOpacity={0.85}
                           >
                             <Ionicons

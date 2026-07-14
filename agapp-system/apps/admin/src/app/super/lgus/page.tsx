@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +11,8 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
 import { lguIdFromName } from '@/lib/lgu';
-import { CaretDown, Eye, Power, UserSwitch, Download } from '@phosphor-icons/react';
+import { listRegions, provincesOfRegion, citiesOfProvince } from '@/data/ph-locations';
+import { Plus, Eye, Power, UserSwitch, Download, ArrowLeft, ArrowRight, CheckCircle, MapPin, Palette, UserPlus, ClipboardText } from '@phosphor-icons/react';
 
 interface Lgu {
   id: string;
@@ -26,6 +28,8 @@ interface Lgu {
   secondary_color: string;
   latitude: number;
   longitude: number;
+  region: string | null;
+  province: string | null;
   onboarding_fee_paid: boolean;
   feature_flags: {
     chatbot: boolean;
@@ -34,18 +38,65 @@ interface Lgu {
   };
 }
 
-const MUNICIPALITY_OPTIONS = [
-  'Pila, Laguna',
-  'Sta. Cruz, Laguna',
-  'Pagsanjan, Laguna',
-  'Lumban, Laguna',
-  'Majayjay, Laguna',
+const DEFAULT_PRIMARY = '#A2B59F';
+const DEFAULT_SECONDARY = '#9FADB5';
+const DEFAULT_FLAGS = { chatbot: true, potholeDetection: true, forum: true };
+
+type WizardFlags = { chatbot: boolean; potholeDetection: boolean; forum: boolean };
+
+interface WizardState {
+  step: number;
+  // Step 1 — location
+  region: string;
+  province: string;
+  city: string;
+  // Step 2 — branding
+  primaryColor: string;
+  secondaryColor: string;
+  onboardingFeePaid: boolean;
+  flags: WizardFlags;
+  // Step 3 — first admin (optional)
+  adminEmail: string;
+  adminName: string;
+  adminPassword: string;
+}
+
+const EMPTY_WIZARD: WizardState = {
+  step: 1,
+  region: '',
+  province: '',
+  city: '',
+  primaryColor: DEFAULT_PRIMARY,
+  secondaryColor: DEFAULT_SECONDARY,
+  onboardingFeePaid: false,
+  flags: { ...DEFAULT_FLAGS },
+  adminEmail: '',
+  adminName: '',
+  adminPassword: '',
+};
+
+const WIZARD_STEPS = [
+  { n: 1, label: 'Location', icon: MapPin },
+  { n: 2, label: 'Branding', icon: Palette },
+  { n: 3, label: 'First Admin', icon: UserPlus },
+  { n: 4, label: 'Review', icon: ClipboardText },
 ];
+
+function ReviewRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2.5">
+      <span className="text-xs font-semibold text-text-muted uppercase">{label}</span>
+      <span className={`text-sm text-text-primary text-right ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
+    </div>
+  );
+}
 
 export default function SuperLgusPage() {
   const [lgus, setLgus] = useState<Lgu[]>([]);
   const [search, setSearch] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizard, setWizard] = useState<WizardState>(EMPTY_WIZARD);
+  const [creating, setCreating] = useState(false);
   const [selectedLguForEdit, setSelectedLguForEdit] = useState<Lgu | null>(null);
   const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
@@ -90,6 +141,8 @@ export default function SuperLgusPage() {
               secondary_color: row.secondary_color || '#9FADB5',
               latitude: row.latitude || 0,
               longitude: row.longitude || 0,
+              region: row.region || null,
+              province: row.province || null,
               onboarding_fee_paid: !!row.onboarding_fee_paid,
               feature_flags: row.feature_flags || { chatbot: true, potholeDetection: true, forum: true },
             };
@@ -107,15 +160,54 @@ export default function SuperLgusPage() {
     fetchLgus();
   }, []);
 
-  const existingNames = useMemo(() => new Set(lgus.map(l => l.name)), [lgus]);
-  const addable = MUNICIPALITY_OPTIONS.filter(n => !existingNames.has(n));
+  const existingIds = useMemo(() => new Set(lgus.map(l => l.id)), [lgus]);
 
   const filtered = lgus.filter(l =>
     l.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAdd = async (name: string) => {
-    const id = lguIdFromName(name);
+  // ---- Add-LGU wizard helpers -------------------------------------------
+  const regions = useMemo(() => listRegions(), []);
+  const provinces = useMemo(
+    () => (wizard.region ? provincesOfRegion(wizard.region) : []),
+    [wizard.region]
+  );
+  const cities = useMemo(
+    () => (wizard.region && wizard.province ? citiesOfProvince(wizard.region, wizard.province) : []),
+    [wizard.region, wizard.province]
+  );
+
+  // Derived LGU name + id from the location selections.
+  const wizardName = wizard.city && wizard.province ? `${wizard.city}, ${wizard.province}` : '';
+  const wizardId = wizardName ? lguIdFromName(wizardName) : '';
+  const duplicateId = !!wizardId && existingIds.has(wizardId);
+  const locationComplete = !!wizard.region && !!wizard.province && !!wizard.city;
+  const canProceedLocation = locationComplete && !duplicateId;
+
+  const openWizard = () => {
+    setWizard(EMPTY_WIZARD);
+    setWizardOpen(true);
+  };
+
+  const closeWizard = () => {
+    if (creating) return;
+    setWizardOpen(false);
+  };
+
+  const patchWizard = (patch: Partial<WizardState>) => setWizard(prev => ({ ...prev, ...patch }));
+
+  const goNext = () => setWizard(prev => ({ ...prev, step: Math.min(prev.step + 1, 4) }));
+  const goBack = () => setWizard(prev => ({ ...prev, step: Math.max(prev.step - 1, 1) }));
+
+  const handleCreateLgu = async () => {
+    if (!canProceedLocation) return;
+
+    const id = wizardId;
+    const name = wizardName;
+    const wantsAdmin = !!wizard.adminEmail.trim();
+
+    setCreating(true);
+
     const newLgu: Lgu = {
       id,
       name,
@@ -126,17 +218,18 @@ export default function SuperLgusPage() {
       responseTime: 'N/A',
       logo: '',
       banner_url: null,
-      primary_color: '#A2B59F',
-      secondary_color: '#9FADB5',
+      primary_color: wizard.primaryColor,
+      secondary_color: wizard.secondaryColor,
       latitude: 0,
       longitude: 0,
-      onboarding_fee_paid: false,
-      feature_flags: { chatbot: true, potholeDetection: true, forum: true },
+      region: wizard.region,
+      province: wizard.province,
+      onboarding_fee_paid: wizard.onboardingFeePaid,
+      feature_flags: { ...wizard.flags },
     };
 
     // Optimistically add to list
     setLgus(prev => [...prev, newLgu]);
-    setAddOpen(false);
 
     const { error } = await supabase
       .from('lgus')
@@ -145,22 +238,58 @@ export default function SuperLgusPage() {
         name,
         logo: '',
         banner_url: null,
-        primary_color: '#A2B59F',
-        secondary_color: '#9FADB5',
+        primary_color: wizard.primaryColor,
+        secondary_color: wizard.secondaryColor,
         latitude: 0,
         longitude: 0,
+        region: wizard.region,
+        province: wizard.province,
         is_active: true,
-        onboarding_fee_paid: false,
-        feature_flags: { chatbot: true, potholeDetection: true, forum: true },
+        onboarding_fee_paid: wizard.onboardingFeePaid,
+        feature_flags: { ...wizard.flags },
       });
 
     if (error) {
       console.error('Failed to add LGU', error);
       setLgus(prev => prev.filter(l => l.id !== id));
+      setCreating(false);
       showToast('Failed to add LGU. Please try again.', 'error');
       return;
     }
 
+    // Optional: create the first LGU admin. A failure here must NOT roll back
+    // the LGU — it's created either way; we just surface the admin error.
+    if (wantsAdmin) {
+      try {
+        const res = await fetch('/api/create-staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: wizard.adminEmail.trim(),
+            password: wizard.adminPassword,
+            name: wizard.adminName.trim(),
+            role: 'LGU_ADMIN',
+            lguId: id,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Failed to create admin account.');
+
+        setCreating(false);
+        setWizardOpen(false);
+        showToast(`Created ${name} and its LGU admin (${wizard.adminEmail.trim()}).`, 'success');
+        return;
+      } catch (err: any) {
+        console.error('LGU created but admin creation failed', err);
+        setCreating(false);
+        setWizardOpen(false);
+        showToast(`LGU created, but admin account couldn't be created: ${err.message || err}`, 'error');
+        return;
+      }
+    }
+
+    setCreating(false);
+    setWizardOpen(false);
     showToast(`Added ${name}.`, 'success');
   };
 
@@ -236,27 +365,10 @@ export default function SuperLgusPage() {
         <CardHeader
           title="Municipalities"
           action={
-            <div className="relative">
-              <Button onClick={() => setAddOpen(v => !v)}>
-                <CaretDown className="w-4 h-4 mr-1" />
-                Add LGU
-              </Button>
-              {addOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-surface border border-theme rounded-xl p-2 z-10">
-                  {addable.length === 0 ? (
-                    <p className="text-sm text-text-muted px-2 py-1">All sample LGUs added</p>
-                  ) : addable.map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => handleAdd(opt)}
-                      className="w-full text-left px-2 py-2 text-sm rounded-lg text-text-primary hover:bg-accent-soft"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Button onClick={openWizard}>
+              <Plus className="w-4 h-4 mr-1" />
+              Add LGU
+            </Button>
           }
         />
 
@@ -452,6 +564,353 @@ export default function SuperLgusPage() {
           </div>
         </div>
       )}
+
+      {/* Add-LGU Onboarding Wizard */}
+      <AnimatePresence>
+        {wizardOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeWizard}
+          >
+            <motion.div
+              className="w-full max-w-2xl bg-surface rounded-2xl border border-theme p-6 overflow-y-auto max-h-[92vh]"
+              initial={{ opacity: 0, scale: 0.97, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 8 }}
+              transition={{ duration: 0.18 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-start border-b border-theme pb-3 mb-5">
+                <div>
+                  <h3 className="text-lg font-bold text-text-primary">Add a new LGU</h3>
+                  <p className="text-sm text-text-muted mt-0.5">
+                    Step {wizard.step} of 4 — {WIZARD_STEPS[wizard.step - 1].label}
+                  </p>
+                </div>
+                <button
+                  onClick={closeWizard}
+                  disabled={creating}
+                  className="text-text-faint hover:text-accent font-bold disabled:opacity-40"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Progress indicator */}
+              <div className="flex items-center justify-between mb-6">
+                {WIZARD_STEPS.map((s, i) => {
+                  const StepIcon = s.icon;
+                  const done = wizard.step > s.n;
+                  const active = wizard.step === s.n;
+                  return (
+                    <React.Fragment key={s.n}>
+                      <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-colors ${
+                            done
+                              ? 'bg-accent border-accent text-white'
+                              : active
+                              ? 'border-accent text-accent bg-accent-soft'
+                              : 'border-theme text-text-faint bg-surface-alt'
+                          }`}
+                        >
+                          {done ? <CheckCircle weight="fill" className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
+                        </div>
+                        <span className={`text-[11px] font-semibold ${active || done ? 'text-text-primary' : 'text-text-faint'}`}>
+                          {s.label}
+                        </span>
+                      </div>
+                      {i < WIZARD_STEPS.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-1 mb-4 rounded ${wizard.step > s.n ? 'bg-accent' : 'bg-theme'}`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+
+              {/* Step body */}
+              <div className="min-h-[240px]">
+                {/* STEP 1 — Location */}
+                {wizard.step === 1 && (
+                  <div className="space-y-5">
+                    <p className="text-sm text-text-muted">
+                      Choose where this LGU is located. We use the official Philippine
+                      region → province → city/municipality hierarchy.
+                    </p>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Region</label>
+                      <select
+                        value={wizard.region}
+                        onChange={(e) => patchWizard({ region: e.target.value, province: '', city: '' })}
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                      >
+                        <option value="">Select a region…</option>
+                        {regions.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Province</label>
+                      <select
+                        value={wizard.province}
+                        disabled={!wizard.region}
+                        onChange={(e) => patchWizard({ province: e.target.value, city: '' })}
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent disabled:opacity-50"
+                      >
+                        <option value="">{wizard.region ? 'Select a province…' : 'Select a region first'}</option>
+                        {provinces.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">City / Municipality</label>
+                      <select
+                        value={wizard.city}
+                        disabled={!wizard.province}
+                        onChange={(e) => patchWizard({ city: e.target.value })}
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent disabled:opacity-50"
+                      >
+                        <option value="">{wizard.province ? 'Select a city/municipality…' : 'Select a province first'}</option>
+                        {cities.map((c) => (
+                          <option key={c.name} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {locationComplete && (
+                      <div className={`rounded-lg px-3 py-2.5 text-sm ${duplicateId ? 'bg-accent-soft text-accent' : 'bg-surface-alt text-text-muted'}`}>
+                        {duplicateId ? (
+                          <>An LGU with the id <span className="font-mono font-semibold">{wizardId}</span> already exists. Pick a different location.</>
+                        ) : (
+                          <>
+                            This LGU will be named <span className="font-semibold text-text-primary">{wizardName}</span>
+                            {' '}(id <span className="font-mono">{wizardId}</span>).
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* STEP 2 — Branding */}
+                {wizard.step === 2 && (
+                  <div className="space-y-5">
+                    <p className="text-sm text-text-muted">
+                      Set the LGU&apos;s brand colors and which features are enabled. You can change
+                      all of this later from the Configure panel.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Primary Color</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={wizard.primaryColor}
+                            onChange={(e) => patchWizard({ primaryColor: e.target.value })}
+                            className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={wizard.primaryColor}
+                            onChange={(e) => patchWizard({ primaryColor: e.target.value })}
+                            className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Secondary Color</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={wizard.secondaryColor}
+                            onChange={(e) => patchWizard({ secondaryColor: e.target.value })}
+                            className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={wizard.secondaryColor}
+                            onChange={(e) => patchWizard({ secondaryColor: e.target.value })}
+                            className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={wizard.onboardingFeePaid}
+                        onChange={(e) => patchWizard({ onboardingFeePaid: e.target.checked })}
+                        className="rounded text-accent focus:ring-accent w-4 h-4"
+                      />
+                      <span className="text-sm font-semibold text-text-primary">Onboarding Fee Paid (Active License)</span>
+                    </label>
+
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-text-faint uppercase tracking-wider">Feature Flags</p>
+                      <div className="grid grid-cols-3 gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={wizard.flags.chatbot}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, chatbot: e.target.checked } })}
+                            className="rounded text-accent focus:ring-accent w-4 h-4"
+                          />
+                          <span className="text-sm font-semibold text-text-primary">Chatbot</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={wizard.flags.potholeDetection}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, potholeDetection: e.target.checked } })}
+                            className="rounded text-accent focus:ring-accent w-4 h-4"
+                          />
+                          <span className="text-sm font-semibold text-text-primary">AI Pothole</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={wizard.flags.forum}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, forum: e.target.checked } })}
+                            className="rounded text-accent focus:ring-accent w-4 h-4"
+                          />
+                          <span className="text-sm font-semibold text-text-primary">Forum</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3 — First admin (optional) */}
+                {wizard.step === 3 && (
+                  <div className="space-y-5">
+                    <p className="text-sm text-text-muted">
+                      Optionally create the first LGU administrator account. You can skip this and
+                      add staff later from the LGU&apos;s Settings page.
+                    </p>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Full Name</label>
+                      <input
+                        type="text"
+                        value={wizard.adminName}
+                        onChange={(e) => patchWizard({ adminName: e.target.value })}
+                        placeholder="e.g. Juan Dela Cruz"
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Email</label>
+                      <input
+                        type="email"
+                        value={wizard.adminEmail}
+                        onChange={(e) => patchWizard({ adminEmail: e.target.value })}
+                        placeholder="admin@lgu.gov.ph"
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Temporary Password</label>
+                      <input
+                        type="text"
+                        value={wizard.adminPassword}
+                        onChange={(e) => patchWizard({ adminPassword: e.target.value })}
+                        placeholder="At least 8 characters"
+                        className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                      <p className="text-xs text-text-faint mt-1.5">
+                        Share these credentials securely with the administrator. They can change the password after signing in.
+                      </p>
+                    </div>
+                    {wizard.adminEmail.trim() && wizard.adminPassword.length > 0 && wizard.adminPassword.length < 8 && (
+                      <p className="text-xs text-accent">Password must be at least 8 characters.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* STEP 4 — Review & Create */}
+                {wizard.step === 4 && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-text-muted">Review the details below, then create the LGU.</p>
+                    <div className="rounded-xl border border-theme divide-y divide-theme overflow-hidden">
+                      <ReviewRow label="Region" value={wizard.region} />
+                      <ReviewRow label="Province" value={wizard.province} />
+                      <ReviewRow label="City / Municipality" value={wizard.city} />
+                      <ReviewRow label="LGU Name" value={wizardName} />
+                      <ReviewRow label="LGU ID" value={wizardId} mono />
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-xs font-semibold text-text-muted uppercase">Branding</span>
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1.5 text-sm text-text-primary">
+                            <span className="inline-block w-4 h-4 rounded border border-theme" style={{ backgroundColor: wizard.primaryColor }} />
+                            <span className="font-mono text-xs">{wizard.primaryColor}</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 text-sm text-text-primary">
+                            <span className="inline-block w-4 h-4 rounded border border-theme" style={{ backgroundColor: wizard.secondaryColor }} />
+                            <span className="font-mono text-xs">{wizard.secondaryColor}</span>
+                          </span>
+                        </div>
+                      </div>
+                      <ReviewRow
+                        label="Features"
+                        value={
+                          [
+                            wizard.flags.chatbot && 'Chatbot',
+                            wizard.flags.potholeDetection && 'AI Pothole',
+                            wizard.flags.forum && 'Forum',
+                          ].filter(Boolean).join(', ') || 'None'
+                        }
+                      />
+                      <ReviewRow label="Onboarding Fee" value={wizard.onboardingFeePaid ? 'Paid' : 'Unpaid'} />
+                      <ReviewRow
+                        label="First Admin"
+                        value={wizard.adminEmail.trim() ? `${wizard.adminName.trim() || '(no name)'} — ${wizard.adminEmail.trim()}` : 'None (skipped)'}
+                      />
+                    </div>
+                    {duplicateId && (
+                      <div className="rounded-lg px-3 py-2.5 text-sm bg-accent-soft text-accent">
+                        An LGU with this id already exists. Go back to Step 1 and pick a different location.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer nav */}
+              <div className="flex items-center justify-between mt-6 border-t border-theme pt-4">
+                <Button variant="secondary" onClick={wizard.step === 1 ? closeWizard : goBack} disabled={creating}>
+                  {wizard.step === 1 ? 'Cancel' : (<><ArrowLeft className="w-4 h-4 mr-1" /> Back</>)}
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  {wizard.step === 3 && (
+                    <Button variant="ghost" onClick={goNext} disabled={creating}>
+                      Skip
+                    </Button>
+                  )}
+                  {wizard.step < 4 ? (
+                    <Button
+                      onClick={goNext}
+                      disabled={wizard.step === 1 && !canProceedLocation}
+                    >
+                      Next <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  ) : (
+                    <Button onClick={handleCreateLgu} disabled={creating || !canProceedLocation}>
+                      {creating ? 'Creating…' : (<><CheckCircle className="w-4 h-4 mr-1" /> Create LGU</>)}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 

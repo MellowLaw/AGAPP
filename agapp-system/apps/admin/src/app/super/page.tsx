@@ -9,8 +9,44 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
+import {
+  ABANDONED_REPORT_DAYS,
+  STALE_REPORT_DAYS,
+  STALE_REQUEST_DAYS,
+  UNCOLLECTED_REQUEST_DAYS,
+} from '@/lib/importantNotices';
 import { ReportsMap, type ReportPin } from '@/components/map';
+import { STATUS_COLORS } from '@/components/map/markers';
+import { LguRankingBarChart, type LguRankingDatum } from '@/components/charts/LguRankingBarChart';
+import { StatusBreakdownChart, type StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
+import { NeedsAttentionPanel, type NeedsAttentionData } from '@/components/charts/NeedsAttentionPanel';
 import { Building, Users, Warning, FileText, Plus } from '@phosphor-icons/react';
+
+// LGUs with zero reports AND zero requests created in this window are
+// flagged as inactive on the cross-LGU "Needs attention" panel.
+const INACTIVE_LGU_DAYS = 14;
+const daysAgo = (days: number) => Date.now() - days * 86_400_000;
+
+const TERMINAL_REPORT_STATUS = 'Resolved';
+const TERMINAL_REQUEST_STATUS = 'Released';
+
+// Numeric twin of formatAvgTurnaround (lib/turnaround.ts) — same rows, same
+// terminal statuses, but returns a raw number (or null) so it can feed the
+// ranking chart instead of a display string.
+function computeAvgResponseDays(reports: any[], requests: any[]): number | null {
+  const durations = [
+    ...reports
+      .filter((r) => r.status === TERMINAL_REPORT_STATUS && r.created_at && r.updated_at)
+      .map((r) => (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 86_400_000)
+      .filter((d) => d >= 0),
+    ...requests
+      .filter((r) => r.status === TERMINAL_REQUEST_STATUS && r.created_at && r.updated_at)
+      .map((r) => (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 86_400_000)
+      .filter((d) => d >= 0),
+  ];
+  if (durations.length === 0) return null;
+  return durations.reduce((sum, d) => sum + d, 0) / durations.length;
+}
 
 const mapDbCategoryToLabel = (category: string): string => {
   switch (category) {
@@ -37,6 +73,7 @@ export default function SuperAdminDashboard() {
   const [selectedLgu, setSelectedLgu] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbReports, setDbReports] = useState<any[]>([]);
+  const [dbRequests, setDbRequests] = useState<any[]>([]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -47,11 +84,12 @@ export default function SuperAdminDashboard() {
           supabase.from('users').select('id, role, lgu_id'),
           supabase
             .from('reports')
-            .select('id, lgu_id, status, created_at, updated_at, reference_number, category, barangay, latitude, longitude, photo_url'),
+            .select('id, lgu_id, status, created_at, updated_at, reference_number, category, barangay, latitude, longitude, photo_url, sla_due_date'),
           supabase.from('service_requests').select('id, lgu_id, status, created_at, updated_at'),
         ]);
 
         if (dbReportsData) setDbReports(dbReportsData);
+        if (dbRequestsData) setDbRequests(dbRequestsData);
 
         if (dbLgus) {
           const mapped = dbLgus.map((lgu: any) => {
@@ -68,6 +106,7 @@ export default function SuperAdminDashboard() {
               reports: lguOwnReports.length,
               requests: lguOwnRequests.length,
               responseTime: formatAvgTurnaround(lguOwnReports, lguOwnRequests),
+              responseTimeDays: computeAvgResponseDays(lguOwnReports, lguOwnRequests),
             };
           });
           setLgus(mapped);
@@ -109,6 +148,86 @@ export default function SuperAdminDashboard() {
       },
     ];
   }, [selectedLgu, filteredLgus]);
+
+  // Chart data for the LGU ranking bars — respects the LGU filter tabs like
+  // the rest of the dashboard.
+  const rankingData = useMemo<LguRankingDatum[]>(
+    () =>
+      filteredLgus.map((l) => ({
+        id: l.id,
+        name: l.name,
+        reports: l.reports,
+        requests: l.requests,
+        users: l.users,
+        responseTimeDays: l.responseTimeDays,
+      })),
+    [filteredLgus]
+  );
+
+  // Reports-by-status per LGU, stacked using the same STATUS_COLORS the
+  // reports map uses, so status colors mean the same thing everywhere.
+  const statusBreakdownData = useMemo<StatusBreakdownDatum[]>(
+    () =>
+      filteredLgus.map((lgu) => {
+        const counts: StatusBreakdownDatum = { name: lgu.name };
+        Object.keys(STATUS_COLORS).forEach((status) => {
+          counts[status] = 0;
+        });
+        dbReports
+          .filter((r) => r.lgu_id === lgu.id)
+          .forEach((r) => {
+            const key = r.status || 'Submitted';
+            counts[key] = (Number(counts[key]) || 0) + 1;
+          });
+        return counts;
+      }),
+    [dbReports, filteredLgus]
+  );
+
+  // Cross-LGU "needs attention" aggregation — same aging thresholds as the
+  // per-LGU notification bell (lib/importantNotices.ts), but computed across
+  // ALL LGUs from data already loaded above instead of one query per LGU.
+  const needsAttention = useMemo<NeedsAttentionData>(() => {
+    const now = Date.now();
+    let overdueReports = 0;
+    let staleReports = 0;
+
+    dbReports
+      .filter((r) => ['Submitted', 'Under Review', 'In Progress'].includes(r.status))
+      .forEach((r) => {
+        const overdue = !!r.sla_due_date && new Date(r.sla_due_date).getTime() < now;
+        if (overdue) {
+          overdueReports++;
+          return; // overdue takes priority over "stale", same as the bell
+        }
+        const abandoned = r.status === 'Submitted' && new Date(r.created_at).getTime() < daysAgo(ABANDONED_REPORT_DAYS);
+        const stale = new Date(r.updated_at).getTime() < daysAgo(STALE_REPORT_DAYS);
+        if (abandoned || stale) staleReports++;
+      });
+
+    let staleRequests = 0;
+    let uncollectedRequests = 0;
+
+    dbRequests.forEach((r) => {
+      if (r.status === 'Ready for Pickup') {
+        if (new Date(r.updated_at).getTime() < daysAgo(UNCOLLECTED_REQUEST_DAYS)) uncollectedRequests++;
+        return;
+      }
+      if (!['Submitted', 'Under Review'].includes(r.status)) return;
+      if (new Date(r.updated_at).getTime() < daysAgo(STALE_REQUEST_DAYS)) staleRequests++;
+    });
+
+    const inactiveLgus = lgus
+      .filter((lgu) => {
+        const cutoff = daysAgo(INACTIVE_LGU_DAYS);
+        const hasRecentReport = dbReports.some((r) => r.lgu_id === lgu.id && new Date(r.created_at).getTime() >= cutoff);
+        const hasRecentRequest = dbRequests.some((r) => r.lgu_id === lgu.id && new Date(r.created_at).getTime() >= cutoff);
+        return !hasRecentReport && !hasRecentRequest;
+      })
+      .map((lgu) => lgu.name);
+
+    return { overdueReports, staleReports, staleRequests, uncollectedRequests, inactiveLgus };
+  }, [dbReports, dbRequests, lgus]);
 
   // Pins for the cross-LGU map, respecting the LGU filter tabs. View-only:
   // super admin sees where every report is and its status, but takes no action.
@@ -209,6 +328,39 @@ export default function SuperAdminDashboard() {
             </motion.div>
           );
         })}
+      </div>
+
+      {/* Needs Attention + LGU Ranking */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        <div className="lg:col-span-1">
+          <NeedsAttentionPanel data={needsAttention} loading={loading} />
+        </div>
+        <div className="lg:col-span-2">
+          <Card noBorder className="rounded-[20px] h-full">
+            <div className="mb-1">
+              <h3 className="text-lg font-bold text-text-primary">LGU Ranking</h3>
+              <p className="text-xs font-serif italic text-accent mt-0.5">Compare each LGU by a metric of your choice</p>
+            </div>
+            <div className="mt-4">
+              <LguRankingBarChart data={rankingData} />
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Status Breakdown */}
+      <div className="mb-8">
+        <div className="mb-5">
+          <h3 className="text-2xl font-bold text-text-primary">Reports by Status</h3>
+          <p className="text-sm font-serif italic text-accent mt-1">
+            {selectedLgu
+              ? `Status breakdown for ${lgus.find(l => l.id === selectedLgu)?.name || 'selected LGU'}`
+              : 'Status breakdown per LGU, across all tenants'}
+          </p>
+        </div>
+        <Card noBorder className="rounded-[20px]">
+          <StatusBreakdownChart data={statusBreakdownData} />
+        </Card>
       </div>
 
       {/* Cross-LGU Reports Map */}

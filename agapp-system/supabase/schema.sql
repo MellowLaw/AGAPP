@@ -22,6 +22,8 @@ DROP TABLE IF EXISTS lgus CASCADE;
 CREATE TABLE lgus (
     id text PRIMARY KEY, -- e.g. 'liliw-laguna'
     name text NOT NULL,
+    region text, -- PSGC region, set by the super-admin onboarding wizard (2026-07-06)
+    province text, -- PSGC province (or 'Metro Manila' for NCR)
     logo text NOT NULL,
     banner_url text,
     primary_color text NOT NULL, -- hex value (e.g. '#A2B59F')
@@ -100,7 +102,7 @@ CREATE TABLE reports (
     latitude double precision NOT NULL,
     longitude double precision NOT NULL,
     barangay text NOT NULL,
-    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Resolved', 'Rejected')),
+    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Resolved', 'Rejected', 'Cancelled')),
     assigned_office text, -- legacy label for quick queries
     assigned_office_id uuid REFERENCES offices(id) ON DELETE SET NULL,
     sla_tier text CHECK (sla_tier IN ('simple', 'complex', 'highly_technical')),
@@ -129,7 +131,7 @@ CREATE TABLE service_requests (
     office_name text NOT NULL, -- e.g. "Civil Registrar"
     office_id uuid REFERENCES offices(id) ON DELETE SET NULL,
     lgu_service_id uuid REFERENCES lgu_services(id) ON DELETE SET NULL,
-    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released', 'Rejected')),
+    status text DEFAULT 'Submitted' NOT NULL CHECK (status IN ('Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released', 'Rejected', 'Cancelled')),
     form_details jsonb NOT NULL,
     qr_code_url text, -- deprecated: QR is now rendered client-side from claim_code, not a stored URL
     attachment_url text,
@@ -767,13 +769,23 @@ CREATE POLICY "Allow LGU admins/personnel to view and modify service requests" O
 -- ml_confidence / ml_verified are intentionally NOT forced (the app still
 -- writes them client-side) — locking those needs ML writes to move server-side
 -- first; tracked as a follow-up in Docs/Audits/Sweep-2026-07-06-Findings.md §1.
+-- NOTE (2026-07-06): both guards also ENFORCE citizen verification server-side
+-- (the app gated it client-side only — a raw REST insert could bypass) and a
+-- 90s submission-cooldown backstop (client cooldown is 120s + bypassable). They
+-- RAISE for an unverified caller or a too-soon repeat; seed/service-role inserts
+-- (auth.uid() null) skip the whole block.
 CREATE OR REPLACE FUNCTION public.guard_citizen_report_insert()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_lgu text; v_name text;
+DECLARE v_lgu text; v_name text; v_status text;
 BEGIN
   IF auth.uid() IS NOT NULL THEN
-    v_lgu  := (SELECT lgu_id FROM users WHERE id = auth.uid());
-    v_name := (SELECT name   FROM users WHERE id = auth.uid());
+    SELECT lgu_id, name, verification_status INTO v_lgu, v_name, v_status FROM users WHERE id = auth.uid();
+    IF v_status IS DISTINCT FROM 'verified' THEN
+      RAISE EXCEPTION 'Your account must be verified before submitting a report.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM reports WHERE citizen_id = auth.uid() AND created_at > now() - interval '90 seconds') THEN
+      RAISE EXCEPTION 'Please wait a moment before submitting another report.';
+    END IF;
     NEW.citizen_id := auth.uid();
     IF v_lgu  IS NOT NULL THEN NEW.lgu_id       := v_lgu;  END IF;
     IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
@@ -792,11 +804,16 @@ CREATE TRIGGER reports_guard_citizen_insert BEFORE INSERT ON reports
 
 CREATE OR REPLACE FUNCTION public.guard_citizen_request_insert()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_lgu text; v_name text;
+DECLARE v_lgu text; v_name text; v_status text;
 BEGIN
   IF auth.uid() IS NOT NULL THEN
-    v_lgu  := (SELECT lgu_id FROM users WHERE id = auth.uid());
-    v_name := (SELECT name   FROM users WHERE id = auth.uid());
+    SELECT lgu_id, name, verification_status INTO v_lgu, v_name, v_status FROM users WHERE id = auth.uid();
+    IF v_status IS DISTINCT FROM 'verified' THEN
+      RAISE EXCEPTION 'Your account must be verified before applying for a service.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM service_requests WHERE citizen_id = auth.uid() AND created_at > now() - interval '90 seconds') THEN
+      RAISE EXCEPTION 'Please wait a moment before submitting another application.';
+    END IF;
     NEW.citizen_id := auth.uid();
     IF v_lgu  IS NOT NULL THEN NEW.lgu_id       := v_lgu;  END IF;
     IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
@@ -812,6 +829,69 @@ END; $$;
 DROP TRIGGER IF EXISTS service_requests_guard_citizen_insert ON service_requests;
 CREATE TRIGGER service_requests_guard_citizen_insert BEFORE INSERT ON service_requests
   FOR EACH ROW EXECUTE FUNCTION public.guard_citizen_request_insert();
+
+-- Forum insert guards (2026-07-06): pin citizen_id/lgu_id/name + require the
+-- caller be verified (matches the app's forum-posting gate; closes the same
+-- client-only bypass as reports/requests). forum_comments has no title/lgu_id.
+CREATE OR REPLACE FUNCTION public.guard_citizen_forum_post_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_lgu text; v_name text; v_status text;
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    SELECT lgu_id, name, verification_status INTO v_lgu, v_name, v_status FROM users WHERE id = auth.uid();
+    IF v_status IS DISTINCT FROM 'verified' THEN
+      RAISE EXCEPTION 'Your account must be verified before posting in the forum.';
+    END IF;
+    NEW.citizen_id := auth.uid();
+    IF v_lgu  IS NOT NULL THEN NEW.lgu_id       := v_lgu;  END IF;
+    IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS forum_posts_guard_citizen_insert ON forum_posts;
+CREATE TRIGGER forum_posts_guard_citizen_insert BEFORE INSERT ON forum_posts
+  FOR EACH ROW EXECUTE FUNCTION public.guard_citizen_forum_post_insert();
+
+CREATE OR REPLACE FUNCTION public.guard_citizen_forum_comment_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_name text; v_status text;
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    SELECT name, verification_status INTO v_name, v_status FROM users WHERE id = auth.uid();
+    IF v_status IS DISTINCT FROM 'verified' THEN
+      RAISE EXCEPTION 'Your account must be verified before commenting in the forum.';
+    END IF;
+    NEW.citizen_id := auth.uid();
+    IF v_name IS NOT NULL THEN NEW.citizen_name := v_name; END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS forum_comments_guard_citizen_insert ON forum_comments;
+CREATE TRIGGER forum_comments_guard_citizen_insert BEFORE INSERT ON forum_comments
+  FOR EACH ROW EXECUTE FUNCTION public.guard_citizen_forum_comment_insert();
+
+-- Citizen self-withdraw RPCs (2026-07-06): cancel your OWN still-Submitted
+-- report/request (sets status 'Cancelled'); SECURITY DEFINER so it bypasses the
+-- staff-only UPDATE policy but only for the owner + only while Submitted.
+CREATE OR REPLACE FUNCTION public.cancel_report(p_report_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE reports SET status = 'Cancelled'
+   WHERE id = p_report_id AND citizen_id = auth.uid() AND status = 'Submitted';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Report not found, not yours, or already being processed.'; END IF;
+END; $$;
+REVOKE ALL ON FUNCTION public.cancel_report(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.cancel_report(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.cancel_request(p_request_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE service_requests SET status = 'Cancelled'
+   WHERE id = p_request_id AND citizen_id = auth.uid() AND status = 'Submitted';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found, not yours, or already being processed.'; END IF;
+END; $$;
+REVOKE ALL ON FUNCTION public.cancel_request(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.cancel_request(uuid) TO authenticated;
 
 -- Citizen rating RPC (2026-07-06, sweep §3): there is no citizen UPDATE policy on
 -- reports (a blanket one would re-open the insert-forgery the guards above close),
