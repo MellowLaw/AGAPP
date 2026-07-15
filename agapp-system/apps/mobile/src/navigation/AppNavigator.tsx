@@ -186,11 +186,14 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               gap: 2,
             }}
           >
-            <IconComponent size={26} color={isFocused ? '#292929' : T.textMuted} variant="Bold" />
+            {/* Active state sits on the T.accentSoft pill — its color must
+                react to how light/dark that specific pill is (an LGU can
+                pick a dark accent), not assume ink always works. */}
+            <IconComponent size={26} color={isFocused ? T.onAccentSoft : T.textMuted} variant="Bold" />
             <Text style={{
               fontFamily: 'Inter-Medium',
               fontSize: 10,
-              color: isFocused ? '#292929' : T.textMuted,
+              color: isFocused ? T.onAccentSoft : T.textMuted,
               lineHeight: 12,
             }}>
               {displayLabel}

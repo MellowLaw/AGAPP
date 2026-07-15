@@ -1,6 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+// Real Iconsax icons — same family/names as mobile's iconsax-react-native
+// (Sidebar.tsx already imports this package successfully in this same
+// Next.js build, confirmed before using it here). Using the actual bold
+// glyphs instead of generic outline placeholders so the preview's icon
+// SHAPE is accurate, not just its color.
+import { Home, Briefcase, Danger, Scroll, DocumentText, Messages, Map, Call, TrendUp, User } from 'iconsax-react';
 
 interface ColorPaletteSelectorProps {
   primaryColor: string;
@@ -9,6 +15,36 @@ interface ColorPaletteSelectorProps {
   darkBgColor: string;
   onChange: (colors: { primaryColor: string; secondaryColor: string; iconColor: string; darkBgColor: string }) => void;
   lguName?: string;
+}
+
+// Reimplementation of packages/shared/src/theme.ts's softenColor/contrastColor —
+// copied verbatim (same math) rather than imported, because @agapp/shared's
+// barrel pulls in react-native (ThemeContext.tsx -> AsyncStorage, theme.ts ->
+// StyleSheet) at module scope, which would risk breaking this Next.js/webpack
+// build. Keep these in sync by hand if the mobile formulas ever change.
+
+// Blends any hex color toward white by `amount` (0-1) — same "soft pill" fill
+// mobile derives for the active tab bar indicator (T.accentSoft).
+function softenColor(hex: string, amount = 0.45): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const mix = (channel: number) => Math.round(channel + (255 - channel) * amount);
+  return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Picks ink or cream depending on how light/dark `hex` itself is — same
+// relative-luminance formula mobile uses to pick text/icon color drawn on
+// top of an accent fill (T.onAccentSoft).
+function contrastColor(hex: string): '#292929' | '#FFFCF5' {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '#292929';
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#292929' : '#FFFCF5';
 }
 
 const PALETTE_CATEGORIES = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Grey', 'Custom'];
@@ -45,6 +81,50 @@ const PREDEFINED_PALETTES = [
   { name: 'Charcoal Slate', primary: '#2F3E46', secondary: '#CAD2C5', icon: '#CBD5E0', darkBg: '#1F242E', category: 'Grey' },
   { name: 'Soft Pebble', primary: '#4A5568', secondary: '#EDF2F7', icon: '#CBD5E0', darkBg: '#242936', category: 'Grey' },
 ];
+
+// The real icons + labels HomeScreen.tsx's quick-action grid and
+// AppNavigator.tsx's floating tab bar actually use (verified against the
+// live mobile code, not approximated) — rendered with `variant="Bold"` to
+// match mobile's filled/bold Iconsax style, not an outline placeholder.
+// "Chatbot" is the one exception: mobile uses Ionicons "chatbox-ellipses"
+// (no iconsax equivalent existed for that exact glyph), so it stays a
+// hand-drawn shape here too, but filled solid now instead of stroked.
+type IconVariant = 'Linear' | 'Outline' | 'Broken' | 'Bold' | 'Bulk' | 'TwoTone';
+type PreviewGlyph = { label: string; Icon?: React.ComponentType<{ size?: string | number; color?: string; variant?: IconVariant }> };
+
+const PREVIEW_QUICK_ACTIONS: PreviewGlyph[] = [
+  { label: 'E-Services', Icon: Briefcase },
+  { label: 'Report', Icon: Danger },
+  { label: 'Citizen Guide', Icon: Scroll },
+  { label: 'News', Icon: DocumentText },
+  { label: 'Forum', Icon: Messages },
+  { label: 'Chatbot' }, // hand-drawn filled bubble below, no iconsax match
+  { label: 'Explore', Icon: Map },
+  { label: 'Emergency', Icon: Call },
+];
+
+const PREVIEW_NAV_TABS: PreviewGlyph[] = [
+  { label: 'Home', Icon: Home },
+  { label: 'Services', Icon: Briefcase },
+  { label: 'Report', Icon: TrendUp },
+  { label: 'Forum', Icon: Messages },
+  { label: 'Profile', Icon: User },
+];
+
+// Filled speech-bubble-with-dots for the one non-iconsax glyph (Chatbot).
+function ChatboxGlyph({ size = 16, color = '#000' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M20 2H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h3v3.5a.5.5 0 0 0 .8.4L13 19h7a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"
+        fill={color}
+      />
+      <circle cx="8" cy="10.5" r="1.4" fill={color === '#FFFCF5' ? '#292929' : '#FFFCF5'} />
+      <circle cx="12" cy="10.5" r="1.4" fill={color === '#FFFCF5' ? '#292929' : '#FFFCF5'} />
+      <circle cx="16" cy="10.5" r="1.4" fill={color === '#FFFCF5' ? '#292929' : '#FFFCF5'} />
+    </svg>
+  );
+}
 
 export function ColorPaletteSelector({
   primaryColor,
@@ -99,10 +179,24 @@ export function ColorPaletteSelector({
     localStorage.setItem('agapp-custom-palettes', JSON.stringify(nextList));
   };
 
-  // SVG base64 noise filter for texture
-  const noiseBgStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-  };
+  // Derived preview values — reproduces the exact mobile color logic
+  // (HomeScreen.tsx's T.iconAccent, AppNavigator.tsx's T.accentSoft /
+  // T.onAccentSoft) so this preview honestly predicts what mobile will show.
+  const previewPrimary = primaryColor || '#A2B59F';
+  const previewIconAccent = iconColor || previewPrimary;
+  const previewBg = isPreviewDark ? (darkBgColor || '#292929') : '#FFFCF5';
+  const previewSoftenAmount = isPreviewDark ? 0.3 : 0.45;
+  const previewPillColor = softenColor(previewPrimary, previewSoftenAmount);
+  const previewPillIconColor = contrastColor(previewPillColor);
+  // Same diagonal accent wash apps/mobile/src/components/ScreenBackground.tsx
+  // paints behind every tab screen — per the brand mockup (HOME PAGE V3.png /
+  // HOME PAGE DARKMODE.png) the tint carries almost the full screen height,
+  // only settling into the flat base bg right near the bottom edge, not a
+  // small corner glow that flattens out early.
+  const washTopAlpha = isPreviewDark ? '33' : '4D';
+  const washMidAlpha = isPreviewDark ? '21' : '29';
+  const washLowAlpha = isPreviewDark ? '12' : '14';
+  const previewWash = `linear-gradient(to bottom left, ${previewPrimary}${washTopAlpha} 0%, ${previewPrimary}${washMidAlpha} 40%, ${previewPrimary}${washLowAlpha} 75%, ${previewBg} 100%)`;
 
   return (
     <div className="space-y-4 border border-theme rounded-xl p-4 bg-surface-alt/30">
@@ -259,14 +353,32 @@ export function ColorPaletteSelector({
         {/* Bezel frame of simulated Phone */}
         <div className="w-[260px] h-[450px] bg-black rounded-[42px] p-2.5 shadow-2xl relative border-4 border-[#333333]">
           
-          {/* Dynamic screen area */}
+          {/* Dynamic screen area — structural mirror of the real mobile Home
+              screen's top portion (HomeScreen.tsx) plus the floating nav bar
+              (AppNavigator.tsx's FloatingTabBar). Static/non-interactive —
+              this is a color preview, not a functional mockup. */}
           <div
-            className="w-full h-full rounded-[32px] overflow-hidden flex flex-col justify-between relative transition-all duration-300 select-none"
+            className="w-full h-full rounded-[32px] overflow-hidden relative transition-all duration-300 select-none"
             style={{
-              backgroundColor: isPreviewDark ? (darkBgColor || '#292929') : '#fffcf5',
-              color: isPreviewDark ? '#fffcf5' : '#292929',
+              background: previewWash,
+              color: isPreviewDark ? '#FFFCF5' : '#292929',
             }}
           >
+            {/* Sparkle shapes — same static/animated decor
+                ScreenBackground.tsx scatters through the top ~60% of every
+                tab screen (star/diamond/ring/dot, tinted with the accent),
+                not confined to a thin sliver under the status bar. Fixed
+                opacity here since this preview has no animation. */}
+            <div className="absolute inset-x-0 top-0 h-[60%] pointer-events-none overflow-hidden">
+              <div className="absolute rounded-full" style={{ top: 10, left: '18%', width: 5, height: 5, backgroundColor: previewPrimary, opacity: 0.55 }} />
+              <div className="absolute rotate-45" style={{ top: 22, left: '68%', width: 6, height: 6, backgroundColor: previewPrimary, opacity: 0.5 }} />
+              <div className="absolute rounded-full border" style={{ top: 34, left: '42%', width: 7, height: 7, borderColor: previewPrimary, opacity: 0.5 }} />
+              <div className="absolute rounded-full" style={{ top: 16, left: '86%', width: 4, height: 4, backgroundColor: previewPrimary, opacity: 0.55 }} />
+              <div className="absolute rotate-45" style={{ top: 92, left: '80%', width: 6, height: 6, backgroundColor: previewPrimary, opacity: 0.45 }} />
+              <div className="absolute rounded-full" style={{ top: 118, left: '14%', width: 5, height: 5, backgroundColor: previewPrimary, opacity: 0.45 }} />
+              <div className="absolute rounded-full border" style={{ top: 150, left: '55%', width: 7, height: 7, borderColor: previewPrimary, opacity: 0.4 }} />
+            </div>
+
             {/* Simulated Phone Status Bar */}
             <div className="h-6 w-full flex justify-between items-center px-5 text-[9px] font-bold tracking-tight z-20 opacity-75">
               <span>9:41</span>
@@ -281,143 +393,88 @@ export function ColorPaletteSelector({
               </div>
             </div>
 
-            {/* Mobile Viewport Main Page Content */}
-            <div className="flex-1 flex flex-col p-3.5 gap-3 overflow-hidden">
-              
-              {/* Mock App Header */}
-              <div className="flex justify-between items-center z-10 shrink-0">
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="text-xs font-bold tracking-tight">agapp</span>
-                </div>
-                {/* Active Notification Indicator */}
-                <div className="relative">
-                  <svg className="w-4 h-4 text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
-                </div>
-              </div>
+            {/* Home screen top portion — greeting header + quick-action grid,
+                mirroring HomeScreen.tsx's "For You" tab structure. */}
+            <div className="px-3.5 pt-1 overflow-hidden" style={{ height: 'calc(100% - 24px - 58px)' }}>
+              <span className="block text-[8px] font-medium opacity-70 mb-0.5">
+                Brgy. Poblacion | {lguName}
+              </span>
+              <h4 className="text-[16px] font-bold leading-tight mb-3">
+                Magandang Araw!
+              </h4>
 
-              {/* Mobile Noise Gradient Banner */}
+              {/* Quick Actions Grid Card — 2x4, matching the real 8 quick
+                  actions. Tile background is T.card equivalent; the glyph
+                  color is T.iconAccent (iconColor || primaryColor), the
+                  ACTUAL fallback logic HomeScreen.tsx uses. */}
               <div
-                className="relative h-28 rounded-2xl overflow-hidden flex flex-col justify-between p-3 text-white transition-all duration-300 shadow-sm shrink-0"
+                className="rounded-2xl border p-2.5"
                 style={{
-                  background: `linear-gradient(135deg, ${primaryColor || '#E63946'}, ${secondaryColor || '#F1FAEE'})`,
+                  backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
+                  borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
                 }}
               >
-                {/* Noise filter overlay */}
-                <div
-                  className="absolute inset-0 opacity-[0.08] pointer-events-none select-none mix-blend-overlay"
-                  style={noiseBgStyle}
-                />
-
-                <div className="flex justify-between items-start z-10">
-                  <div>
-                    <span className="text-[7px] font-mono tracking-[0.2em] uppercase opacity-75">
-                      Citizen Portal
-                    </span>
-                    <h4 className="display-font font-serif italic text-sm tracking-tight leading-tight mt-0.5">
-                      Discover {lguName}
-                    </h4>
-                  </div>
-                  <div className="w-5 h-5 rounded-full bg-white/20 backdrop-blur-sm border border-white/25 flex items-center justify-center">
-                    <span className="text-[6px] font-bold">LGU</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-end z-10">
-                  <span className="text-[7px] font-mono opacity-70">Liliw, Laguna</span>
-                  <div
-                    className="px-2.5 py-1 rounded-md text-[7px] font-bold shadow-sm transition-transform cursor-pointer"
-                    style={{ backgroundColor: isPreviewDark ? '#ffffff' : '#000000', color: isPreviewDark ? '#000000' : '#ffffff' }}
-                  >
-                    Quick Services
-                  </div>
+                <span className="block text-[8px] font-bold mb-2 opacity-80">
+                  What would you like to do?
+                </span>
+                <div className="grid grid-cols-4 gap-x-1.5 gap-y-2.5">
+                  {PREVIEW_QUICK_ACTIONS.map((qa) => (
+                    <div key={qa.label} className="flex flex-col items-center gap-1">
+                      <div
+                        className="w-8 h-8 rounded-xl border flex items-center justify-center"
+                        style={{
+                          backgroundColor: isPreviewDark ? '#3A3A33' : '#FFFFFF',
+                          borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
+                        }}
+                      >
+                        {qa.Icon ? (
+                          <qa.Icon size={16} color={previewIconAccent} variant="Bold" />
+                        ) : (
+                          <ChatboxGlyph size={16} color={previewIconAccent} />
+                        )}
+                      </div>
+                      <span className="text-[5.5px] font-medium text-center leading-tight opacity-80">
+                        {qa.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* Simulated Card widgets */}
-              <div className="space-y-2 overflow-hidden flex-1">
-                {/* Card 1 */}
-                <div
-                  className="rounded-xl p-2.5 border text-left flex flex-col gap-1 transition-colors"
-                  style={{
-                    backgroundColor: isPreviewDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isPreviewDark ? '#3d3d3d' : '#e5e2d9',
-                  }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-[6px] uppercase font-bold tracking-wider opacity-60">Citizen Alert</span>
-                    <span className="text-[6px] font-mono opacity-50">Just now</span>
-                  </div>
-                  <h5 className="text-[9px] font-bold leading-tight">Cluttered Canal Overflow</h5>
-                  <p className="text-[8px] opacity-60 leading-normal line-clamp-1">
-                    Emergency response node dispatched in Barangay Kanluran.
-                  </p>
-                </div>
-
-                {/* Card 2 */}
-                <div
-                  className="rounded-xl p-2.5 border text-left flex flex-col gap-1 transition-colors"
-                  style={{
-                    backgroundColor: isPreviewDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isPreviewDark ? '#3d3d3d' : '#e5e2d9',
-                  }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-[6px] uppercase font-bold tracking-wider opacity-60">Forum Activity</span>
-                    <span className="text-[6px] font-mono opacity-50">3m ago</span>
-                  </div>
-                  <h5 className="text-[9px] font-bold leading-tight">Community Meeting Schedule</h5>
-                  <div className="flex items-center gap-1 pt-0.5">
-                    <span className="w-1 h-1 rounded-full" style={{ backgroundColor: primaryColor }} />
-                    <span className="text-[8px] font-medium opacity-70">24 Citizen attendees</span>
-                  </div>
-                </div>
-              </div>
-
             </div>
 
-            {/* Simulated Phone Navigation Tab Bar */}
+            {/* Floating pill nav bar — structural mirror of AppNavigator.tsx's
+                FloatingTabBar. Tab 0 ("Home") is active: pill background is
+                softenColor(primaryColor, isPreviewDark ? 0.3 : 0.45) i.e.
+                T.accentSoft, and its icon color is contrastColor(that pill
+                color) i.e. T.onAccentSoft — the exact mobile formula, so an
+                admin's primary color going murky when softened for dark mode
+                honestly shows the icon flipping to cream here too. */}
             <div
-              className="h-12 w-full border-t flex justify-around items-center px-4 select-none shrink-0"
+              className="absolute left-2.5 right-2.5 bottom-2.5 h-11 rounded-full flex items-center px-1 shadow-sm border"
               style={{
-                backgroundColor: isPreviewDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: isPreviewDark ? '#3d3d3d' : '#e5e2d9',
+                backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
+                borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
               }}
             >
-              {/* Tab 1 (Active) */}
-              <div className="flex flex-col items-center gap-0.5 cursor-pointer">
-                {/* Active Tab Icon using custom Icon Color */}
-                <svg className="w-4 h-4 transition-colors" viewBox="0 0 24 24" fill={iconColor || primaryColor}>
-                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-                </svg>
-                <span className="text-[7px] font-bold" style={{ color: iconColor || primaryColor }}>Home</span>
-                {/* Active indicator dot */}
-                <div className="w-1 h-1 rounded-full" style={{ backgroundColor: iconColor || primaryColor }} />
-              </div>
-
-              {/* Tab 2 */}
-              <div className="flex flex-col items-center gap-0.5 cursor-pointer opacity-50 hover:opacity-80">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span className="text-[7px] font-semibold">Services</span>
-              </div>
-
-              {/* Tab 3 */}
-              <div className="flex flex-col items-center gap-0.5 cursor-pointer opacity-50 hover:opacity-80">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                </svg>
-                <span className="text-[7px] font-semibold">Profile</span>
-              </div>
+              {PREVIEW_NAV_TABS.map((tab, idx) => {
+                const active = idx === 0;
+                const tabColor = active ? previewPillIconColor : (isPreviewDark ? '#A19E97' : '#8A8781');
+                return (
+                  <div key={tab.label} className="flex-1 flex items-center justify-center">
+                    <div
+                      className="flex items-center justify-center rounded-full transition-colors"
+                      style={{
+                        width: active ? 30 : 24,
+                        height: active ? 30 : 24,
+                        backgroundColor: active ? previewPillColor : 'transparent',
+                      }}
+                    >
+                      {tab.Icon && <tab.Icon size={14} color={tabColor} variant="Bold" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
           </div>
         </div>
       </div>

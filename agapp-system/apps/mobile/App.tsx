@@ -18,29 +18,35 @@ const DEFAULT_ACCENT = '#F2E863';
 // a circular import between the mobile app and packages/shared.
 function AccentSync() {
   const { selectedLgu, guestLgu } = useAuth();
-  const { setAccent } = useTheme();
+  const { setAccent, setIconAccent, setDarkBg } = useTheme();
 
   useEffect(() => {
     const lgu = selectedLgu || guestLgu;
     if (!lgu?.id) {
       setAccent(DEFAULT_ACCENT);
+      setIconAccent(null);
+      setDarkBg(null);
       return;
     }
     // Always re-fetch from DB to pick up any admin color changes without needing a re-login.
     supabase
       .from('lgus')
-      .select('primary_color')
+      .select('primary_color, icon_color, dark_bg_color')
       .eq('id', lgu.id)
       .single()
       .then(({ data, error }) => {
-        if (data?.primary_color && !error) {
-          setAccent(data.primary_color);
+        if (data && !error) {
+          setAccent(data.primary_color || lgu?.primary_color || lgu?.color || DEFAULT_ACCENT);
+          setIconAccent(data.icon_color || null);
+          setDarkBg(data.dark_bg_color || null);
         } else {
           // Fallback to cached value if network is unavailable
           setAccent(lgu?.primary_color || lgu?.color || DEFAULT_ACCENT);
+          setIconAccent(null);
+          setDarkBg(null);
         }
       });
-  }, [selectedLgu, guestLgu, setAccent]);
+  }, [selectedLgu, guestLgu, setAccent, setIconAccent, setDarkBg]);
 
   return null;
 }

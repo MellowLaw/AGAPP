@@ -27,6 +27,8 @@ interface Lgu {
   banner_url: string | null;
   primary_color: string;
   secondary_color: string;
+  icon_color: string | null;
+  dark_bg_color: string | null;
   latitude: number;
   longitude: number;
   region: string | null;
@@ -36,8 +38,6 @@ interface Lgu {
     chatbot: boolean;
     potholeDetection: boolean;
     forum: boolean;
-    iconColor?: string;
-    darkBgColor?: string;
   };
 }
 
@@ -45,7 +45,7 @@ const DEFAULT_PRIMARY = '#A2B59F';
 const DEFAULT_SECONDARY = '#9FADB5';
 const DEFAULT_FLAGS = { chatbot: true, potholeDetection: true, forum: true };
 
-type WizardFlags = { chatbot: boolean; potholeDetection: boolean; forum: boolean; iconColor?: string; darkBgColor?: string; };
+type WizardFlags = { chatbot: boolean; potholeDetection: boolean; forum: boolean; };
 
 interface WizardState {
   step: number;
@@ -56,6 +56,8 @@ interface WizardState {
   // Step 2 — branding
   primaryColor: string;
   secondaryColor: string;
+  iconColor: string;
+  darkBgColor: string;
   onboardingFeePaid: boolean;
   flags: WizardFlags;
   // Step 3 — first admin (optional)
@@ -71,6 +73,8 @@ const EMPTY_WIZARD: WizardState = {
   city: '',
   primaryColor: DEFAULT_PRIMARY,
   secondaryColor: DEFAULT_SECONDARY,
+  iconColor: DEFAULT_PRIMARY,
+  darkBgColor: '#292929',
   onboardingFeePaid: false,
   flags: { ...DEFAULT_FLAGS },
   adminEmail: '',
@@ -142,12 +146,22 @@ export default function SuperLgusPage() {
               banner_url: row.banner_url || null,
               primary_color: row.primary_color || '#A2B59F',
               secondary_color: row.secondary_color || '#9FADB5',
+              icon_color: row.icon_color || null,
+              dark_bg_color: row.dark_bg_color || null,
               latitude: row.latitude || 0,
               longitude: row.longitude || 0,
               region: row.region || null,
               province: row.province || null,
               onboarding_fee_paid: !!row.onboarding_fee_paid,
-              feature_flags: row.feature_flags || { chatbot: true, potholeDetection: true, forum: true },
+              // Explicit allowlist (not a spread) so any stale iconColor/darkBgColor
+              // keys left over from before these became top-level columns get
+              // dropped as soon as the row is loaded, instead of round-tripping
+              // back into feature_flags on the next save.
+              feature_flags: {
+                chatbot: row.feature_flags?.chatbot ?? true,
+                potholeDetection: row.feature_flags?.potholeDetection ?? true,
+                forum: row.feature_flags?.forum ?? true,
+              },
             };
           });
           setLgus(mapped);
@@ -223,6 +237,8 @@ export default function SuperLgusPage() {
       banner_url: null,
       primary_color: wizard.primaryColor,
       secondary_color: wizard.secondaryColor,
+      icon_color: wizard.iconColor,
+      dark_bg_color: wizard.darkBgColor,
       latitude: 0,
       longitude: 0,
       region: wizard.region,
@@ -243,6 +259,8 @@ export default function SuperLgusPage() {
         banner_url: null,
         primary_color: wizard.primaryColor,
         secondary_color: wizard.secondaryColor,
+        icon_color: wizard.iconColor,
+        dark_bg_color: wizard.darkBgColor,
         latitude: 0,
         longitude: 0,
         region: wizard.region,
@@ -329,6 +347,8 @@ export default function SuperLgusPage() {
         longitude: selectedLguForEdit.longitude,
         primary_color: selectedLguForEdit.primary_color,
         secondary_color: selectedLguForEdit.secondary_color,
+        icon_color: selectedLguForEdit.icon_color,
+        dark_bg_color: selectedLguForEdit.dark_bg_color,
         onboarding_fee_paid: selectedLguForEdit.onboarding_fee_paid,
         feature_flags: selectedLguForEdit.feature_flags,
       })
@@ -504,20 +524,20 @@ export default function SuperLgusPage() {
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={selectedLguForEdit.feature_flags?.iconColor || selectedLguForEdit.primary_color || '#ffffff'}
+                      value={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
                       onChange={(e) => setSelectedLguForEdit({
                         ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags, iconColor: e.target.value }
+                        icon_color: e.target.value
                       })}
                       className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
                     />
                     <input
                       type="text"
-                      value={selectedLguForEdit.feature_flags?.iconColor || ''}
+                      value={selectedLguForEdit.icon_color || ''}
                       placeholder={selectedLguForEdit.primary_color}
                       onChange={(e) => setSelectedLguForEdit({
                         ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags, iconColor: e.target.value }
+                        icon_color: e.target.value
                       })}
                       className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                     />
@@ -528,20 +548,20 @@ export default function SuperLgusPage() {
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={selectedLguForEdit.feature_flags?.darkBgColor || '#292929'}
+                      value={selectedLguForEdit.dark_bg_color || '#292929'}
                       onChange={(e) => setSelectedLguForEdit({
                         ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags, darkBgColor: e.target.value }
+                        dark_bg_color: e.target.value
                       })}
                       className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
                     />
                     <input
                       type="text"
-                      value={selectedLguForEdit.feature_flags?.darkBgColor || ''}
+                      value={selectedLguForEdit.dark_bg_color || ''}
                       placeholder="#292929"
                       onChange={(e) => setSelectedLguForEdit({
                         ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags, darkBgColor: e.target.value }
+                        dark_bg_color: e.target.value
                       })}
                       className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                     />
@@ -552,18 +572,15 @@ export default function SuperLgusPage() {
               <ColorPaletteSelector
                 primaryColor={selectedLguForEdit.primary_color || '#ffffff'}
                 secondaryColor={selectedLguForEdit.secondary_color || '#ffffff'}
-                iconColor={selectedLguForEdit.feature_flags?.iconColor || selectedLguForEdit.primary_color || '#ffffff'}
-                darkBgColor={selectedLguForEdit.feature_flags?.darkBgColor || '#292929'}
+                iconColor={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
+                darkBgColor={selectedLguForEdit.dark_bg_color || '#292929'}
                 onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
                   setSelectedLguForEdit({
                     ...selectedLguForEdit,
                     primary_color: primaryColor,
                     secondary_color: secondaryColor,
-                    feature_flags: {
-                      ...selectedLguForEdit.feature_flags,
-                      iconColor,
-                      darkBgColor,
-                    }
+                    icon_color: iconColor,
+                    dark_bg_color: darkBgColor,
                   })
                 }
                 lguName={selectedLguForEdit.name}
@@ -818,15 +835,15 @@ export default function SuperLgusPage() {
                         <div className="flex gap-2">
                           <input
                             type="color"
-                            value={wizard.flags.iconColor || wizard.primaryColor}
-                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, iconColor: e.target.value } })}
+                            value={wizard.iconColor || wizard.primaryColor}
+                            onChange={(e) => patchWizard({ iconColor: e.target.value })}
                             className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
                           />
                           <input
                             type="text"
-                            value={wizard.flags.iconColor || ''}
+                            value={wizard.iconColor || ''}
                             placeholder={wizard.primaryColor}
-                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, iconColor: e.target.value } })}
+                            onChange={(e) => patchWizard({ iconColor: e.target.value })}
                             className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                           />
                         </div>
@@ -836,15 +853,15 @@ export default function SuperLgusPage() {
                         <div className="flex gap-2">
                           <input
                             type="color"
-                            value={wizard.flags.darkBgColor || '#292929'}
-                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, darkBgColor: e.target.value } })}
+                            value={wizard.darkBgColor || '#292929'}
+                            onChange={(e) => patchWizard({ darkBgColor: e.target.value })}
                             className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
                           />
                           <input
                             type="text"
-                            value={wizard.flags.darkBgColor || ''}
+                            value={wizard.darkBgColor || ''}
                             placeholder="#292929"
-                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, darkBgColor: e.target.value } })}
+                            onChange={(e) => patchWizard({ darkBgColor: e.target.value })}
                             className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                           />
                         </div>
@@ -854,17 +871,14 @@ export default function SuperLgusPage() {
                     <ColorPaletteSelector
                       primaryColor={wizard.primaryColor}
                       secondaryColor={wizard.secondaryColor}
-                      iconColor={wizard.flags.iconColor || wizard.primaryColor}
-                      darkBgColor={wizard.flags.darkBgColor || '#292929'}
+                      iconColor={wizard.iconColor || wizard.primaryColor}
+                      darkBgColor={wizard.darkBgColor || '#292929'}
                       onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
                         patchWizard({
                           primaryColor,
                           secondaryColor,
-                          flags: {
-                            ...wizard.flags,
-                            iconColor,
-                            darkBgColor,
-                          }
+                          iconColor,
+                          darkBgColor,
                         })
                       }
                       lguName={wizard.city || 'Municipality'}

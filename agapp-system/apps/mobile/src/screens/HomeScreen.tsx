@@ -346,7 +346,11 @@ export function HomeScreen({ navigation }: any) {
                         marginBottom: 8,
                       }}
                     >
-                      <action.icon size={36} color={T.text} variant="Bold" />
+                      {/* Only these quick-action icons react to the LGU's
+                          customized icon color (falls back to the nav accent
+                          when not separately set) — everything else in the
+                          app stays on theme tokens by design. */}
+                      <action.icon size={36} color={T.iconAccent} variant="Bold" />
                     </TouchableOpacity>
                     <Text style={{
                       fontFamily: 'Inter-Medium',

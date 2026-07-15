@@ -26,6 +26,23 @@ export function softenColor(hex: string, amount = 0.45): string {
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// Picks ink or cream depending on how light/dark `hex` itself is — NOT the
+// app's light/dark theme mode. Use this for any text/icon drawn ON TOP of an
+// accent-colored fill (e.g. the tab bar's active pill): an LGU can pick a
+// genuinely dark accent, and hardcoded ink text would go invisible on it even
+// while the rest of the app is still in light mode. Same relative-luminance
+// formula as admin's DashboardLayout.tsx (so both sides agree on what reads
+// as "light enough for dark text").
+export function contrastColor(hex: string): '#292929' | '#FFFCF5' {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '#292929';
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#292929' : '#FFFCF5';
+}
+
 export const TOKENS = {
   light: {
     bg:        '#FFFCF5',

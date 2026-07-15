@@ -5,7 +5,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SPARKLE_BAND_HEIGHT = SCREEN_HEIGHT * 0.22; // sparkles only live in the top ~22%
+// Brand mockup (HOME PAGE V3.png / HOME PAGE DARKMODE.png) tints nearly the
+// whole screen, with sparkles scattered from the header down past the quick
+// action grid — not confined to a thin sliver under the status bar.
+const SPARKLE_BAND_HEIGHT = SCREEN_HEIGHT * 0.6;
 
 type SparkleShape = 'dot' | 'star' | 'diamond' | 'ring';
 
@@ -18,6 +21,9 @@ const SPARKLES: { top: number; left: string; size: number; delay: number; shape:
   { top: 44, left: '88%', size: 10, delay: 850, shape: 'ring' },
   { top: 128, left: '10%', size: 16, delay: 1100, shape: 'star' },
   { top: 10, left: '55%', size: 7, delay: 650, shape: 'dot' },
+  { top: 210, left: '80%', size: 10, delay: 300, shape: 'star' },
+  { top: 260, left: '20%', size: 8, delay: 950, shape: 'dot' },
+  { top: 320, left: '60%', size: 11, delay: 550, shape: 'ring' },
 ];
 
 // The brand kit's own sparkle glyph (seen on the Pagbati splash) — a simple
@@ -96,17 +102,23 @@ function FloatingSparkle({ top, left, size, delay, shape, color }: { top: number
 }
 
 // Wraps a tab screen with a soft diagonal wash: LGU accent colour (heavily
-// diluted) glowing from the top-right corner, melting into the base bg
-// within the upper half — plus a few lightweight sparkle dots confined to
-// that same top band. Uses alpha-hex stops (never 'transparent') — RN
-// renders a dark halo with the 'transparent' keyword on Android.
+// diluted) glowing from the top-right corner, carrying nearly the full
+// screen height before settling into the base bg near the bottom edge —
+// plus lightweight sparkle dots scattered through that same span. Uses
+// alpha-hex stops (never 'transparent') — RN renders a dark halo with the
+// 'transparent' keyword on Android.
 export function ScreenBackground({ children }: { children: React.ReactNode }) {
   const { T, isDarkMode } = useTheme();
 
-  // Much more diluted than a flat accent fill — this should read as a
-  // gentle tint, not a block of color.
+  // Diluted accent tint — reads as a gentle wash, not a block of color. The
+  // brand mockup (HOME PAGE V3.png / HOME PAGE DARKMODE.png) carries this
+  // tint almost the full height of the screen, only settling to the flat
+  // base bg right near the bottom edge — a small corner glow that flattens
+  // out by ~60% down (the previous formula) reads as much weaker/plainer
+  // than the reference.
   const topColor    = isDarkMode ? `${T.accent}33` : `${T.accent}4D`; // ~20% / ~30%
-  const midColor    = isDarkMode ? `${T.accent}12` : `${T.accent}1F`; // ~7% / ~12%
+  const midColor    = isDarkMode ? `${T.accent}21` : `${T.accent}29`; // ~13% / ~16%
+  const lowColor    = isDarkMode ? `${T.accent}12` : `${T.accent}14`; // ~7% / ~8%
   const bottomColor = T.bg;
 
   return (
@@ -114,8 +126,8 @@ export function ScreenBackground({ children }: { children: React.ReactNode }) {
       {/* Decorative wash + sparkles — no touch events */}
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_HEIGHT }}>
         <LinearGradient
-          colors={[topColor, midColor, bottomColor]}
-          locations={[0, 0.35, 0.62]}
+          colors={[topColor, midColor, lowColor, bottomColor]}
+          locations={[0, 0.4, 0.75, 1]}
           style={{ flex: 1 }}
           start={{ x: 1, y: 0 }}
           end={{ x: 0, y: 1 }}

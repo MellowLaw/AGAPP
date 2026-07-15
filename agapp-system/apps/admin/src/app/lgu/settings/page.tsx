@@ -89,8 +89,8 @@ export default function SettingsPage() {
           setSecondaryColor(lgu.secondary_color || '#ffffff');
           const flags = lgu.feature_flags || {};
           setFeatureFlags(flags);
-          setIconColor(flags.iconColor || lgu.primary_color || '#d62a53');
-          setDarkBgColor(flags.darkBgColor || '#292929');
+          setIconColor(lgu.icon_color || lgu.primary_color || '#d62a53');
+          setDarkBgColor(lgu.dark_bg_color || '#292929');
         }
 
         // 2. Load Staff Members
@@ -150,11 +150,16 @@ export default function SettingsPage() {
           office_address: officeAddress,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
+          icon_color: iconColor,
+          dark_bg_color: darkBgColor,
+          // Explicit allowlist (not a spread) so any stale iconColor/darkBgColor
+          // keys left over from before these became top-level columns get
+          // dropped on save instead of persisting forever.
           feature_flags: {
-            ...featureFlags,
-            iconColor: iconColor,
-            darkBgColor: darkBgColor,
-          }
+            chatbot: featureFlags.chatbot ?? true,
+            potholeDetection: featureFlags.potholeDetection ?? true,
+            forum: featureFlags.forum ?? true,
+          },
         })
         .eq('id', lguId);
 
