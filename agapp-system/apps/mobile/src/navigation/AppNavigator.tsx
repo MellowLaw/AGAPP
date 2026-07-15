@@ -154,14 +154,14 @@ function AuthGate({ label, navigation }: { label: string; navigation: any }) {
           alignItems: 'center',
           marginBottom: 16,
         }}
-        onPress={() => navigation.navigate('Login')}
+        onPress={() => navigation.navigate('Login', { initialMode: 'register' })}
         activeOpacity={0.85}
       >
         <Text style={{ color: '#FFFFFF', fontFamily: 'Inter-Bold', fontSize: 16 }}>Sign up</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => navigation.navigate('Login')}
+        onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
         activeOpacity={0.7}
         style={{ paddingVertical: 8 }}
       >

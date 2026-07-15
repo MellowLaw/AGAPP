@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import { Eye, EyeSlash, Check } from 'iconsax-react-native';
 
-export function LoginScreen({ navigation }: any) {
+export function LoginScreen({ navigation, route }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { hasCompletedGuestLguChoice } = useAuth();
@@ -21,9 +21,17 @@ export function LoginScreen({ navigation }: any) {
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(true);
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [isLoginMode, setIsLoginMode] = useState(route?.params?.initialMode !== 'register');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    if (route?.params?.initialMode === 'register') {
+      setIsLoginMode(false);
+    } else if (route?.params?.initialMode === 'login') {
+      setIsLoginMode(true);
+    }
+  }, [route?.params?.initialMode]);
 
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
