@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -36,24 +36,143 @@ const Tab = createBottomTabNavigator();
  * an account. Lets guests explore Home/News/Map while nudging them to sign
  * in for any action that requires identity.
  */
+const ShapeCell = ({ col, row, S }: { col: number; row: number; S: number }) => {
+  return (
+    <View style={{ width: S, height: S, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
+      <Image
+        source={require('../../assets/brand/main-shapes.png')}
+        style={{
+          width: S * 3,
+          height: S * 3,
+          position: 'absolute',
+          left: -col * S,
+          top: -row * S,
+        }}
+        resizeMode="stretch"
+      />
+    </View>
+  );
+};
+
+const EaselCell = ({ S }: { S: number }) => {
+  const easelSize = S * 1.5;
+  const offsetX = (S - easelSize) / 2;
+  const offsetY = (S - easelSize) / 2 - 10;
+
+  return (
+    <View style={{ width: S, height: S, position: 'relative', zIndex: 10 }}>
+      <View style={{
+        position: 'absolute',
+        width: easelSize,
+        height: easelSize,
+        left: offsetX,
+        top: offsetY,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <Image
+          source={require('../../assets/brand/stickers/16.png')}
+          style={{ width: easelSize, height: easelSize }}
+          resizeMode="contain"
+        />
+        <View style={{
+          position: 'absolute',
+          width: easelSize * 0.57,
+          height: easelSize * 0.55,
+          left: easelSize * 0.230,
+          top: easelSize * 0.15,
+          padding: 3,
+        }}>
+          <View style={{
+            flex: 1,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 6,
+            overflow: 'hidden',
+          }}>
+            <Image
+              source={require('../../assets/brand/logo.png')}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 function AuthGate({ label, navigation }: { label: string; navigation: any }) {
   const { T } = useTheme();
+  const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  const S = (SCREEN_WIDTH - 48) / 3;
+
   return (
-    <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: T.cardAlt, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-        <Ionicons name="lock-closed-outline" size={28} color={T.textMuted} />
+    <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 }}>
+      <View style={{ width: S * 3, height: S * 3, flexDirection: 'row', flexWrap: 'wrap', marginBottom: 40 }}>
+        <ShapeCell col={0} row={0} S={S} />
+        <ShapeCell col={1} row={0} S={S} />
+        <ShapeCell col={2} row={0} S={S} />
+        
+        <ShapeCell col={0} row={1} S={S} />
+        <ShapeCell col={1} row={1} S={S} />
+        <ShapeCell col={2} row={1} S={S} />
+        
+        <ShapeCell col={0} row={2} S={S} />
+        <EaselCell S={S} />
+        <ShapeCell col={2} row={2} S={S} />
       </View>
-      <Text style={{ color: T.text, fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 6 }}>
-        Sign in to {label}
+
+      <Text style={{
+        color: T.text,
+        fontSize: 26,
+        fontFamily: 'Octarine-Bold',
+        textAlign: 'center',
+        marginBottom: 8,
+      }}>
+        Get the Full Experience!
       </Text>
-      <Text style={{ color: T.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
-        You can browse Home, News, and the Map without an account. Sign in to submit reports, apply for services, or post in the forum.
+      
+      <Text style={{
+        color: T.textMuted,
+        fontSize: 14,
+        fontFamily: 'Inter-Medium',
+        textAlign: 'center',
+        paddingHorizontal: 12,
+        marginBottom: 36,
+        lineHeight: 20,
+      }}>
+        Sign in to access full features and services.
       </Text>
+
       <TouchableOpacity
-        style={{ height: 52, borderRadius: 16, backgroundColor: T.text, paddingHorizontal: 32, justifyContent: 'center', alignItems: 'center' }}
+        style={{
+          width: '100%',
+          height: 52,
+          borderRadius: 26,
+          backgroundColor: '#292929',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
         onPress={() => navigation.navigate('Login')}
+        activeOpacity={0.85}
       >
-        <Text style={{ color: T.bg, fontWeight: '700' }}>Sign in / Create account</Text>
+        <Text style={{ color: '#FFFFFF', fontFamily: 'Inter-Bold', fontSize: 16 }}>Sign up</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Login')}
+        activeOpacity={0.7}
+        style={{ paddingVertical: 8 }}
+      >
+        <Text style={{
+          color: T.text,
+          fontFamily: 'Octarine-Bold',
+          fontSize: 16,
+          textAlign: 'center',
+        }}>
+          Login
+        </Text>
       </TouchableOpacity>
     </View>
   );
