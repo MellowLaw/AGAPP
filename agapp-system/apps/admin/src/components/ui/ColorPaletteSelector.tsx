@@ -360,7 +360,16 @@ export function ColorPaletteSelector({
           <div
             className="w-full h-full rounded-[32px] overflow-hidden relative transition-all duration-300 select-none"
             style={{
-              background: previewWash,
+              // NOT the `background` shorthand — that resets background-color
+              // to transparent, so the gradient's translucent alpha stops
+              // (30%/16%/8%) would composite against the black phone bezel
+              // behind this div instead of against previewBg, rendering as a
+              // dark/muddy smear instead of a light accent tint. Setting
+              // backgroundColor separately gives the gradient a solid cream
+              // (or dark) base to blend against, same as how ScreenBackground.tsx
+              // paints its LinearGradient over an already-opaque T.bg View.
+              backgroundImage: previewWash,
+              backgroundColor: previewBg,
               color: isPreviewDark ? '#FFFCF5' : '#292929',
             }}
           >
@@ -395,7 +404,7 @@ export function ColorPaletteSelector({
 
             {/* Home screen top portion — greeting header + quick-action grid,
                 mirroring HomeScreen.tsx's "For You" tab structure. */}
-            <div className="px-3.5 pt-1 overflow-hidden" style={{ height: 'calc(100% - 24px - 58px)' }}>
+            <div className="px-3.5 pt-1 overflow-hidden" style={{ height: 'calc(100% - 24px - 62px)' }}>
               <span className="block text-[8px] font-medium opacity-70 mb-0.5">
                 Brgy. Poblacion | {lguName}
               </span>
@@ -443,14 +452,17 @@ export function ColorPaletteSelector({
             </div>
 
             {/* Floating pill nav bar — structural mirror of AppNavigator.tsx's
-                FloatingTabBar. Tab 0 ("Home") is active: pill background is
-                softenColor(primaryColor, isPreviewDark ? 0.3 : 0.45) i.e.
-                T.accentSoft, and its icon color is contrastColor(that pill
-                color) i.e. T.onAccentSoft — the exact mobile formula, so an
-                admin's primary color going murky when softened for dark mode
-                honestly shows the icon flipping to cream here too. */}
+                FloatingTabBar: every tab shows icon + label; the active
+                tab's whole slot (icon AND label together) sits on an oval
+                T.accentSoft pill, not just a small circle around the icon.
+                Pill background is softenColor(primaryColor, isPreviewDark
+                ? 0.3 : 0.45) i.e. T.accentSoft, and its icon/label color is
+                contrastColor(that pill color) i.e. T.onAccentSoft — the
+                exact mobile formula, so an admin's primary color going
+                murky when softened for dark mode honestly shows the icon
+                flipping to cream here too. */}
             <div
-              className="absolute left-2.5 right-2.5 bottom-2.5 h-11 rounded-full flex items-center px-1 shadow-sm border"
+              className="absolute left-2.5 right-2.5 bottom-2.5 h-12 rounded-full flex items-center px-1 shadow-sm border"
               style={{
                 backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
                 borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
@@ -460,16 +472,18 @@ export function ColorPaletteSelector({
                 const active = idx === 0;
                 const tabColor = active ? previewPillIconColor : (isPreviewDark ? '#A19E97' : '#8A8781');
                 return (
-                  <div key={tab.label} className="flex-1 flex items-center justify-center">
-                    <div
-                      className="flex items-center justify-center rounded-full transition-colors"
-                      style={{
-                        width: active ? 30 : 24,
-                        height: active ? 30 : 24,
-                        backgroundColor: active ? previewPillColor : 'transparent',
-                      }}
-                    >
+                  <div key={tab.label} className="flex-1 h-full flex items-center justify-center relative">
+                    {active && (
+                      <div
+                        className="absolute inset-y-1 inset-x-0.5 rounded-full"
+                        style={{ backgroundColor: previewPillColor }}
+                      />
+                    )}
+                    <div className="relative flex flex-col items-center gap-0.5">
                       {tab.Icon && <tab.Icon size={14} color={tabColor} variant="Bold" />}
+                      <span style={{ fontSize: 6, fontWeight: 500, color: tabColor, lineHeight: '7px' }}>
+                        {tab.label}
+                      </span>
                     </div>
                   </div>
                 );

@@ -148,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   };
 
   return (
-    <aside className="group w-[72px] hover:w-[512px] transition-all duration-300 ease-in-out h-screen bg-gradient-to-r from-[#f6f4f1] via-[#f6f4f1]/95 via-[#f6f4f1]/75 to-transparent dark:from-[#0d0c0e] dark:via-[#0d0c0e]/95 dark:via-[#0d0c0e]/75 dark:to-transparent flex flex-col fixed left-0 top-0 z-40 overflow-hidden">
+    <aside className="group w-[72px] hover:w-[512px] transition-all duration-300 ease-in-out h-screen bg-gradient-to-r from-[#f6f4f1] via-[#f6f4f1]/95 via-[#f6f4f1]/75 to-transparent dark:from-[#292929] dark:via-[#292929]/95 dark:via-[#292929]/75 dark:to-transparent flex flex-col fixed left-0 top-0 z-40 overflow-hidden">
       {/* Logo */}
       <div className="flex flex-col justify-center pl-6 pr-4 py-5 border-b border-transparent group-hover:border-theme/50 transition-colors">
         <AgappLogo size={44} textClassName="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap" />
