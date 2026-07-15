@@ -354,19 +354,13 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="ServicesTab" options={{ title: 'Services' }}>
-        {({ navigation }) => session
-          ? <ServicesScreen navigation={navigation} />
-          : <AuthGate label="apply for government services" navigation={navigation} />}
+        {({ navigation }) => <ServicesScreen navigation={navigation} />}
       </Tab.Screen>
       <Tab.Screen name="ReportsTab" options={{ title: 'Report' }}>
-        {({ navigation }) => session
-          ? <ReportsScreen navigation={navigation} />
-          : <AuthGate label="submit reports" navigation={navigation} />}
+        {({ navigation }) => <ReportsScreen navigation={navigation} />}
       </Tab.Screen>
       <Tab.Screen name="Forum" options={{ title: 'Forum' }}>
-        {({ navigation }) => session
-          ? <ForumScreen navigation={navigation} />
-          : <AuthGate label="join the community forum" navigation={navigation} />}
+        {({ navigation }) => <ForumScreen navigation={navigation} />}
       </Tab.Screen>
       <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
         {({ navigation }) => session

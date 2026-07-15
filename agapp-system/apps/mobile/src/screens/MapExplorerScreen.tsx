@@ -107,12 +107,104 @@ const SHEET_EXPANDED  = 300;
 export function MapExplorerScreen() {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
-  const { selectedLgu, guestLgu, profile } = useAuth();
+  const { session, selectedLgu, guestLgu, profile } = useAuth();
   const navigation = useNavigation<any>();
 
   const activeLgu = selectedLgu || guestLgu || { id: 'liliw-laguna', name: 'Liliw, Laguna', latitude: 14.1350, longitude: 121.4363 };
   const mapRef = useRef<MapView>(null);
   const insets = useSafeAreaInsets();
+
+  if (!session) {
+    return (
+      <View style={{ flex: 1, backgroundColor: T.bg, paddingTop: insets.top }}>
+        {/* Header bar with back button */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 16,
+        }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+            <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+          </TouchableOpacity>
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 20, marginLeft: 16 }}>
+            Map Explorer
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingBottom: 80 }}>
+          {/* Centered Map Icon */}
+          <View style={{
+            width: 80,
+            height: 80,
+            borderRadius: 40,
+            backgroundColor: T.cardAlt,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 24,
+            borderWidth: 1,
+            borderColor: T.border,
+          }}>
+            <LocationIcon size={40} color={T.text} variant="Outline" />
+          </View>
+          
+          <Text style={{
+            fontFamily: 'Octarine-Bold',
+            color: T.text,
+            fontSize: 24,
+            textAlign: 'center',
+            marginBottom: 12,
+          }}>
+            Sign in to see your local map
+          </Text>
+          
+          <Text style={{
+            fontFamily: 'Inter-Medium',
+            color: T.textMuted,
+            textAlign: 'center',
+            fontSize: 14,
+            lineHeight: 22,
+            marginBottom: 36,
+            paddingHorizontal: 16,
+          }}>
+            Create an account to explore local landmarks, locate municipal offices, and access community facilities on the interactive map.
+          </Text>
+
+          <TouchableOpacity
+            style={{
+              width: '100%',
+              height: 52,
+              borderRadius: 26,
+              backgroundColor: '#292929',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+            onPress={() => navigation.navigate('Login', { initialMode: 'register' })}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: 'Inter-Bold', fontSize: 16 }}>Sign up</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+            activeOpacity={0.7}
+            style={{ paddingVertical: 8 }}
+          >
+            <Text style={{
+              color: T.text,
+              fontFamily: 'Octarine-Bold',
+              fontSize: 16,
+              textAlign: 'center',
+            }}>
+              Login
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   const [facilities, setFacilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

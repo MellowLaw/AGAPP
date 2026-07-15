@@ -34,7 +34,7 @@ const OFFICE_ICONS: Record<string, any> = {
 export function ServicesScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
-  const { selectedLgu, profile } = useAuth();
+  const { selectedLgu, guestLgu, profile, session } = useAuth();
   const [catalog, setCatalog] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [selectedService, setSelectedService] = useState<any>(null);
@@ -77,13 +77,14 @@ export function ServicesScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    if (!selectedLgu || !profile) return;
+    const lgu = selectedLgu || guestLgu;
+    if (!lgu) return;
 
     const fetchServices = async () => {
       const { data } = await supabase
         .from('lgu_services')
         .select('*')
-        .eq('lgu_id', selectedLgu.id)
+        .eq('lgu_id', lgu.id)
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
@@ -92,7 +93,7 @@ export function ServicesScreen({ navigation }: any) {
 
     fetchServices();
     refreshRequests();
-  }, [selectedLgu, profile]);
+  }, [selectedLgu, guestLgu, profile]);
 
   const submitApplication = async () => {
     if (!verified) {
@@ -416,7 +417,7 @@ export function ServicesScreen({ navigation }: any) {
               justifyContent: 'center',
               alignItems: 'center',
             }}
-            onPress={() => setShowForm(true)}
+            onPress={() => session ? setShowForm(true) : navigation.navigate('Login', { initialMode: 'register' })}
           >
             <Text style={{
               color: '#FFFCF5',
@@ -521,7 +522,31 @@ export function ServicesScreen({ navigation }: any) {
             )
           ) : (
             /* Requests list */
-            myRequests.length === 0 ? (
+            !session ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center', paddingHorizontal: 20 }}>
+                <ClipboardText size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18, textAlign: 'center', marginBottom: 8 }}>
+                  Track your applications
+                </Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14, lineHeight: 20, paddingHorizontal: 12, marginBottom: 20 }}>
+                  Sign in to view and track your submitted document and permit applications.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: '#292929',
+                    paddingHorizontal: 24,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Sign in</Text>
+                </TouchableOpacity>
+              </View>
+            ) : myRequests.length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ClipboardText size={48} color={T.textMuted} variant="Linear" />
                 <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 12, textAlign: 'center' }}>

@@ -54,7 +54,7 @@ const PRESET_IMAGES = [
 export function ForumScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
-  const { profile, selectedLgu } = useAuth();
+  const { profile, selectedLgu, guestLgu, session } = useAuth();
   
   // ── Swipeable Row component (swipe right → reply) ──────────────────────
   const SwipeableRow = useCallback(({ children, onSwipe }: { children: React.ReactNode; onSwipe: () => void }) => {
@@ -142,7 +142,8 @@ export function ForumScreen({ navigation }: any) {
 
   // 1. Fetch Posts subscription
   useEffect(() => {
-    if (!selectedLgu) return;
+    const lgu = selectedLgu || guestLgu;
+    if (!lgu) return;
     fetchPosts();
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -155,7 +156,7 @@ export function ForumScreen({ navigation }: any) {
 
     const postsSubscription = supabase
       .channel('public:forum_posts_global')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_posts', filter: `lgu_id=eq.${selectedLgu.id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_posts', filter: `lgu_id=eq.${lgu.id}` }, () => {
         debouncedFetchPosts();
       })
       .subscribe();
@@ -164,7 +165,7 @@ export function ForumScreen({ navigation }: any) {
       if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(postsSubscription);
     };
-  }, [selectedLgu]);
+  }, [selectedLgu, guestLgu, profile]);
 
   // 2. Fetch Comments subscription (only active when inside detail view)
   useEffect(() => {
@@ -185,13 +186,21 @@ export function ForumScreen({ navigation }: any) {
   }, [viewState, selectedPost?.id]);
 
   const fetchPosts = async () => {
-    if (!selectedLgu || !profile) return;
+    const lgu = selectedLgu || guestLgu;
+    if (!lgu) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('forum_posts')
         .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved)')
-        .eq('lgu_id', selectedLgu.id)
-        .or(`is_approved.eq.true,citizen_id.eq.${profile.id}`)
+        .eq('lgu_id', lgu.id);
+
+      if (profile) {
+        query = query.or(`is_approved.eq.true,citizen_id.eq.${profile.id}`);
+      } else {
+        query = query.eq('is_approved', true);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -732,10 +741,10 @@ export function ForumScreen({ navigation }: any) {
                   : null;
 
                 return (
-                  <SwipeableRow key={c.id} onSwipe={() => setReplyTarget(c)}>
+                  <SwipeableRow key={c.id} onSwipe={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}>
                     <TouchableOpacity 
                       activeOpacity={0.8}
-                      onLongPress={() => setReplyTarget(c)}
+                      onLongPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}
                       style={{
                         flexDirection: 'row',
                         paddingHorizontal: 16,
@@ -776,7 +785,7 @@ export function ForumScreen({ navigation }: any) {
                               <Text style={{ color: '#854D0E', fontSize: 8, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
                             </View>
                           )}
-                          <TouchableOpacity onPress={() => setReplyTarget(c)} style={{ marginLeft: 'auto', padding: 2 }}>
+                          <TouchableOpacity onPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })} style={{ marginLeft: 'auto', padding: 2 }}>
                             <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
                           </TouchableOpacity>
                         </View>
@@ -835,76 +844,104 @@ export function ForumScreen({ navigation }: any) {
           )}
 
           {/* Chat input bar */}
-          <View style={{
-            flexDirection: 'row',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            alignItems: 'center',
-            borderTopWidth: 1,
-            borderColor: T.border,
-            backgroundColor: T.card,
-          }}>
-            <TouchableOpacity 
-              onPress={() => setShowPresetsInChat(!showPresetsInChat)}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: T.cardAlt,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 10,
-              }}
-            >
-              <Add size={18} color={T.text} variant="Bold" />
-            </TouchableOpacity>
-            
+          {!session ? (
             <View style={{
-              flex: 1,
-              flexDirection: 'row',
+              paddingHorizontal: 16,
+              paddingVertical: 16,
+              borderTopWidth: 1,
+              borderColor: T.border,
+              backgroundColor: T.card,
               alignItems: 'center',
-              borderRadius: 999, // Pill layout
-              backgroundColor: T.cardAlt,
-              paddingHorizontal: 14,
-              height: 40,
-              marginRight: 6,
             }}>
-              <TextInput
+              <TouchableOpacity
                 style={{
-                  flex: 1,
-                  height: '100%',
-                  fontSize: 14,
-                  fontFamily: 'Inter-Medium',
-                  color: T.text,
-                  paddingVertical: 0,
+                  width: '100%',
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: '#292929',
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
-                value={newComment}
-                onChangeText={setNewComment}
-                placeholder={`Message "${selectedPost.title}"…`}
-                placeholderTextColor={T.textMuted}
-                onSubmitEditing={() => handleCreateComment()}
-              />
-              <TouchableOpacity onPress={() => setNewComment(prev => prev + ' 😊')}>
-                <EmojiHappy size={18} color={T.textMuted} variant="Linear" />
+                onPress={() => navigation.navigate('Login', { initialMode: 'register' })}
+                activeOpacity={0.85}
+              >
+                <Text style={{ color: '#FFFFFF', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                  Sign in to join the conversation
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity 
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: T.accentSoft,
-                justifyContent: 'center',
+          ) : (
+            <View style={{
+              flexDirection: 'row',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              alignItems: 'center',
+              borderTopWidth: 1,
+              borderColor: T.border,
+              backgroundColor: T.card,
+            }}>
+              <TouchableOpacity 
+                onPress={() => setShowPresetsInChat(!showPresetsInChat)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: T.cardAlt,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 10,
+                }}
+              >
+                <Add size={18} color={T.text} variant="Bold" />
+              </TouchableOpacity>
+              
+              <View style={{
+                flex: 1,
+                flexDirection: 'row',
                 alignItems: 'center',
-                marginLeft: 6,
-              }}
-              onPress={() => handleCreateComment()}
-              disabled={!newComment.trim()}
-            >
-              <Send2 size={16} color="#292929" variant="Bold" />
-            </TouchableOpacity>
-          </View>
+                borderRadius: 999, // Pill layout
+                backgroundColor: T.cardAlt,
+                paddingHorizontal: 14,
+                height: 40,
+                marginRight: 6,
+              }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    height: '100%',
+                    fontSize: 14,
+                    fontFamily: 'Inter-Medium',
+                    color: T.text,
+                    paddingVertical: 0,
+                  }}
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  placeholder={`Message "${selectedPost.title}"…`}
+                  placeholderTextColor={T.textMuted}
+                  onSubmitEditing={() => handleCreateComment()}
+                />
+                <TouchableOpacity onPress={() => setNewComment(prev => prev + ' 😊')}>
+                  <EmojiHappy size={18} color={T.textMuted} variant="Linear" />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: T.accentSoft,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginLeft: 6,
+                }}
+                onPress={() => handleCreateComment()}
+                disabled={!newComment.trim()}
+              >
+                <Send2 size={16} color="#292929" variant="Bold" />
+              </TouchableOpacity>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -1343,6 +1380,10 @@ export function ForumScreen({ navigation }: any) {
             shadowRadius: 3.84,
           }}
           onPress={() => {
+            if (!session) {
+              navigation.navigate('Login', { initialMode: 'register' });
+              return;
+            }
             if (!verified) {
               showToast('Please verify your identity before creating forum threads.', 'error');
               return;

@@ -17,11 +17,18 @@ const DEFAULT_ACCENT = '#F2E863';
 // (in ThemeContext). Lives here rather than inside either context to avoid
 // a circular import between the mobile app and packages/shared.
 function AccentSync() {
-  const { selectedLgu, guestLgu } = useAuth();
-  const { setAccent, setIconAccent, setDarkBg } = useTheme();
+  const { session, selectedLgu, guestLgu } = useAuth();
+  const { setAccent, setIconAccent, setDarkBg, isDarkMode } = useTheme();
 
   useEffect(() => {
-    const lgu = selectedLgu || guestLgu;
+    if (!session) {
+      // Stripped monochrome shell for guest users
+      setAccent(isDarkMode ? '#FFFCF5' : '#292929');
+      setIconAccent(null);
+      setDarkBg(null);
+      return;
+    }
+    const lgu = selectedLgu;
     if (!lgu?.id) {
       setAccent(DEFAULT_ACCENT);
       setIconAccent(null);
@@ -46,7 +53,7 @@ function AccentSync() {
           setDarkBg(null);
         }
       });
-  }, [selectedLgu, guestLgu, setAccent, setIconAccent, setDarkBg]);
+  }, [selectedLgu, guestLgu, session, isDarkMode, setAccent, setIconAccent, setDarkBg]);
 
   return null;
 }

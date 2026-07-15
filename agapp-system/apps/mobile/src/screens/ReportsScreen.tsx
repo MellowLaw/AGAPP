@@ -195,8 +195,10 @@ export function ReportsScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      getLocation();
-    }, [selectedLgu?.id])
+      if (session) {
+        getLocation();
+      }
+    }, [selectedLgu?.id, session])
   );
 
   const submitReport = async () => {
@@ -714,6 +716,10 @@ export function ReportsScreen({ navigation }: any) {
                       marginBottom: 12,
                     }}
                     onPress={() => {
+                      if (!session) {
+                        navigation.navigate('Login', { initialMode: 'register' });
+                        return;
+                      }
                       setCategory(cat.id);
                       setShowForm(true);
                     }}
@@ -736,7 +742,31 @@ export function ReportsScreen({ navigation }: any) {
             </View>
           ) : (
             /* Reports list directly inline */
-            reports.length === 0 ? (
+            !session ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center', paddingHorizontal: 20 }}>
+                <Danger size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18, textAlign: 'center', marginBottom: 8 }}>
+                  Track your reports
+                </Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14, lineHeight: 20, paddingHorizontal: 12, marginBottom: 20 }}>
+                  Sign in to view status updates and resolutions for your submitted community reports.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: '#292929',
+                    paddingHorizontal: 24,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Sign in</Text>
+                </TouchableOpacity>
+              </View>
+            ) : reports.length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <Danger size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
                 <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center' }}>
