@@ -1,6 +1,9 @@
 # AGAPP — Automated Governance and Public Service Platform
 
-> **Monorepo** for the AGAPP fully working system. Contains the citizen mobile app (Expo / React Native), the LGU & super-admin web dashboard (Next.js), the REST API (NestJS), and shared types (`zod` + TypeScript).
+> **Monorepo** for the AGAPP system: the citizen mobile app (Expo / React Native), the
+> LGU + Super-Admin web dashboard (Next.js), the API (NestJS), and shared types.
+> Pilot LGU: Liliw, Laguna. All three client apps talk **directly to Supabase** —
+> the API is intentionally thin (chatbot + one guarded ML endpoint only).
 
 ---
 
@@ -9,316 +12,281 @@
 ```
 agapp-system/
 ├── apps/
-│   ├── mobile/      # Citizen mobile app — Expo SDK 54, React Native 0.81
-│   ├── admin/       # LGU / Super-admin dashboard — Next.js 14
-│   └── api/         # REST API — NestJS + Supabase + zod
+│   ├── mobile/      # Citizen mobile app — Expo SDK 54, React Native 0.81, React 19
+│   ├── admin/       # LGU / Super-Admin dashboard — Next.js 14 (App Router), React 18
+│   └── api/         # NestJS API — chatbot + a guarded photo-verification ML endpoint ONLY
 ├── packages/
-│   └── shared/      # Shared TS types & zod schemas (consumed by all apps)
-├── supabase/        # SQL migrations / seed data for Supabase Postgres
-└── package.json     # Root workspace (npm workspaces)
+│   └── shared/      # Shared TS types (consumed by the other workspaces)
+├── stubs/           # Placeholder packages that force npm to nest React 18 for admin
+│                     # (see "React 18/19 split" gotcha below — do not remove)
+└── supabase/        # schema.sql, seed.sql, storage_setup.sql, verification_setup.sql
 ```
+
+> ⚠️ There used to be a fourth app, `apps/field-officer` — it was cut from the project
+> and deleted. If you see it referenced anywhere (old docs, old branches), it's gone;
+> don't try to resurrect it.
 
 ---
 
 ## ✅ Prerequisites
 
-Install these **before cloning**:
+| Tool | Version | Why |
+|---|---|---|
+| **Node.js** | 20 LTS (or 18+) | Runtime for all three apps |
+| **npm** | 10+ | Comes with Node |
+| **Git** | any | Clone the repo |
+| **Expo Go app** | latest | Run the mobile app on your physical phone (Play Store / App Store) |
+| **A Supabase project** | free tier is fine | The shared Postgres backend — **required**, there is no mock/offline mode |
+| Android Studio / Xcode | optional | Only if you want an emulator/simulator instead of a physical phone |
 
-| Tool | Version | Why | Install |
-|---|---|---|---|
-| **Node.js** | **20 LTS** (or 18+) | Runtime for all three apps | [nodejs.org](https://nodejs.org/) |
-| **npm** | 10+ | Comes with Node | — |
-| **Git** | any | Clone repo | [git-scm.com](https://git-scm.com/) |
-| **Expo Go app** | latest | Run mobile app on your physical phone | Play Store / App Store |
-| **Android Studio** *(optional)* | latest | Run mobile app on Android emulator | [developer.android.com](https://developer.android.com/studio) |
-| **Xcode** *(optional, macOS only)* | latest | Run mobile app on iOS simulator | Mac App Store |
-| **Supabase account** *(optional for full DB)* | free tier | Backend Postgres + Auth | [supabase.com](https://supabase.com/) |
-
-> ⚠ **Phone & PC must be on the same Wi-Fi network** for Expo Go to connect.
+> ⚠️ **Phone and PC must be on the same Wi-Fi network** for Expo Go to reach your
+> machine — the mobile app talks to Supabase directly over the internet, but if you
+> also run the API locally (for the chatbot/ML endpoints), your phone needs to reach
+> your PC's LAN IP, not `localhost`.
 
 ---
 
-## 🚀 Quick start (first-time setup)
+## 🚀 First-time setup
 
 ```bash
-# 1. Clone
-git clone <your-repo-url> AGAP
-cd AGAP/agapp-system
+# 1. From the repo root, go to the actual system
+cd agapp-system
 
-# 2. Install ALL workspaces (uses npm workspaces, hoists deps automatically)
+# 2. Install every workspace (npm workspaces hoists shared deps automatically)
 npm install --legacy-peer-deps
 
-# 3. Build the shared types package once (other apps import from it)
+# 3. Build the shared types package once — other workspaces import from it
 npm run build:shared
 
-# 4. Set up environment variables (see "Environment variables" section below)
-#    Create:  apps/api/.env
-#    Create:  apps/mobile/.env
-#    Create:  apps/admin/.env.local
-
-# 5. You're ready. See "Running the apps" below.
+# 4. Set up environment variables — see below. Create:
+#    apps/api/.env
+#    apps/mobile/.env
+#    apps/admin/.env.local
 ```
 
-> **Why `--legacy-peer-deps`?** React 19 + Expo 54 has peer-dep mismatches with some packages (e.g. `react-native-maps`). This flag is the safe default and is also what `npx expo install` uses internally.
+**Why `--legacy-peer-deps`?** Mobile needs React 19 (Expo 54); admin needs React 18
+(Next.js 14). That mismatch means some peer-dep warnings are expected — this flag
+(and `npx expo install` for mobile packages) is the correct way to handle it in this
+repo. See the React 18/19 gotcha further down before touching root `package.json` or
+`stubs/`.
 
 ---
 
 ## 🔐 Environment variables
 
-Each app needs its own env file. **Never commit these.** Templates are below — ask the project lead for actual keys.
+Every app fails silently (or shows no data) without its `.env` file. **None of these
+are committed** — copy the `.example` file in each app and ask the project lead for
+the real values (they're one shared Supabase project + a couple of third-party API keys).
 
-### `apps/api/.env`
+### `apps/api/.env` (copy from `.env.example`)
 ```env
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_KEY=<service-role-secret-key>      # bypasses RLS — server-only, never share
+MISTRAL_API_KEY=<key>                        # chatbot LLM fallback (mistral-small-latest)
+ROBOFLOW_API_KEY=<key>                       # pothole + stray-pet photo-verification ML
+ROBOFLOW_POTHOLE_MODEL_URL=https://serverless.roboflow.com/<pothole-slug>/<version>
+ROBOFLOW_STRAYPETS_MODEL_URL=https://serverless.roboflow.com/<straypets-slug>/<version>
 PORT=5000
-SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...        # service role, server-only
-GEMINI_API_KEY=                                # optional, for chatbot
-JWT_SECRET=replace-me-with-a-long-random-string
+# ALLOWED_ORIGINS=https://your-deployed-admin-url   # CORS allowlist; unset = open + a warning, fine for local dev
 ```
+Missing `ROBOFLOW_*` just means the AI photo-verification badge returns "not analyzed"
+instead of a result — it never fabricates a confidence score, so it's safe to skip if
+you're not working on that feature. `MISTRAL_API_KEY` missing means the chatbot falls
+back to "couldn't find an answer" once its keyword FAQ match fails.
 
-### `apps/mobile/.env`
+### `apps/mobile/.env` (copy from `.env.example`)
 ```env
-EXPO_PUBLIC_API_URL=http://192.168.1.x:5000    # your PC's LAN IP, NOT localhost
-EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...    # anon/public key only
-REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.x     # your PC's LAN IP
+EXPO_PUBLIC_API_URL=http://192.168.1.x:5000/api   # your PC's LAN IP, NOT localhost
+EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
+REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.x        # your PC's LAN IP
 ```
+> 📡 Find your LAN IP: Windows → `ipconfig` (look for `IPv4 Address`); macOS/Linux →
+> `ifconfig | grep inet`.
 
-> 📡 **How to find your LAN IP:**
-> - Windows: `ipconfig` → look for `IPv4 Address` under your Wi-Fi adapter
-> - macOS / Linux: `ifconfig | grep inet`
->
-> Replace `192.168.1.x` with what you see (typically `192.168.x.x` or `10.0.x.x`).
-
-### `apps/admin/.env.local`
+### `apps/admin/.env.local` (copy from `.env.local.example`)
 ```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
 NEXT_PUBLIC_API_URL=http://localhost:5000
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+SUPABASE_SERVICE_ROLE_KEY=<service-role-secret-key>   # server-only; needed for staff creation ("Add Staff") and LGU onboarding
+
+# Demo Quick Login (seeded accounts) — base64-encoded, ask the project lead for the
+# actual passwords, then encode locally:
+#   node -e "console.log(Buffer.from('yourPassword','utf8').toString('base64'))"
+DEMO_SUPERADMIN_PASSWORD_B64=
+DEMO_LGUADMIN_PASSWORD_B64=
+DEMO_PERSONNEL_PASSWORD_B64=
 ```
 
 ---
 
 ## ▶️ Running the apps
 
-### Option A — Run everything at once (API + Admin)
-
 From `agapp-system/`:
-```bash
-npm run dev
-```
-This boots:
-- **API**     → http://localhost:5000
-- **Admin**   → http://localhost:3000
-
-The mobile app must be started separately (it's an Expo native dev server).
-
-### Option B — Run individually
 
 ```bash
-# API only (NestJS, hot reload)
-npm run dev:api
-
-# Admin only (Next.js, hot reload)
-npm run dev:admin
-
-# Mobile only (Expo)
-npm run dev:mobile
+npm run dev          # API (:5000) + Admin (:3000) together
+npm run dev:api       # API only (NestJS, hot reload)
+npm run dev:admin     # Admin only (Next.js, hot reload)
+npm run dev:mobile    # Mobile only (Expo)
 ```
+
+The mobile app is a separate native dev server and isn't part of `npm run dev` —
+start it on its own (see below).
 
 ---
 
 ## 📱 Running the mobile app on your phone
 
-1. **Install Expo Go** on your phone from the Play Store / App Store.
-2. **Connect phone to the same Wi-Fi as your PC.** (Mobile data won't work — Expo dev server is LAN-only.)
-3. Start Metro:
-   ```bash
-   cd apps/mobile
-   npx expo start --lan --clear
-   ```
-4. **Scan the QR code** that appears in the terminal:
-   - Android: open Expo Go → tap "Scan QR code"
-   - iOS: open the camera app → point at QR → tap the banner
-5. The app will bundle (~30–60 s first time) and load on your phone.
-
-### Common Metro hotkeys (in the terminal)
-| Key | Action |
-|---|---|
-| `r` | Reload the app |
-| `j` | Open the dev menu / debugger |
-| `m` | Toggle the in-app dev menu |
-| `c` | Clear the Metro cache and reload |
-| `Ctrl + C` | Stop the dev server |
-
-### Run on Android emulator
 ```bash
 cd apps/mobile
-npx expo start --android
+npx expo start --lan --clear
 ```
+1. Make sure your phone is on the **same Wi-Fi** as your PC.
+2. Scan the QR code Metro prints: Android → open Expo Go → "Scan QR code"; iOS →
+   point the Camera app at it and tap the banner.
+3. First bundle takes ~30–60s.
 
-### Run on iOS simulator (macOS only)
-```bash
-cd apps/mobile
-npx expo start --ios
-```
+To run on an emulator/simulator instead: `npx expo start --android` or
+`npx expo start --ios` (macOS only).
 
----
-
-## 🛠 Mobile app — features that need real device permissions
-
-| Feature | Permission | Tested on |
-|---|---|---|
-| **Pothole report camera** | Camera | Expo Go (Android & iOS) |
-| **GPS auto-tag on reports** | Foreground location | Expo Go (Android & iOS) |
-| **Geofence verification** (Haversine vs LGU centroid) | Foreground location | runs locally |
-| **Map view** (`react-native-maps`) | none for testing | Apple Maps on iOS · Google Maps on Android |
-| **Secure session storage** (`expo-secure-store`) | none | Keychain / Keystore |
-
-### Production map keys (only when building with EAS)
-For production Android builds you'll need a Google Maps API key. Add it to `apps/mobile/app.json`:
-```json
-"android": {
-  "config": {
-    "googleMaps": { "apiKey": "AIza..." }
-  }
-}
-```
-Not needed in Expo Go (Expo's bundled key is used for development).
+**Adding a mobile dependency?** Use `npx expo install <package>` — not
+`npm install` — so you get an Expo-SDK-54-compatible version.
 
 ---
 
 ## 🗄 Supabase / Database
 
-The API expects a Supabase Postgres instance. SQL is in `supabase/`.
+The whole system needs one real Supabase project (Postgres + PostGIS) — every client
+talks to it directly. Ask the project lead for access, or stand up your own project
+and run the SQL in `supabase/` in this order:
 
-```bash
-# To apply migrations (with Supabase CLI installed)
-cd supabase
-supabase db push
+```
+schema.sql              # tables, RLS policies, triggers, functions
+storage_setup.sql        # storage buckets + their access policies
+verification_setup.sql   # citizen ID-verification tables/RPCs
+seed.sql                 # demo LGUs + accounts (optional, for local testing)
 ```
 
-**Mock mode**: if `SUPABASE_URL` is unset, the API falls back to in-memory mock seeds — useful for offline demos but data resets on restart.
+Run these through the Supabase SQL editor (or `supabase db push` if you have the CLI
+set up against the project). `patches/` holds smaller, dated one-off fixes that were
+already applied to the shared project — check dates before re-running one.
+
+> ⚠️ **Free-tier Supabase projects pause when idle.** If everything suddenly "can't
+> connect," check the project isn't `INACTIVE` in the dashboard and restore it.
 
 ---
 
-## 🔑 Demo credentials (mock mode)
+## 🔑 Logging in / demo accounts
 
-| Role | Login | Password / OTP |
-|---|---|---|
-| **Super Admin** (web) | `superadmin@agapp.gov.ph` | `password123` |
-| **LGU Admin** (web) | `admin@liliw.gov.ph` | `password123` |
-| **Citizen** (mobile) | any email | OTP `123456` (or leave blank to bypass) |
+There's no mock mode and no OTP — authentication is real Supabase Auth
+(`signInWithPassword` / `signUp`), and Row-Level Security enforces who can see what.
 
----
-
-## 🧪 Defense walkthrough script
-
-### Scenario 1 — On-device YOLO pothole credibility *(mitigates spam DDoS)*
-1. Mobile → log in → select **Liliw**
-2. Tab **Reports** → category **Pothole** → tap **Capture photo**
-3. After capture, GPS auto-loads → mini-map shows your pin → submit
-4. ✓ "Inside LGU geofence" confirmation appears
-
-### Scenario 2 — LGU SLA auto-routing *(RA 11032)*
-1. Open admin dashboard → **Issue Reports**
-2. Locate the pothole report → it's pre-routed to *Engineering Office* with a **3-day SLA**
-3. Click **Acknowledge & Route**
-
-### Scenario 3 — Document request *(RA 10173 + RA 11032)*
-1. Mobile → tab **Services** → tap **Birth Certificate** → fill the form sheet → submit
-2. Reference number generated → bring to Treasurer's counter
-3. Admin dashboard → **Service Requests** → mark **Under Review** → **Released**
-
-### Scenario 4 — Forum profanity moderation *(RA 10175)*
-1. Mobile → forum → post a clean message ✓
-2. Post a message containing a flagged word → auto-flagged "Awaiting Moderation"
-3. Admin → **Forum Moderation** → approve or delete
-
-### Scenario 5 — Map view of LGU coverage
-1. Mobile → home → **Map** quick action
-2. See black pin (selected LGU centroid) + pastel pins (other municipalities) + pink pins (your reports)
+- **Admin dashboard** (`apps/admin`) has three roles: Super Admin, LGU Admin, LGU
+  Personnel. The login page has **Quick Login** buttons for seeded demo accounts —
+  wired to the `DEMO_*_PASSWORD_B64` env vars above. Ask the project lead for the
+  actual passwords (they're not in this README).
+- **Citizen mobile app** — real email/password sign-up. New accounts start
+  **unverified**: submitting a report, applying for a service, or posting in the
+  forum requires completing ID verification first (an ID photo + a selfie, reviewed
+  and approved by an LGU Admin in the dashboard). Browsing (Home, News, Map) works
+  without an account or verification.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Mobile app
-
-**"Network response timed out" / app stuck on splash**
-- Phone and PC not on same Wi-Fi. Check both.
-- Some routers block client-to-client traffic ("AP isolation"). Try a hotspot from another phone.
-- Set `REACT_NATIVE_PACKAGER_HOSTNAME` in `.env` to your PC's LAN IP.
+**Mobile app stuck on splash / "Network request failed"**
+- Phone and PC aren't on the same Wi-Fi, or the router blocks client-to-client
+  traffic ("AP isolation") — try a phone hotspot instead.
+- Double-check `REACT_NATIVE_PACKAGER_HOSTNAME` and `EXPO_PUBLIC_API_URL` are your
+  PC's actual LAN IP, not `localhost`.
 
 **Metro bundler errors / "Cannot find module"**
 ```bash
 cd apps/mobile
 rm -rf node_modules .expo
-cd ../..
-npm install --legacy-peer-deps
-cd apps/mobile
-npx expo start --clear
+cd ../.. && npm install --legacy-peer-deps
+cd apps/mobile && npx expo start --clear
 ```
 
-**`'S' of undefined` or other Hermes crashes after installing a new package**
-- Always use `npx expo install <package>` (not `npm install`) — it picks Expo-compatible versions.
-- Restart Metro with `--clear` after any native dep install.
+**Installed a package and now the mobile app crashes on native code**
+- You probably used `npm install` instead of `npx expo install` — reinstall with the
+  latter, then restart Metro with `--clear`.
 
-**Camera / location alerts but nothing happens**
-- Check phone Settings → Apps → Expo Go → Permissions → enable Camera + Location.
+**`Module not found: @agapp/shared`**
+- Run `npm run build:shared` from `agapp-system/`.
 
-**TypeScript version warning**
-- Safe to ignore. The repo pins TS 5.3 for compatibility with all workspaces.
-
-### API / Admin
-
-**"ECONNREFUSED localhost:5000" from mobile**
-- Mobile cannot reach `localhost`. Use your PC's LAN IP in `EXPO_PUBLIC_API_URL`.
-
-**"Module not found: @agapp/shared"**
-- Run `npm run build:shared` from the repo root.
+**Admin "Add Staff" or the Super Admin onboarding wizard's admin-creation step 500s**
+- `SUPABASE_SERVICE_ROLE_KEY` is missing from `apps/admin/.env.local`.
 
 **Port already in use**
-- Kill the process on the port:
-  - Windows: `netstat -ano | findstr :5000` → `taskkill /PID <pid> /F`
-  - macOS / Linux: `lsof -ti:5000 | xargs kill -9`
+- Windows: `netstat -ano | findstr :5000` → `taskkill /PID <pid> /F`
+- macOS/Linux: `lsof -ti:5000 | xargs kill -9`
+
+**A weird React error in the admin app after touching dependencies**
+- This monorepo deliberately nests React 18 inside `apps/admin/node_modules` while
+  the root pins React 19 for mobile (see the gotcha below). Don't remove
+  `stubs/`, the root `react`/`react-dom` version pins, or the admin `tsconfig.json`
+  path overrides — re-run `npm install --legacy-peer-deps` and re-check
+  `apps/admin/node_modules/react/package.json` still says 18.x if something looks off.
+
+---
+
+## ⚠️ Gotchas worth knowing before you dig in
+
+- **Only the API's two endpoints exist:** `POST /api/chatbot/ask` and the guarded
+  `POST /api/reports/verify-image`. Every other feature (reports, services, forum,
+  facilities, notifications…) is the client apps talking straight to Supabase, with
+  Postgres RLS as the real security/multi-tenancy boundary — not the NestJS layer.
+- **`@supabase/supabase-js` version differs across apps** — mobile is on `2.108`,
+  admin/api on `2.43`. Don't assume a newer client API is available everywhere.
+- **Realtime subscriptions need their table in the `supabase_realtime` publication.**
+  If a live-update feature (forum, notifications, tracking) silently does nothing,
+  check `pg_publication_tables` before assuming the client code is broken.
+- **No automated tests exist anywhere in this repo yet**, and `any` types are common
+  in older code. Don't assume test coverage when refactoring.
+- **AI photo verification is real, not simulated** — pothole and stray-pet reports
+  get a genuine confidence score from Roboflow-hosted models. The admin report views
+  show a three-state badge (detected / not detected / not analyzed) — don't collapse
+  that to a boolean, "not analyzed" and "analyzed but nothing found" are different states.
 
 ---
 
 ## 📚 Tech stack reference
 
-**Mobile** — Expo SDK 54 · React Native 0.81 · React 19 · TypeScript · `expo-camera` · `expo-location` · `expo-secure-store` · `react-native-maps` · `@expo/vector-icons` (Ionicons)
+**Mobile** — Expo SDK 54 · React Native 0.81 · React 19 · TypeScript · `expo-camera` ·
+`expo-location` · `expo-secure-store` · `react-native-maps` · `react-native-view-shot`
 
-**Admin** — Next.js 14 · React · TypeScript · TailwindCSS · Supabase JS
+**Admin** — Next.js 14 (App Router) · React 18 · TypeScript · Tailwind CSS ·
+Recharts · Leaflet (`react-leaflet`) · Supabase JS
 
-**API** — NestJS 10 · Express · Supabase JS · Zod · `@google/generative-ai` (Gemini chatbot) · `pdf-lib` (cert generation)
+**API** — NestJS 10 · Express · Supabase JS · Mistral AI (chatbot) · Roboflow
+(hosted inference for photo verification)
 
-**Shared** — TypeScript declarations + Zod schemas, built once via `npm run build:shared`.
+**Shared** — TypeScript types, built once via `npm run build:shared`; re-run it after
+any edit under `packages/shared`.
 
----
-
-## 📝 Compliance notes (thesis context)
-
-- **RA 10173** — Data Privacy Act: opt-in consent for GPS + push, secure storage of session tokens via OS keychain.
-- **RA 11032** — Ease of Doing Business: SLA auto-routing for service requests (Simple = 3 days, Complex = 7, Highly Technical = 20).
-- **RA 10175** — Cybercrime Prevention: forum profanity filter + admin moderation queue.
-- **RA 10844** — DICT mandate: digital governance platform for LGUs.
+**Database** — Supabase (Postgres + PostGIS), Row-Level Security on every tenant table.
 
 ---
 
 ## 🤝 Contributing
 
-1. Branch from `main`: `git checkout -b feat/<short-description>`
-2. Commit in small, focused chunks. Reference scenarios above when relevant.
+1. Branch from `main`: `git checkout -b feat/<short-description>`.
+2. Match the surrounding file's existing style (this codebase uses inline
+   presentational helpers and theme tokens rather than a component library).
 3. Run `npm run build:shared` after editing `packages/shared`.
-4. Open a PR — describe what changed in the mobile / admin / api column.
+4. Check `Docs/` (in the repo root, one level up) before starting a feature —
+   it tracks what's already built, what's mid-flight, and what's intentionally
+   deferred, and it's kept more current than this README's feature descriptions.
+5. Open a PR describing what changed, and which app(s) it touches.
 
 ---
 
 ## 📞 Need help?
 
-- Check the **Troubleshooting** section above first.
-- Slack / Discord: ask the project lead.
-- Logs: Metro terminal output + the in-app dev menu (`j` in Metro).
-
-— Last updated: 2026-05
+Check **Troubleshooting** above first, then ask the project lead. Logs: the Metro
+terminal (mobile), the `npm run dev` terminal (API/admin), and your browser's
+devtools console (admin).
