@@ -10,20 +10,8 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import { 
-  Gear,
-  User,
-  Bell,
-  Shield,
-  Building,
-  MapPin,
-  Envelope,
-  Phone,
-  Plus,
-  Trash,
-  Pencil,
-  X
-} from '@phosphor-icons/react';
+import { Setting2, User, Notification, Shield, Building, Location, Sms, Call, Add, Trash, Edit, CloseCircle } from 'iconsax-react';
+import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
 
 interface StaffMember {
   id: string;
@@ -50,6 +38,11 @@ export default function SettingsPage() {
   const [officeAddress, setOfficeAddress] = useState('');
   const [latitude, setLatitude] = useState(0);
   const [longitude, setLongitude] = useState(0);
+  const [primaryColor, setPrimaryColor] = useState('#d62a53');
+  const [secondaryColor, setSecondaryColor] = useState('#ffffff');
+  const [iconColor, setIconColor] = useState('#d62a53');
+  const [darkBgColor, setDarkBgColor] = useState('#292929');
+  const [featureFlags, setFeatureFlags] = useState<any>({ chatbot: true, potholeDetection: true, forum: true });
 
   // Staff States
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -92,6 +85,12 @@ export default function SettingsPage() {
           setOfficeAddress(lgu.office_address || '');
           setLatitude(lgu.latitude || 0);
           setLongitude(lgu.longitude || 0);
+          setPrimaryColor(lgu.primary_color || '#d62a53');
+          setSecondaryColor(lgu.secondary_color || '#ffffff');
+          const flags = lgu.feature_flags || {};
+          setFeatureFlags(flags);
+          setIconColor(flags.iconColor || lgu.primary_color || '#d62a53');
+          setDarkBgColor(flags.darkBgColor || '#292929');
         }
 
         // 2. Load Staff Members
@@ -149,6 +148,13 @@ export default function SettingsPage() {
           contact_email: contactEmail,
           contact_phone: contactPhone,
           office_address: officeAddress,
+          primary_color: primaryColor,
+          secondary_color: secondaryColor,
+          feature_flags: {
+            ...featureFlags,
+            iconColor: iconColor,
+            darkBgColor: darkBgColor,
+          }
         })
         .eq('id', lguId);
 
@@ -283,7 +289,7 @@ export default function SettingsPage() {
                     : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
-                <Building className="w-4 h-4" />
+                <Building variant="Bold" className="w-4 h-4" />
                 General
               </button>
               <button
@@ -294,7 +300,7 @@ export default function SettingsPage() {
                     : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
-                <User className="w-4 h-4" />
+                <User variant="Bold" className="w-4 h-4" />
                 Staff Management
               </button>
               <button
@@ -305,7 +311,7 @@ export default function SettingsPage() {
                     : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
-                <Bell className="w-4 h-4" />
+                <Notification className="w-4 h-4" />
                 Notifications
               </button>
             </nav>
@@ -339,7 +345,7 @@ export default function SettingsPage() {
                     onChange={(e: any) => setContactEmail(e.target.value)}
                   />
                   <Input
-                    label="Contact Phone"
+                    label="Contact Call"
                     value={contactPhone}
                     onChange={(e: any) => setContactPhone(e.target.value)}
                   />
@@ -376,6 +382,96 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Colors and Palette Selector */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1.5">Primary Color</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1.5">Secondary Color</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={secondaryColor}
+                        onChange={(e) => setSecondaryColor(e.target.value)}
+                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={secondaryColor}
+                        onChange={(e) => setSecondaryColor(e.target.value)}
+                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overrides */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1.5">Icon Override Color</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={iconColor}
+                        onChange={(e) => setIconColor(e.target.value)}
+                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={iconColor}
+                        onChange={(e) => setIconColor(e.target.value)}
+                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1.5">Dark BG Override</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={darkBgColor}
+                        onChange={(e) => setDarkBgColor(e.target.value)}
+                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={darkBgColor}
+                        onChange={(e) => setDarkBgColor(e.target.value)}
+                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <ColorPaletteSelector
+                  primaryColor={primaryColor}
+                  secondaryColor={secondaryColor}
+                  iconColor={iconColor}
+                  darkBgColor={darkBgColor}
+                  onChange={({ primaryColor: p, secondaryColor: s, iconColor: i, darkBgColor: d }) => {
+                    setPrimaryColor(p);
+                    setSecondaryColor(s);
+                    setIconColor(i);
+                    setDarkBgColor(d);
+                  }}
+                  lguName={lguNameParam}
+                />
+
                 <div className="pt-4 border-t border-theme">
                   <Button onClick={handleSaveGeneral}>Save Changes</Button>
                 </div>
@@ -394,7 +490,7 @@ export default function SettingsPage() {
                   setStaffRole('LGU_PERSONNEL');
                   setShowStaffModal(true);
                 }}>
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Add className="w-4 h-4 mr-1" />
                   Add Staff
                 </Button>
               </div>
@@ -404,7 +500,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-text-muted" />
+                        <User variant="Bold" className="w-5 h-5 text-text-muted" />
                       </div>
                       <div>
                         <p className="font-medium text-text-primary">{member.name}</p>
@@ -424,10 +520,10 @@ export default function SettingsPage() {
                         setStaffRole(member.role as any);
                         setShowStaffModal(true);
                       }}>
-                        <Pencil className="w-4 h-4" />
+                        <Edit className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(member.id, member.name)}>
-                        <Trash className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
                       </Button>
                     </div>
                   </div>
@@ -495,7 +591,7 @@ export default function SettingsPage() {
                 {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
               </h3>
               <button onClick={() => setShowStaffModal(false)} className="text-text-faint hover:text-text-primary">
-                <X className="w-5 h-5" />
+                <CloseCircle className="w-5 h-5" />
               </button>
             </div>
 

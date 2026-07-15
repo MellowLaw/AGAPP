@@ -1,14 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Platform, Animated, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { globalStyles, PASTELS } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
-import { AgappLogo } from '../components/AgappLogo';
+import { globalStyles } from '../theme';
+import { ArrowLeft2, Notification } from 'iconsax-react-native';
 
 const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient || Constants?.appOwnership === 'expo';
 
@@ -37,7 +35,7 @@ if (Notifications) {
 
 export function NotificationsScreen({ navigation }: any) {
   const { profile } = useAuth();
-  const { T } = useTheme();
+  const { T, isDarkMode } = useTheme();
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
@@ -73,27 +71,107 @@ export function NotificationsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-      <View style={[globalStyles.screen, { backgroundColor: T.bg }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, backgroundColor: T.card, borderBottomWidth: 1, borderColor: T.border }}>
-          <Ionicons name="arrow-back" size={24} color={T.text} onPress={() => navigation.goBack()} />
-          <Text style={[globalStyles.serif, { color: T.text, fontSize: 22, marginLeft: 16 }]}>Notifications</Text>
+      {/* Tinted Map Background */}
+      <Image
+        source={isDarkMode ? require('../../assets/brand/bg-map-2.png') : require('../../assets/brand/bg-map-1.png')}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+          opacity: isDarkMode ? 0.04 : 0.07,
+          tintColor: T.accent,
+        }}
+        resizeMode="cover"
+      />
+
+      <View style={{ flex: 1 }}>
+        {/* Header Bar */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 16,
+          borderBottomWidth: 1,
+          borderColor: T.border,
+        }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+            <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+          </TouchableOpacity>
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 20, marginLeft: 16 }}>Notifications</Text>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           {notifications.length === 0 ? (
-            <Text style={{ color: T.textMuted, marginTop: 40, textAlign: 'center' }}>No notifications yet.</Text>
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
+              <Image
+                source={require('../../assets/brand/mascot.png')}
+                style={{ width: 120, height: 120, opacity: 0.6, marginBottom: 16 }}
+                resizeMode="contain"
+              />
+              <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 15, textAlign: 'center' }}>
+                No notifications yet.
+              </Text>
+            </View>
           ) : (
             notifications.map(n => (
-              <View key={n.id} style={[globalStyles.card, { backgroundColor: n.is_read ? T.card : T.cardAlt, borderColor: T.border, padding: 16, marginBottom: 12 }]} onTouchEnd={() => !n.is_read && markAsRead(n.id)}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                   <View style={{flex: 1}}>
-                      <Text style={{ color: T.text, fontWeight: n.is_read ? '500' : '700', fontSize: 16, marginBottom: 4 }}>{n.title}</Text>
-                      <Text style={{ color: T.textMuted, fontSize: 14 }}>{n.body}</Text>
-                      <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 8 }}>{new Date(n.created_at).toLocaleString()}</Text>
-                   </View>
-                   {!n.is_read && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F497A2', marginTop: 6 }} />}
+              <TouchableOpacity
+                key={n.id}
+                style={{
+                  backgroundColor: n.is_read ? T.card : T.cardAlt,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 20, // card radii 20
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+                onPress={() => !n.is_read && markAsRead(n.id)}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: n.is_read ? T.cardAlt : T.accent,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Notification size={18} color={n.is_read ? T.text : '#292929'} variant={n.is_read ? 'Linear' : 'Bold'} />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={{
+                      color: T.text,
+                      fontFamily: 'Octarine-Bold',
+                      fontSize: 15,
+                      marginBottom: 4,
+                    }}>
+                      {n.title}
+                    </Text>
+                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, lineHeight: 18 }}>
+                      {n.body}
+                    </Text>
+                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 8 }}>
+                      {new Date(n.created_at).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  {!n.is_read && (
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: T.accent,
+                      marginTop: 6,
+                    }} />
+                  )}
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>
@@ -101,5 +179,3 @@ export function NotificationsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
-

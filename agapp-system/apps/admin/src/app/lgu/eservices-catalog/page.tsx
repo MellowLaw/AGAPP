@@ -11,7 +11,7 @@ import { ConfirmModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import { Plus, Trash, X } from '@phosphor-icons/react';
+import { Add, Trash, CloseCircle } from 'iconsax-react';
 
 interface CatalogService {
   id: string;
@@ -213,7 +213,7 @@ export default function EservicesCatalogPage() {
                   className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
                 <Button variant="secondary" size="sm" onClick={addRequirement}>
-                  <Plus className="w-4 h-4" />
+                  <Add className="w-4 h-4" />
                 </Button>
               </div>
               <ul className="space-y-1">
@@ -221,7 +221,7 @@ export default function EservicesCatalogPage() {
                   <li key={i} className="flex items-center justify-between gap-2 text-sm bg-surface-alt rounded-md px-3 py-1.5">
                     <span className="text-text-primary">{req}</span>
                     <button onClick={() => removeRequirement(i)} className="text-text-faint hover:text-red-600 dark:text-red-400">
-                      <X className="w-3.5 h-3.5" />
+                      <CloseCircle className="w-3.5 h-3.5" />
                     </button>
                   </li>
                 ))}
@@ -257,7 +257,7 @@ export default function EservicesCatalogPage() {
                       if (s) setDeleteTarget(s);
                     }}
                   >
-                    <Trash className="w-4 h-4" />
+                    <Trash variant="Bold" className="w-4 h-4" />
                   </Button>
                 </>
               )}

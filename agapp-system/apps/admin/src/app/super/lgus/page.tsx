@@ -12,7 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
 import { lguIdFromName } from '@/lib/lgu';
 import { listRegions, provincesOfRegion, citiesOfProvince } from '@/data/ph-locations';
-import { Plus, Eye, Power, UserSwitch, Download, ArrowLeft, ArrowRight, CheckCircle, MapPin, Palette, UserPlus, ClipboardText } from '@phosphor-icons/react';
+import { Add, Eye, CloseCircle, DocumentDownload, ArrowLeft, ArrowRight, TickCircle, Location, Colorfilter, UserAdd, ClipboardText } from 'iconsax-react';
+import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
 
 interface Lgu {
   id: string;
@@ -35,6 +36,8 @@ interface Lgu {
     chatbot: boolean;
     potholeDetection: boolean;
     forum: boolean;
+    iconColor?: string;
+    darkBgColor?: string;
   };
 }
 
@@ -42,7 +45,7 @@ const DEFAULT_PRIMARY = '#A2B59F';
 const DEFAULT_SECONDARY = '#9FADB5';
 const DEFAULT_FLAGS = { chatbot: true, potholeDetection: true, forum: true };
 
-type WizardFlags = { chatbot: boolean; potholeDetection: boolean; forum: boolean };
+type WizardFlags = { chatbot: boolean; potholeDetection: boolean; forum: boolean; iconColor?: string; darkBgColor?: string; };
 
 interface WizardState {
   step: number;
@@ -76,9 +79,9 @@ const EMPTY_WIZARD: WizardState = {
 };
 
 const WIZARD_STEPS = [
-  { n: 1, label: 'Location', icon: MapPin },
-  { n: 2, label: 'Branding', icon: Palette },
-  { n: 3, label: 'First Admin', icon: UserPlus },
+  { n: 1, label: 'Location', icon: Location },
+  { n: 2, label: 'Branding', icon: Colorfilter },
+  { n: 3, label: 'First Admin', icon: UserAdd },
   { n: 4, label: 'Review', icon: ClipboardText },
 ];
 
@@ -343,10 +346,7 @@ export default function SuperLgusPage() {
     showToast(`Updated profile configurations for ${name}.`, 'success');
   };
 
-  const impersonate = (id: string, name: string) => {
-    const url = `/lgu/dashboard?lguName=${encodeURIComponent(name)}`;
-    window.location.href = url;
-  };
+
 
   return (
     <DashboardLayout role="super-admin" title="LGU Directory">
@@ -366,7 +366,7 @@ export default function SuperLgusPage() {
           title="Municipalities"
           action={
             <Button onClick={openWizard}>
-              <Plus className="w-4 h-4 mr-1" />
+              <Add className="w-4 h-4 mr-1" />
               Add LGU
             </Button>
           }
@@ -378,7 +378,7 @@ export default function SuperLgusPage() {
             variant="secondary"
             onClick={handleExportCsv}
           >
-            <Download className="w-4 h-4 mr-1" /> Export CSV
+            <DocumentDownload className="w-4 h-4 mr-1" /> Export CSV
           </Button>
         </div>
 
@@ -411,13 +411,10 @@ export default function SuperLgusPage() {
                   <td className="py-3 px-4 rounded-r-md">
                     <div className="flex items-center justify-end gap-2">
                       <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
-                        <Eye className="w-4 h-4 mr-1" /> Configure
+                        <Eye variant="Bold" className="w-4 h-4 mr-1" /> Configure
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => toggleActive(lgu.id)}>
-                        <Power className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
-                      </Button>
-                      <Button variant="primary" size="sm" onClick={() => impersonate(lgu.id, lgu.name)}>
-                        <UserSwitch className="w-4 h-4 mr-1" /> Impersonate
+                        <CloseCircle className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
                       </Button>
                     </div>
                   </td>
@@ -499,6 +496,78 @@ export default function SuperLgusPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Custom Icon Color and Dark BG Color overrides */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Icon Override Color</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={selectedLguForEdit.feature_flags?.iconColor || selectedLguForEdit.primary_color || '#ffffff'}
+                      onChange={(e) => setSelectedLguForEdit({
+                        ...selectedLguForEdit,
+                        feature_flags: { ...selectedLguForEdit.feature_flags, iconColor: e.target.value }
+                      })}
+                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={selectedLguForEdit.feature_flags?.iconColor || ''}
+                      placeholder={selectedLguForEdit.primary_color}
+                      onChange={(e) => setSelectedLguForEdit({
+                        ...selectedLguForEdit,
+                        feature_flags: { ...selectedLguForEdit.feature_flags, iconColor: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Dark BG Override</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={selectedLguForEdit.feature_flags?.darkBgColor || '#292929'}
+                      onChange={(e) => setSelectedLguForEdit({
+                        ...selectedLguForEdit,
+                        feature_flags: { ...selectedLguForEdit.feature_flags, darkBgColor: e.target.value }
+                      })}
+                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={selectedLguForEdit.feature_flags?.darkBgColor || ''}
+                      placeholder="#292929"
+                      onChange={(e) => setSelectedLguForEdit({
+                        ...selectedLguForEdit,
+                        feature_flags: { ...selectedLguForEdit.feature_flags, darkBgColor: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <ColorPaletteSelector
+                primaryColor={selectedLguForEdit.primary_color || '#ffffff'}
+                secondaryColor={selectedLguForEdit.secondary_color || '#ffffff'}
+                iconColor={selectedLguForEdit.feature_flags?.iconColor || selectedLguForEdit.primary_color || '#ffffff'}
+                darkBgColor={selectedLguForEdit.feature_flags?.darkBgColor || '#292929'}
+                onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
+                  setSelectedLguForEdit({
+                    ...selectedLguForEdit,
+                    primary_color: primaryColor,
+                    secondary_color: secondaryColor,
+                    feature_flags: {
+                      ...selectedLguForEdit.feature_flags,
+                      iconColor,
+                      darkBgColor,
+                    }
+                  })
+                }
+                lguName={selectedLguForEdit.name}
+              />
 
               {/* Onboarding payment status */}
               <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
@@ -618,7 +687,7 @@ export default function SuperLgusPage() {
                               : 'border-theme text-text-faint bg-surface-alt'
                           }`}
                         >
-                          {done ? <CheckCircle weight="fill" className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
+                          {done ? <TickCircle className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
                         </div>
                         <span className={`text-[11px] font-semibold ${active || done ? 'text-text-primary' : 'text-text-faint'}`}>
                           {s.label}
@@ -741,6 +810,65 @@ export default function SuperLgusPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Custom Icon Color and Dark BG Color overrides for Wizard */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Icon Override Color</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={wizard.flags.iconColor || wizard.primaryColor}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, iconColor: e.target.value } })}
+                            className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={wizard.flags.iconColor || ''}
+                            placeholder={wizard.primaryColor}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, iconColor: e.target.value } })}
+                            className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Dark BG Override</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="color"
+                            value={wizard.flags.darkBgColor || '#292929'}
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, darkBgColor: e.target.value } })}
+                            className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={wizard.flags.darkBgColor || ''}
+                            placeholder="#292929"
+                            onChange={(e) => patchWizard({ flags: { ...wizard.flags, darkBgColor: e.target.value } })}
+                            className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <ColorPaletteSelector
+                      primaryColor={wizard.primaryColor}
+                      secondaryColor={wizard.secondaryColor}
+                      iconColor={wizard.flags.iconColor || wizard.primaryColor}
+                      darkBgColor={wizard.flags.darkBgColor || '#292929'}
+                      onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
+                        patchWizard({
+                          primaryColor,
+                          secondaryColor,
+                          flags: {
+                            ...wizard.flags,
+                            iconColor,
+                            darkBgColor,
+                          }
+                        })
+                      }
+                      lguName={wizard.city || 'Municipality'}
+                    />
 
                     <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
                       <input
@@ -884,7 +1012,7 @@ export default function SuperLgusPage() {
               {/* Footer nav */}
               <div className="flex items-center justify-between mt-6 border-t border-theme pt-4">
                 <Button variant="secondary" onClick={wizard.step === 1 ? closeWizard : goBack} disabled={creating}>
-                  {wizard.step === 1 ? 'Cancel' : (<><ArrowLeft className="w-4 h-4 mr-1" /> Back</>)}
+                  {wizard.step === 1 ? 'Cancel' : (<><ArrowLeft variant="Linear" className="w-4 h-4 mr-1" /> Back</>)}
                 </Button>
 
                 <div className="flex items-center gap-2">
@@ -898,11 +1026,11 @@ export default function SuperLgusPage() {
                       onClick={goNext}
                       disabled={wizard.step === 1 && !canProceedLocation}
                     >
-                      Next <ArrowRight className="w-4 h-4 ml-1" />
+                      Next <ArrowRight variant="Linear" className="w-4 h-4 ml-1" />
                     </Button>
                   ) : (
                     <Button onClick={handleCreateLgu} disabled={creating || !canProceedLocation}>
-                      {creating ? 'Creating…' : (<><CheckCircle className="w-4 h-4 mr-1" /> Create LGU</>)}
+                      {creating ? 'Creating…' : (<><TickCircle className="w-4 h-4 mr-1" /> Create LGU</>)}
                     </Button>
                   )}
                 </div>

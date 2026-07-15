@@ -30,6 +30,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-Personnel-Enhancement](Planning/Plan-Personnel-Enhancement.md) — office-based Personnel accounts + scoped UI + front-line trio; ease-of-use for non-technical clerks (draft)
 - [Plan-Reporting-Camera-GPS-Hardening](Planning/Plan-Reporting-Camera-GPS-Hardening.md) — mobile report flow: camera-only, auto-GPS, stamped photo (shipped 2026-07-06, not yet device-tested)
 - [Plan-Phone-Login-SMS](Planning/Plan-Phone-Login-SMS.md) — 🔵 future: phone-number + SMS OTP login; Semaphore (PH) via Supabase SMS hook is the cost-efficient pick
+- [Plan-Mobile-Redesign](Planning/Plan-Mobile-Redesign.md) — citizen app reskin to Brand Kit v2 (self-contained, phased P0–P6; any agent/AI can execute or resume it)
 
 **Tasks**
 - [TODO](Tasks/TODO.md) — prioritized outstanding work

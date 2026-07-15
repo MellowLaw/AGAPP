@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, TextArea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash } from '@phosphor-icons/react';
+import { Add, Trash } from 'iconsax-react';
 
 export default function SuperSettingsPage() {
   const { showToast, ToastContainer } = useToast();
@@ -239,7 +239,7 @@ export default function SuperSettingsPage() {
                   className="text-red-600 dark:text-red-400 hover:text-red-800 transition-colors p-1 rounded"
                   title="Remove category"
                 >
-                  <Trash className="w-4 h-4" />
+                  <Trash variant="Bold" className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -257,7 +257,7 @@ export default function SuperSettingsPage() {
               className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
             />
             <Button onClick={addCategory} disabled={saving === 'categories'}>
-              <Plus className="w-4 h-4" />
+              <Add className="w-4 h-4" />
             </Button>
           </div>
         </Card>
@@ -274,7 +274,7 @@ export default function SuperSettingsPage() {
                   className="text-red-600 dark:text-red-400 hover:text-red-800 transition-colors p-1 rounded"
                   title="Remove service type"
                 >
-                  <Trash className="w-4 h-4" />
+                  <Trash variant="Bold" className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -292,7 +292,7 @@ export default function SuperSettingsPage() {
               className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
             />
             <Button onClick={addServiceType} disabled={saving === 'serviceTypes'}>
-              <Plus className="w-4 h-4" />
+              <Add className="w-4 h-4" />
             </Button>
           </div>
         </Card>

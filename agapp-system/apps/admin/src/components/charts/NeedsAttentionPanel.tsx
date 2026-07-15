@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { ClockCountdown, WarningCircle, Package, MapPinLine, CheckCircle } from '@phosphor-icons/react';
+import { Timer, Danger, Box, Location, TickCircle } from 'iconsax-react';
 
 export interface NeedsAttentionData {
   /** Reports past their SLA due date. */
@@ -35,7 +35,7 @@ const StatRow: React.FC<StatRowProps> = ({ icon: Icon, count, label, tone }) => 
   return (
     <div className="flex items-center gap-3 py-2.5">
       <div className={`p-2 rounded-lg ${styles.iconBg} shrink-0`}>
-        <Icon className={`w-4 h-4 ${styles.iconColor}`} weight="bold" />
+        <Icon className={`w-4 h-4 ${styles.iconColor}`} variant="Bold" />
       </div>
       <div className="flex items-baseline gap-2 min-w-0">
         <span className="text-xl font-bold font-mono text-text-primary tabular-nums">{count}</span>
@@ -73,30 +73,30 @@ export const NeedsAttentionPanel: React.FC<NeedsAttentionPanelProps> = ({ data, 
         <div className="flex-1 flex items-center justify-center text-sm text-text-muted py-8">Loading…</div>
       ) : allClear ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center">
-          <CheckCircle className="w-7 h-7 text-green-600" weight="fill" />
+          <TickCircle className="w-7 h-7 text-green-600" />
           <p className="text-sm text-text-muted">Nothing needs attention right now.</p>
         </div>
       ) : (
         <>
           <div className="divide-y divide-theme">
             {overdueReports > 0 && (
-              <StatRow icon={WarningCircle} count={overdueReports} label="reports past SLA due date" tone="critical" />
+              <StatRow icon={Danger} count={overdueReports} label="reports past SLA due date" tone="critical" />
             )}
             {staleReports > 0 && (
-              <StatRow icon={ClockCountdown} count={staleReports} label="reports stale with no update" tone="warning" />
+              <StatRow icon={Timer} count={staleReports} label="reports stale with no update" tone="warning" />
             )}
             {staleRequests > 0 && (
-              <StatRow icon={ClockCountdown} count={staleRequests} label="service requests stale" tone="warning" />
+              <StatRow icon={Timer} count={staleRequests} label="service requests stale" tone="warning" />
             )}
             {uncollectedRequests > 0 && (
-              <StatRow icon={Package} count={uncollectedRequests} label="requests uncollected" tone="warning" />
+              <StatRow icon={Box} count={uncollectedRequests} label="requests uncollected" tone="warning" />
             )}
           </div>
 
           {inactiveLgus.length > 0 && (
             <div className="mt-4 pt-4 border-t border-theme">
               <div className="flex items-center gap-2 mb-2.5">
-                <MapPinLine className="w-4 h-4 text-text-muted" />
+                <Location className="w-4 h-4 text-text-muted" />
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
                   Inactive 14+ days
                 </p>

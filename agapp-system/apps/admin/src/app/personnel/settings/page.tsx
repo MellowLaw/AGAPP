@@ -7,10 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import {
-  User,
-  Bell,
-} from '@phosphor-icons/react';
+import { User, Notification } from 'iconsax-react';
 
 const NOTIF_ITEMS: { key: 'push' | 'sms' | 'email'; label: string }[] = [
   { key: 'push', label: 'Push notifications for new assignments' },
@@ -169,7 +166,7 @@ export default function PersonnelSettingsPage() {
                     : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
-                <User className="w-4 h-4" />
+                <User variant="Bold" className="w-4 h-4" />
                 My Profile
               </button>
               <button
@@ -180,7 +177,7 @@ export default function PersonnelSettingsPage() {
                     : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
-                <Bell className="w-4 h-4" />
+                <Notification className="w-4 h-4" />
                 Notifications
               </button>
             </nav>
@@ -196,7 +193,7 @@ export default function PersonnelSettingsPage() {
               <div className="space-y-6">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 bg-surface-alt rounded-full flex items-center justify-center">
-                    <User className="w-8 h-8 text-text-muted" />
+                    <User variant="Bold" className="w-8 h-8 text-text-muted" />
                   </div>
                   <div>
                     <p className="font-medium text-text-primary">{name || 'Loading...'}</p>

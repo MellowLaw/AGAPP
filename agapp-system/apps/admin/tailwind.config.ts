@@ -30,6 +30,7 @@ const config: Config = {
         theme: 'var(--border-theme)',
         accent: 'var(--accent)',
         'accent-soft': 'var(--accent-soft)',
+        'accent-icon': 'var(--accent-icon)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'sans-serif'],

@@ -4,7 +4,13 @@
     "slug": "agapp-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/brand/logo.png",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/brand/pagbati-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFCF5"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],

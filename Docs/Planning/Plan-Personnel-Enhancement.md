@@ -81,6 +81,58 @@ Two ways to do the office split:
   buttons." Weaker separation-of-duties story.
 Recommend **A** — it's the version that makes Personnel defensibly non-redundant.
 
+## Architecture & how it connects (mobile ↔ admin ↔ personnel ↔ super)
+
+### Data model (Supabase — additive, backward-compatible)
+| Object | State | Change |
+|---|---|---|
+| `offices` | exists, **empty** | Seed the standard offices per LGU (Civil Registry, BPLO, Engineering, Health, MDRRMO, Agriculture, General Services). `id, lgu_id, name, slug, type, is_active`. |
+| `users.office_id` | — | **New** nullable FK → `offices`. Non-null only for `LGU_PERSONNEL`; ties a clerk to exactly one office. |
+| `reports.assigned_office_id` | exists, **unwired** | Set on insert by a category→office router; admin-reassignable. Wire it (stop using the legacy free-text `assigned_office` + hardcoded 4-item list). |
+| `service_requests.office_id`/`office_name` | exists | Already derivable from the service catalog (each `lgu_service` has an `office_name`) — ensure it's set; optional `assigned_personnel` for a specific clerk. |
+| `internal_notes` | — | **New** table: `id, subject_type ('report'\|'request'), subject_id, lgu_id, author_id, body, created_at`. Staff-only via RLS; citizens have NO policy (invisible). |
+| `lgu_category_office` | — | **New** small map `(lgu_id, category, office_id)` so admins can tune which office a report category routes to (else a sane default in the router). |
+
+### RLS (the actual enforcement — an office dimension on top of the existing LGU scoping)
+- **Personnel read** on `reports`/`service_requests`: `role = LGU_PERSONNEL AND assigned_office_id = (caller's users.office_id)` → a clerk sees ONLY their office's queue. LGU Admin keeps LGU-wide read; Super keeps all. (Null `office_id` personnel fall back to LGU-wide = today's behavior, so nothing breaks pre-migration.)
+- **`internal_notes`**: read/write by staff of the same LGU only; no citizen policy → notes never leak to the mobile app.
+- Mirrors the existing per-LGU RLS pattern we already use; verifiable the same way (role-simulated reads).
+
+### The end-to-end flow (who touches what)
+```
+CITIZEN (mobile)  ── submits report/request ──▶  guard trigger auto-ROUTES to an office
+                                                 (reports: category→office map;
+                                                  requests: office from the service catalog)
+                                                        │
+                                                        ▼
+                                   appears in THAT OFFICE's PERSONNEL queue (admin web
+                                   /personnel/*) — RLS-scoped to the clerk's office_id
+                                                        │  personnel: acknowledge / start /
+                                                        │  resolve · add internal note ·
+                                                        │  attach resolution proof
+                                                        ▼
+        status change + proof ──▶ Realtime ──▶ CITIZEN (mobile) sees new status + proof
+                                                 on TrackingDetail (+ optional "Handled by:
+                                                 <Office>" for transparency; notes stay hidden)
+
+LGU ADMIN (web)   ── oversees ALL offices · reassigns office · breaks down dashboards by
+                     office · CREATES personnel accounts WITH an office (create-staff)
+SUPER ADMIN (web) ── creates the LGU + seeds its offices (onboarding wizard) + first admin
+```
+
+### Per surface
+- **Mobile (citizen)** — submit flow *unchanged*; the routing is invisible to them. NEW: TrackingDetail shows the resolution proof + richer status (ties into the unused `reports.rating`/`feedback` — they rate after seeing proof). Citizens never see offices/notes. Optional: a read-only "Handled by: <Office>" line.
+- **Admin (LGU Admin)** — `create-staff` route + the staff-creation UIs (`lgu/settings`, the super-admin wizard's first-admin step) gain an **Office picker** when role = `LGU_PERSONNEL`. `lgu/reports` Reassign writes real `assigned_office_id`. Admin dashboards can add an office breakdown (reuses the new Recharts components).
+- **Personnel (office staff)** — the bulk of new UI: office-scoped `personnel/dashboard` + `personnel/reports`, internal notes, attach-proof. Dashboard leads with "**Your office's pending work: N**".
+- **Super Admin** — the onboarding wizard (just built) gains an office-seeding step, or seeds the default office set automatically on LGU create.
+- **NestJS API** — unaffected (still just chatbot + verify-image). *Optional later:* extend the `notify_*` triggers to target the assigned office's personnel (audience-by-office) so a routed report pings the right desk.
+
+### Backward compatibility (the 2 existing LGUs)
+Seed offices for Liliw + Nagcarlan; one-time backfill of `assigned_office_id` on existing reports by category; assign existing personnel an `office_id` (or default them to "General Services"). All additive/nullable — no breaking change, and unassigned-office personnel keep working LGU-wide until assigned.
+
+### Explicitly out of scope (scope guard, per "not too much")
+No new mobile app (field-officer stays cut), no per-office branding/theme (offices share the LGU theme), notifications-to-office is a nice-to-have not a v1 requirement, and no cross-LGU office sharing.
+
 ## Files likely touched
 - `supabase/` — seed offices; `users.office_id` migration; `internal_notes` table + RLS;
   category→office routing (trigger or app-side); sync `schema.sql`.

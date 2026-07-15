@@ -13,6 +13,7 @@
 # Allow the docs vault and project guide to be tracked
 !/Docs/
 !/CLAUDE.md
+!/AGAPP - ASSETS
 
 # Ignore Obsidian workspace files (which contain local layout, tabs, and history state)
 /Docs/.obsidian/workspace.json

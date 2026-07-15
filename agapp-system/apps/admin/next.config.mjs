@@ -2,12 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@agapp/shared'],
-  // @phosphor-icons/react ships ~3,000 individual icon files behind a single
-  // barrel export. Without this, every `import { X } from '@phosphor-icons/react'`
-  // pulls the whole barrel into the dev compile graph — Next.js's own docs name
-  // this exact package as a known case for optimizePackageImports.
+  // iconsax-react barrel imports optimization for dev server performance
   experimental: {
-    optimizePackageImports: ['@phosphor-icons/react'],
+    optimizePackageImports: ['iconsax-react'],
   },
   // Baseline hardening headers. Not a full CSP — this app loads Leaflet tiles,
   // Google Fonts, and Supabase over various origins, so a locked-down

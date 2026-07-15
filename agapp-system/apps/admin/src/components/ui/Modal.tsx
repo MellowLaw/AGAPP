@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X } from '@phosphor-icons/react';
+import { CloseCircle } from 'iconsax-react';
 import { Button } from './Button';
 
 interface ModalProps {
@@ -63,7 +63,7 @@ export const Modal: React.FC<ModalProps> = ({
             onClick={onClose}
             className="p-1 text-text-muted hover:text-text-primary hover:bg-surface-alt rounded-md transition-colors"
           >
-            <X className="w-5 h-5" />
+            <CloseCircle className="w-5 h-5" />
           </button>
         </div>
         

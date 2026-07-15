@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Manrope } from 'next/font/google';
-import { ArrowRight, Eye, EyeSlash } from '@phosphor-icons/react';
+import { ArrowRight, Eye, EyeSlash } from 'iconsax-react';
 import { supabase } from '@/lib/supabase';
 import { lguNameFromId, lguIdFromName } from '@/lib/lgu';
 import { AgappLogo } from '@/components/ui/AgappLogo';
@@ -229,9 +229,9 @@ export default function UnifiedLoginPage() {
   };
 
   return (
-    <div className={`${bodyFont.className} min-h-screen grid grid-cols-1 md:grid-cols-2 bg-white text-[#262223]`}>
+    <div className={`${bodyFont.className} min-h-screen grid grid-cols-1 md:grid-cols-2 bg-white text-[#292929]`}>
       {/* Left: form */}
-      <div className="flex flex-col justify-center items-center px-6 py-16 md:px-12">
+      <div className="flex flex-col justify-center items-center px-6 py-16 md:px-12 bg-white">
         <div className="w-full max-w-[400px] flex flex-col">
           <div className="mb-10">
             <AgappLogo size={40} />
@@ -239,11 +239,11 @@ export default function UnifiedLoginPage() {
 
           <h1
             style={{ fontFamily: 'var(--font-brand)' }}
-            className="font-extrabold text-[32px] md:text-[40px] tracking-[-0.03em] mb-2.5 text-[#262223]"
+            className="font-extrabold text-[32px] md:text-[40px] tracking-[-0.03em] mb-2.5 text-[#292929]"
           >
             Welcome back
           </h1>
-          <p className="text-[15px] leading-relaxed text-[#8A8482] mb-10">
+          <p className="text-[15px] leading-relaxed text-[#7a7771] mb-10">
             Sign in to the admin portal to continue.
           </p>
 
@@ -262,7 +262,7 @@ export default function UnifiedLoginPage() {
 
           <form onSubmit={handleLogin} className="flex flex-col" autoComplete="on">
             <div className="flex flex-col gap-2 mb-5">
-              <label htmlFor="email" className="text-[13px] font-bold text-[#262223] tracking-[0.01em]">
+              <label htmlFor="email" className="text-[13px] font-bold text-[#292929] tracking-[0.01em]">
                 Email address
               </label>
               <input
@@ -275,12 +275,12 @@ export default function UnifiedLoginPage() {
                 disabled={isLocked}
                 required
                 placeholder="you@lgu.gov.ph"
-                className="h-12 px-4 border-[1.5px] border-[#E4E0DD] rounded-[10px] text-[15px] text-[#262223] placeholder-[#B4AFAC] bg-white outline-none focus:border-[#262223] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="h-12 px-4 border-[1.5px] border-[#e5e2d9] rounded-[10px] text-[15px] text-[#292929] placeholder-[#a3a097] bg-white outline-none focus:border-[#292929] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               />
             </div>
 
             <div className="flex flex-col gap-2 mb-4">
-              <label htmlFor="password" className="text-[13px] font-bold text-[#262223] tracking-[0.01em]">
+              <label htmlFor="password" className="text-[13px] font-bold text-[#292929] tracking-[0.01em]">
                 Password
               </label>
               <div className="relative">
@@ -294,7 +294,7 @@ export default function UnifiedLoginPage() {
                   disabled={isLocked}
                   required
                   placeholder="••••••••"
-                  className="h-12 w-full pl-4 pr-11 border-[1.5px] border-[#E4E0DD] rounded-[10px] text-[15px] text-[#262223] placeholder-[#B4AFAC] bg-white outline-none focus:border-[#262223] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-12 w-full pl-4 pr-11 border-[1.5px] border-[#e5e2d9] rounded-[10px] text-[15px] text-[#292929] placeholder-[#a3a097] bg-white outline-none focus:border-[#292929] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 />
                 <button
                   type="button"
@@ -302,9 +302,9 @@ export default function UnifiedLoginPage() {
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
                   tabIndex={0}
-                  className="absolute right-0 top-0 h-12 w-11 flex items-center justify-center text-[#8A8482] hover:text-[#262223] transition-colors"
+                  className="absolute right-0 top-0 h-12 w-11 flex items-center justify-center text-[#7a7771] hover:text-[#292929] transition-colors"
                 >
-                  {showPassword ? <EyeSlash className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                  {showPassword ? <EyeSlash variant="Bold" className="w-[18px] h-[18px]" /> : <Eye variant="Bold" className="w-[18px] h-[18px]" />}
                 </button>
               </div>
             </div>
@@ -314,7 +314,7 @@ export default function UnifiedLoginPage() {
                 type="button"
                 onClick={handleForgotPassword}
                 disabled={resetLoading}
-                className="text-[13.5px] font-bold text-[#262223] no-underline hover:text-[#F27983] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="text-[13.5px] font-bold text-[#292929] no-underline hover:text-[#ff758f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {resetLoading ? 'Sending…' : 'Forgot password?'}
               </button>
@@ -323,7 +323,7 @@ export default function UnifiedLoginPage() {
             <button
               type="submit"
               disabled={isLoading || isLocked}
-              className="h-[50px] border-none rounded-[10px] bg-[#262223] text-white font-bold text-[15px] tracking-[0.01em] flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="h-[50px] border-none rounded-[10px] bg-[#292929] text-white font-bold text-[15px] tracking-[0.01em] flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               style={{ fontFamily: 'var(--font-brand)' }}
             >
               {isLoading ? (
@@ -336,7 +336,7 @@ export default function UnifiedLoginPage() {
               ) : (
                 <>
                   Sign in
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight variant="Linear" className="w-4 h-4" />
                 </>
               )}
             </button>
@@ -345,11 +345,11 @@ export default function UnifiedLoginPage() {
           {/* Demo Quick Login */}
           <div className="mt-9">
             <div className="flex items-center gap-3.5 mb-5">
-              <div className="flex-1 h-px bg-[#ECE8E5]" />
-              <span className="text-[11px] font-bold tracking-[0.12em] uppercase text-[#B4AFAC]">
+              <div className="flex-1 h-px bg-[#e5e2d9]" />
+              <span className="text-[11px] font-bold tracking-[0.12em] uppercase text-[#a3a097]">
                 Demo quick login
               </span>
-              <div className="flex-1 h-px bg-[#ECE8E5]" />
+              <div className="flex-1 h-px bg-[#e5e2d9]" />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -359,58 +359,67 @@ export default function UnifiedLoginPage() {
                   type="button"
                   disabled={isLoading || isLocked}
                   onClick={() => handleDemoLogin(acct.role)}
-                  className="flex justify-between items-center gap-3 px-4 py-3 border-[1.5px] border-[#ECE8E5] rounded-[10px] bg-[#FBFAF9] text-left hover:border-[#262223] hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex justify-between items-center gap-3 px-4 py-3 border-[1.5px] border-[#e5e2d9] rounded-[10px] bg-[#fffcf5] text-left hover:border-[#292929] hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span className="text-[13.5px] font-bold text-[#262223]">{acct.label}</span>
-                  <span className="text-[13px] text-[#8A8482]">{acct.email}</span>
+                  <span className="text-[13.5px] font-bold text-[#292929]">{acct.label}</span>
+                  <span className="text-[13px] text-[#7a7771]">{acct.email}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <p className="mt-11 text-[12.5px] text-[#B4AFAC]">
+          <p className="mt-11 text-[12.5px] text-[#a3a097]">
             © 2026 Agapp. Local Government Digital Platform.
           </p>
         </div>
       </div>
 
       {/* Right: brand panel */}
-      <div className="hidden md:flex flex-col justify-between p-12 bg-[#EDE9E6] relative overflow-hidden">
-        <div className="flex justify-end">
-          <span className="text-xs font-bold tracking-[0.14em] uppercase text-[#A39D99]">
+      <div className="hidden md:flex flex-col justify-between p-12 bg-[#fffcf5] border-l border-[#e5e2d9] relative overflow-hidden">
+        <div className="flex justify-end relative z-10">
+          <span className="text-xs font-mono font-bold tracking-[0.14em] uppercase text-[#a3a097]">
             Admin Portal
           </span>
         </div>
 
-        <div className="flex flex-col items-center gap-9">
+        <div className="flex flex-col items-center gap-9 relative z-10">
           <Image
-            src="/agapp-icon.png"
-            alt=""
+            src="/main-logo.png"
+            alt="Agapp Logo"
             width={240}
             height={240}
             className="rounded-[48px]"
-            style={{ boxShadow: '0 24px 60px rgba(38,34,35,0.14)' }}
             priority
           />
           <div className="flex flex-col items-center gap-2.5 max-w-[380px] text-center">
             <span
-              style={{ fontFamily: 'var(--font-brand)' }}
-              className="font-extrabold text-[26px] tracking-[-0.02em] text-[#262223]"
+              className="font-extrabold text-[28px] tracking-[-0.02em] text-[#292929] font-sans"
             >
-              One platform for your LGU.
+              Discover your town.
             </span>
-            <span className="text-[15px] leading-relaxed text-[#8A8482]">
-              Manage services, personnel, and records for your local government — all in one place.
+            <span className="text-[15px] leading-relaxed text-[#7a7771]">
+              Manage local services, personnel, and citizen feedback for your municipality — all in one unified digital platform.
             </span>
           </div>
         </div>
 
-        <div className="flex justify-between items-center">
-          <span className="text-[13px] font-semibold text-[#A39D99]">agapp.gov.ph</span>
+        {/* Decorative background shapes */}
+        <div className="absolute inset-0 opacity-[0.06] pointer-events-none select-none">
+          <Image
+            src="/main-shapes.png"
+            alt=""
+            fill
+            className="object-cover"
+            priority
+          />
+        </div>
+
+        <div className="flex justify-between items-center relative z-10">
+          <span className="text-[13px] font-mono font-semibold text-[#a3a097]">agapp.gov.ph</span>
           <div className="flex gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#262223]" />
-            <span className="w-2 h-2 rounded-full bg-[#F27983]" />
-            <span className="w-2 h-2 rounded-full bg-[#C9C3BF]" />
+            <span className="w-2 h-2 rounded-full bg-[#292929]" />
+            <span className="w-2 h-2 rounded-full bg-[#ff758f]" />
+            <span className="w-2 h-2 rounded-full bg-[#e5e2d9]" />
           </div>
         </div>
       </div>

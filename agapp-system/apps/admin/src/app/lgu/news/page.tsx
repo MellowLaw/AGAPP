@@ -11,20 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import { 
-  Newspaper,
-  Plus,
-  Calendar,
-  Clock,
-  Paperclip,
-  Eye,
-  Trash,
-  Pencil,
-  PaperPlane,
-  Image as ImageIcon,
-  FilePdf,
-  X
-} from '@phosphor-icons/react';
+import { Book, Add, Calendar, Clock, Paperclip, Eye, Trash, Edit, Send, Image as ImageIcon, DocumentText, CloseCircle } from 'iconsax-react';
 
 type AnnouncementStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 
@@ -326,7 +313,7 @@ export default function NewsPage() {
       title="News and Announcements"
       action={
         <Button onClick={() => { setShowCreateForm(true); setEditingAnnouncement(null); }}>
-          <Plus className="w-4 h-4 mr-1" />
+          <Add className="w-4 h-4 mr-1" />
           Create New
         </Button>
       }
@@ -369,7 +356,7 @@ export default function NewsPage() {
                 <label className="block text-sm text-text-muted mb-2">Attachments</label>
                 <div className="border border-dashed border-theme rounded-lg p-6 text-center">
                   <div className="w-10 h-10 bg-surface-alt rounded-md flex items-center justify-center mx-auto mb-2">
-                    <Paperclip className="w-5 h-5 text-text-muted" />
+                    <Paperclip variant="Bold" className="w-5 h-5 text-text-muted" />
                   </div>
                   <p className="text-sm text-text-muted">Drop files here or click to upload</p>
                   <p className="text-xs text-text-faint mt-1">Images and PDFs supported</p>
@@ -379,11 +366,11 @@ export default function NewsPage() {
               {/* Actions */}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handlePublish}>
-                  <PaperPlane className="w-4 h-4 mr-1" />
+                  <Send className="w-4 h-4 mr-1" />
                   Publish Now
                 </Button>
                 <Button variant="secondary" onClick={openSchedule}>
-                  <Clock className="w-4 h-4 mr-1" />
+                  <Clock variant="Bold" className="w-4 h-4 mr-1" />
                   Schedule
                 </Button>
                 <Button variant="ghost" onClick={handleCancelForm}>
@@ -451,24 +438,24 @@ export default function NewsPage() {
                     {announcement.status === 'published' && (
                       <>
                         <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
+                          <Clock variant="Bold" className="w-4 h-4" />
                           Published {announcement.publishedAt}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Eye className="w-4 h-4" />
+                          <Eye variant="Bold" className="w-4 h-4" />
                           {announcement.views} views
                         </span>
                       </>
                     )}
                     {announcement.status === 'scheduled' && (
                       <span className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
+                        <Calendar variant="Bold" className="w-4 h-4" />
                         Scheduled for {announcement.scheduledFor}
                       </span>
                     )}
                     {announcement.attachments > 0 && (
                       <span className="flex items-center gap-1">
-                        <Paperclip className="w-4 h-4" />
+                        <Paperclip variant="Bold" className="w-4 h-4" />
                         {announcement.attachments} attachment{announcement.attachments > 1 ? 's' : ''}
                       </span>
                     )}
@@ -482,14 +469,14 @@ export default function NewsPage() {
                     size="sm"
                     onClick={() => handleEdit(announcement)}
                   >
-                    <Pencil className="w-4 h-4" />
+                    <Edit className="w-4 h-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => handleDelete(announcement.id)}
                   >
-                    <Trash className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
                   </Button>
                 </div>
               </div>
@@ -499,7 +486,7 @@ export default function NewsPage() {
           {!loading && !loadError && announcementsList.length === 0 && (
             <Card>
               <div className="text-center py-8">
-                <Newspaper className="w-12 h-12 text-text-muted mx-auto mb-3" />
+                <Book className="w-12 h-12 text-text-muted mx-auto mb-3" />
                 <p className="text-text-muted">No announcements yet</p>
                 <Button className="mt-4" onClick={() => setShowCreateForm(true)}>
                   Create First Announcement

@@ -10,20 +10,7 @@ import { TextArea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import {
-  IdentificationBadge,
-  User,
-  Clock,
-  Check,
-  X,
-  Eye,
-  MagnifyingGlass,
-  Warning,
-  Envelope,
-  MapPin,
-  FileText,
-  Camera,
-} from '@phosphor-icons/react';
+import { Personalcard, User, Clock, TickSquare, CloseCircle, Eye, SearchNormal1, Danger, Sms, Location, DocumentText, Camera } from 'iconsax-react';
 
 type TabKey = 'pending' | 'approved' | 'rejected' | 'all';
 
@@ -246,7 +233,7 @@ export default function VerificationsPage() {
       {/* Search */}
       <Card noBorder padding="sm" className="mb-6">
         <div className="relative">
-          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
             placeholder="Search by name, email, barangay, or ID type..."
@@ -264,12 +251,12 @@ export default function VerificationsPage() {
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-text-muted" />
+                  <User variant="Bold" className="w-5 h-5 text-text-muted" />
                 </div>
                 <div>
                   <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
                   <div className="flex items-center gap-2 text-sm text-text-muted">
-                    <Envelope className="w-3 h-3" />
+                    <Sms className="w-3 h-3" />
                     {req.citizen_email || 'No email'}
                   </div>
                 </div>
@@ -279,21 +266,21 @@ export default function VerificationsPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
               <div className="flex items-center gap-2 text-text-muted">
-                <FileText className="w-4 h-4 flex-shrink-0" />
+                <DocumentText className="w-4 h-4 flex-shrink-0" />
                 <div>
                   <p className="text-text-faint text-xs">ID Type</p>
                   <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-text-muted">
-                <MapPin className="w-4 h-4 flex-shrink-0" />
+                <Location className="w-4 h-4 flex-shrink-0" />
                 <div>
                   <p className="text-text-faint text-xs">Barangay</p>
                   <p className="text-text-primary font-medium">{req.declared_barangay || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-text-muted">
-                <Clock className="w-4 h-4 flex-shrink-0" />
+                <Clock variant="Bold" className="w-4 h-4 flex-shrink-0" />
                 <div>
                   <p className="text-text-faint text-xs">Submitted</p>
                   <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
@@ -301,7 +288,7 @@ export default function VerificationsPage() {
               </div>
               {req.rejection_reason && (
                 <div className="flex items-center gap-2">
-                  <Warning className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                  <Danger className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
                   <div>
                     <p className="text-text-faint text-xs">Rejection Reason</p>
                     <p className="text-red-600 dark:text-red-400 font-medium text-xs">{req.rejection_reason}</p>
@@ -313,7 +300,7 @@ export default function VerificationsPage() {
             {req.status === 'pending' && (
               <div className="flex gap-3 pt-3 border-t border-theme">
                 <Button variant="primary" onClick={() => handleViewDetails(req)}>
-                  <Eye className="w-4 h-4 mr-1" />
+                  <Eye variant="Bold" className="w-4 h-4 mr-1" />
                   Review &amp; Approve
                 </Button>
                 <Button
@@ -323,7 +310,7 @@ export default function VerificationsPage() {
                     setShowRejectModal(true);
                   }}
                 >
-                  <X className="w-4 h-4 mr-1" />
+                  <CloseCircle className="w-4 h-4 mr-1" />
                   Reject
                 </Button>
               </div>
@@ -332,7 +319,7 @@ export default function VerificationsPage() {
             {(req.status === 'approved' || req.status === 'rejected') && (
               <div className="flex gap-3 pt-3 border-t border-theme">
                 <Button variant="ghost" onClick={() => handleViewDetails(req)}>
-                  <Eye className="w-4 h-4 mr-1" />
+                  <Eye variant="Bold" className="w-4 h-4 mr-1" />
                   View Documents
                 </Button>
               </div>
@@ -343,7 +330,7 @@ export default function VerificationsPage() {
         {filteredRequests.length === 0 && (
           <Card noBorder>
             <div className="text-center py-8 text-text-muted">
-              <IdentificationBadge className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <Personalcard className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No verification requests found</p>
               {activeTab === 'pending' && (
                 <p className="text-sm mt-1">All caught up! No pending requests.</p>
@@ -374,7 +361,7 @@ export default function VerificationsPage() {
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-surface-alt rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-text-muted" />
+                    <User variant="Bold" className="w-6 h-6 text-text-muted" />
                   </div>
                   <div>
                     <p className="font-semibold text-text-primary">{selectedRequest.citizen_name}</p>
@@ -407,7 +394,7 @@ export default function VerificationsPage() {
               {/* ID Document Image */}
               <div className="mb-6">
                 <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
+                  <DocumentText className="w-4 h-4" />
                   Government ID
                 </p>
                 {imageLoading ? (
@@ -430,7 +417,7 @@ export default function VerificationsPage() {
               {/* Selfie with ID */}
               <div className="mb-6">
                 <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                  <Camera className="w-4 h-4" />
+                  <Camera variant="Bold" className="w-4 h-4" />
                   Selfie with ID
                 </p>
                 {imageLoading ? (
@@ -465,7 +452,7 @@ export default function VerificationsPage() {
                     onClick={handleApprove}
                     isLoading={actionLoading}
                   >
-                    <Check className="w-4 h-4 mr-1" />
+                    <TickSquare className="w-4 h-4 mr-1" />
                     Approve Verification
                   </Button>
                   <Button
@@ -473,7 +460,7 @@ export default function VerificationsPage() {
                     onClick={() => setShowRejectModal(true)}
                     disabled={actionLoading}
                   >
-                    <X className="w-4 h-4 mr-1" />
+                    <CloseCircle className="w-4 h-4 mr-1" />
                     Reject
                   </Button>
                 </div>
@@ -506,7 +493,7 @@ export default function VerificationsPage() {
                 isLoading={actionLoading}
                 disabled={!rejectReason.trim()}
               >
-                <X className="w-4 h-4 mr-1" />
+                <CloseCircle className="w-4 h-4 mr-1" />
                 Confirm Rejection
               </Button>
               <Button variant="secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }}>

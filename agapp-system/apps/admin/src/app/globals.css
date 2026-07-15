@@ -10,27 +10,29 @@
   text-*) so components never hardcode a literal hex — see tailwind.config.ts.
 */
 :root {
-  --bg-base: #f6f4f1;
+  --bg-base: #fffcf5;
   --surface: #ffffff;
-  --surface-alt: #efece7;
-  --text-base: #201d1d;
-  --text-muted: #6b6560;
-  --text-faint: #a39d97;
-  --border-theme: #e4e0da;
+  --surface-alt: #f5f2eb;
+  --text-base: #292929;
+  --text-muted: #7a7771;
+  --text-faint: #a3a097;
+  --border-theme: #e5e2d9;
   --accent: #d62a53;
   --accent-soft: rgba(214, 42, 83, 0.08);
+  --accent-icon: var(--accent);
 }
 
 .dark {
-  --bg-base: #0d0c0e;
-  --surface: #17161a;
-  --surface-alt: #1e1d22;
-  --text-base: #eeecea;
-  --text-muted: #918d97;
-  --text-faint: #59565f;
-  --border-theme: #2a2830;
+  --bg-base: #292929;
+  --surface: #333333;
+  --surface-alt: #1f1f1f;
+  --text-base: #fffcf5;
+  --text-muted: #a19e97;
+  --text-faint: #5e5c56;
+  --border-theme: #3d3d3d;
   --accent: #ff758f;
   --accent-soft: rgba(255, 117, 143, 0.08);
+  --accent-icon: var(--accent);
 }
 
 body {

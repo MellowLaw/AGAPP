@@ -9,16 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import {
-  FileText,
-  Check,
-  Clock,
-  User,
-  Calendar,
-  MagnifyingGlass,
-  QrCode,
-  Warning
-} from '@phosphor-icons/react';
+import { DocumentText, TickSquare, Clock, User, Calendar, SearchNormal1, Barcode, Danger } from 'iconsax-react';
 
 // Literal DB `service_requests.status` values (see supabase/schema.sql CHECK constraint).
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
@@ -264,7 +255,7 @@ export default function PersonnelDashboard() {
           {/* Search */}
           <Card padding="sm">
             <div className="relative">
-              <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-faint" />
+              <SearchNormal1 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-faint" />
               <input
                 type="text"
                 placeholder="Search queue by reference, type, or citizen name..."
@@ -279,7 +270,7 @@ export default function PersonnelDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredQueue.length === 0 ? (
               <div className="col-span-full py-16 text-center bg-surface border border-theme rounded-2xl">
-                <FileText className="w-12 h-12 text-text-faint mx-auto mb-3.5" />
+                <DocumentText className="w-12 h-12 text-text-faint mx-auto mb-3.5" />
                 <p className="text-sm font-bold text-text-primary">No requests in queue</p>
                 <p className="text-xs text-text-muted mt-1.5 px-6">There are no pending document applications in your active work queue.</p>
               </div>
@@ -294,14 +285,14 @@ export default function PersonnelDashboard() {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-1.5">
-                      <QrCode className="w-4 h-4 text-text-faint" />
+                      <Barcode className="w-4 h-4 text-text-faint" />
                       <span className="font-semibold text-text-primary text-xs font-mono">{request.id}</span>
                     </div>
                     <ServiceStatusBadge status={request.status} />
                   </div>
                   <p className="text-text-primary text-sm font-semibold mb-2.5 line-clamp-1">{request.serviceType}</p>
                   <div className="flex items-center gap-1.5 text-xs text-text-muted font-medium">
-                    <User className="w-3.5 h-3.5" />
+                    <User variant="Bold" className="w-3.5 h-3.5" />
                     {request.citizen}
                   </div>
                 </Card>
@@ -312,7 +303,7 @@ export default function PersonnelDashboard() {
           {/* Recent Reports (Read-only for personnel) */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
-              <Warning className="w-5 h-5 text-accent" />
+              <Danger className="w-5 h-5 text-accent" />
               <h3 className="font-bold text-sm text-text-primary">Recent Town Issue Reports</h3>
             </div>
             <div className="space-y-1">
@@ -351,7 +342,7 @@ export default function PersonnelDashboard() {
                 {/* Header */}
                 <div className="border-b border-theme pb-4.5">
                   <div className="flex items-center gap-1.5 mb-2.5">
-                    <QrCode className="w-5 h-5 text-text-faint" />
+                    <Barcode className="w-5 h-5 text-text-faint" />
                     <h2 className="text-base font-bold text-text-primary font-mono">{selectedRequest.id}</h2>
                   </div>
                   <ServiceStatusBadge status={selectedRequest.status} />
@@ -367,7 +358,7 @@ export default function PersonnelDashboard() {
                 <div>
                   <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-1">Citizen</p>
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-text-faint" />
+                    <User variant="Bold" className="w-4 h-4 text-text-faint" />
                     <span className="text-sm font-semibold text-text-primary">{selectedRequest.citizen}</span>
                   </div>
                 </div>
@@ -376,7 +367,7 @@ export default function PersonnelDashboard() {
                 <div>
                   <p className="text-[10px] uppercase font-bold tracking-wider text-text-faint mb-1">Submitted</p>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-text-faint" />
+                    <Calendar variant="Bold" className="w-4 h-4 text-text-faint" />
                     <span className="text-sm font-mono text-text-primary">{selectedRequest.submittedAt}</span>
                   </div>
                 </div>
@@ -390,7 +381,7 @@ export default function PersonnelDashboard() {
                     <ul className="space-y-1.5">
                       {selectedRequest.documents.map((doc: string, i: number) => (
                         <li key={i} className="flex items-center gap-2 text-xs font-semibold text-text-muted bg-surface-alt p-2 rounded-lg">
-                          <FileText className="w-4 h-4 text-text-faint" />
+                          <DocumentText className="w-4 h-4 text-text-faint" />
                           {doc}
                         </li>
                       ))}
@@ -409,19 +400,19 @@ export default function PersonnelDashboard() {
                 <div className="flex flex-col gap-2.5 pt-4.5 border-t border-theme">
                   {selectedRequest.status === 'Under Review' && (
                     <Button onClick={() => updateStatus('In Progress')} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
-                      <Clock className="w-4 h-4" />
+                      <Clock variant="Bold" className="w-4 h-4" />
                       Start Processing
                     </Button>
                   )}
                   {selectedRequest.status === 'In Progress' && (
                     <Button onClick={handleMarkReady} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
-                      <Check className="w-4 h-4" />
+                      <TickSquare className="w-4 h-4" />
                       Mark Ready for Pickup
                     </Button>
                   )}
                   {selectedRequest.status === 'Ready for Pickup' && (
                     <Button onClick={handleManualRelease} disabled={actionBusy} className="w-full flex items-center justify-center gap-2">
-                      <Check className="w-4 h-4" />
+                      <TickSquare className="w-4 h-4" />
                       Mark Released (manual override)
                     </Button>
                   )}
@@ -429,7 +420,7 @@ export default function PersonnelDashboard() {
               </div>
             ) : (
               <div className="py-16 text-center text-sm text-text-muted">
-                <QrCode className="w-10 h-10 text-text-faint mx-auto mb-3.5" />
+                <Barcode className="w-10 h-10 text-text-faint mx-auto mb-3.5" />
                 <p className="font-semibold text-text-primary">Select a request</p>
                 <p className="text-xs text-text-muted mt-1">Select a request from the queue to view details</p>
               </div>

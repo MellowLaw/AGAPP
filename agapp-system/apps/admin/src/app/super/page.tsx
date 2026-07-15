@@ -20,7 +20,7 @@ import { STATUS_COLORS } from '@/components/map/markers';
 import { LguRankingBarChart, type LguRankingDatum } from '@/components/charts/LguRankingBarChart';
 import { StatusBreakdownChart, type StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
 import { NeedsAttentionPanel, type NeedsAttentionData } from '@/components/charts/NeedsAttentionPanel';
-import { Building, Users, Warning, FileText, Plus } from '@phosphor-icons/react';
+import { Building, People, Danger, DocumentText, Add } from 'iconsax-react';
 
 // LGUs with zero reports AND zero requests created in this window are
 // flagged as inactive on the cross-LGU "Needs attention" panel.
@@ -132,19 +132,19 @@ export default function SuperAdminDashboard() {
         icon: Building
       },
       {
-        label: 'Active Users',
+        label: 'Active People',
         value: filteredLgus.reduce((sum, l) => sum + l.users, 0).toLocaleString(),
-        icon: Users
+        icon: People
       },
       {
         label: 'Reports Seeded',
         value: filteredLgus.reduce((sum, l) => sum + l.reports, 0).toString(),
-        icon: Warning
+        icon: Danger
       },
       {
         label: 'Service Requests',
         value: filteredLgus.reduce((sum, l) => sum + l.requests, 0).toString(),
-        icon: FileText
+        icon: DocumentText
       },
     ];
   }, [selectedLgu, filteredLgus]);
@@ -297,7 +297,7 @@ export default function SuperAdminDashboard() {
             whileTap={{ scale: 0.96 }}
             className="px-5 py-2.5 bg-transparent border border-theme rounded-full text-[13px] font-semibold text-text-primary hover:border-text-muted flex items-center gap-1.5 transition-colors"
           >
-            <Plus className="w-4 h-4" />
+            <Add className="w-4 h-4" />
             Add LGU
           </motion.button>
         </Link>
@@ -318,7 +318,7 @@ export default function SuperAdminDashboard() {
                 <div className="flex items-start justify-between">
                   <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
                   <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
-                    <Icon className="w-4 h-4 text-accent" />
+                    <Icon className="w-4 h-4 text-accent" variant="Bold" />
                   </div>
                 </div>
                 <div className="mt-4">
@@ -397,7 +397,7 @@ export default function SuperAdminDashboard() {
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90" onClick={() => {
               const rows = (selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map(l => [l.name, l.users, l.reports, l.requests, l.responseTime, 'Active'].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
-              const csv = ['LGU,Users,Reports,Requests,Avg Response,Status', ...rows].join('\n');
+              const csv = ['LGU,People,Reports,Requests,Avg Response,Status', ...rows].join('\n');
               const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
@@ -416,7 +416,7 @@ export default function SuperAdminDashboard() {
             <thead>
               <tr>
                 <th className="pb-3 pl-10 pr-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">LGU</th>
-                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Users</th>
+                <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">People</th>
                 <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Reports</th>
                 <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Requests</th>
                 <th className="pb-3 px-6 text-[11px] font-medium text-text-primary/80 uppercase tracking-wider">Avg Response</th>

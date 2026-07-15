@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell } from '@phosphor-icons/react';
+import { Notification } from 'iconsax-react';
 import { supabase } from '@/lib/supabase';
 import { lguNameFromId } from '@/lib/lgu';
 import { fetchImportantNotices, ImportantNotice } from '@/lib/importantNotices';
@@ -156,7 +156,7 @@ export function NotificationBell() {
         whileTap={{ scale: 0.85 }}
         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
       >
-        <Bell className="w-4 h-4" />
+        <Notification className="w-4 h-4" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] flex items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}

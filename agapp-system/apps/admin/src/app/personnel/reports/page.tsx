@@ -6,7 +6,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Search } from '@/components/ui/Search';
-import { ArrowsClockwise, Check, Warning, X } from '@phosphor-icons/react';
+import { Refresh, TickSquare, Danger, CloseCircle } from 'iconsax-react';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { timeAgo } from '@/lib/timeAgo';
@@ -269,14 +269,14 @@ export default function PersonnelReportsPage() {
                 {active.aiVerified !== null && (
                   active.aiVerified ? (
                     <div className="flex items-center gap-2 p-3 bg-green-600 text-white rounded-md font-semibold">
-                      <Check className="w-4 h-4" />
+                      <TickSquare className="w-4 h-4" />
                       <span className="text-sm">
                         AI Verified — {ML_SUBJECT_LABEL[active.dbCategory] || 'subject'} detected in photo ({Math.round((active.aiConfidence || 0) * 100)}%)
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 p-3 bg-amber-500 text-white rounded-md font-semibold">
-                      <Warning className="w-4 h-4" />
+                      <Danger className="w-4 h-4" />
                       <span className="text-sm">
                         No {ML_SUBJECT_LABEL[active.dbCategory] || 'match'} detected — review photo
                       </span>
@@ -287,19 +287,19 @@ export default function PersonnelReportsPage() {
                   {(active.status==='pending' || active.status==='acknowledged') && (
                     <>
                       <Button variant="primary" onClick={() => update('acknowledged')}>
-                        <Check className="w-4 h-4 mr-1" /> Acknowledge
+                        <TickSquare className="w-4 h-4 mr-1" /> Acknowledge
                       </Button>
                       <Button variant="secondary" onClick={() => update('in_progress')}>
-                        <ArrowsClockwise className="w-4 h-4 mr-1" /> Start
+                        <Refresh className="w-4 h-4 mr-1" /> Start
                       </Button>
                       <Button variant="danger" onClick={() => update('rejected')}>
-                        <X className="w-4 h-4 mr-1" /> Reject
+                        <CloseCircle className="w-4 h-4 mr-1" /> Reject
                       </Button>
                     </>
                   )}
                   {active.status==='in_progress' && (
                     <Button variant="primary" onClick={() => update('resolved')}>
-                      <Check className="w-4 h-4 mr-1" /> Mark Resolved
+                      <TickSquare className="w-4 h-4 mr-1" /> Mark Resolved
                     </Button>
                   )}
                   {active.status==='resolved' && (

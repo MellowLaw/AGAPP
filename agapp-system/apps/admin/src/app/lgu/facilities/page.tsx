@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { FacilityPickerMap } from '@/components/map';
-import { MapPin, Trash, Plus } from '@phosphor-icons/react';
+import { Location, Trash, Add } from 'iconsax-react';
 
 interface Facility {
   id: string;
@@ -209,12 +209,12 @@ export default function FacilitiesPage() {
         <Card noBorder className="lg:col-span-2 shadow-sm" padding="sm">
           <div className="px-2 pt-1 pb-3 flex items-center justify-between">
             <p className="text-sm text-text-muted">
-              <MapPin className="inline w-4 h-4 mr-1 -mt-0.5" />
+              <Location className="inline w-4 h-4 mr-1 -mt-0.5" />
               Click the map to place a pin, or click an existing pin to edit it. Drag the dark pin to fine-tune.
             </p>
             {(selectedId || draftPosition) && (
               <Button variant="ghost" size="sm" onClick={resetForm}>
-                <Plus className="w-4 h-4 mr-1" />
+                <Add className="w-4 h-4 mr-1" />
                 New pin
               </Button>
             )}
@@ -307,7 +307,7 @@ export default function FacilitiesPage() {
                       if (f) setDeleteTarget(f);
                     }}
                   >
-                    <Trash className="w-4 h-4" />
+                    <Trash variant="Bold" className="w-4 h-4" />
                   </Button>
                 )}
               </div>

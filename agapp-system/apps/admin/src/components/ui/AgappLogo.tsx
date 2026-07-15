@@ -34,11 +34,11 @@ export function AgappLogo({
           style={{
             fontFamily: 'var(--font-sans)',
             fontSize: size * 0.5,
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.06em',
             color: textColor || 'var(--text-primary)',
           }}
         >
-          Agapp<span style={{ color: '#FF758F' }}>.</span>
+          agapp
         </span>
       )}
     </div>

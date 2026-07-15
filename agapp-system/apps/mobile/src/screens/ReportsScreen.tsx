@@ -1,32 +1,43 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Linking, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { globalStyles, ACCENT, PASTELS } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
 import { analyzeReportPhoto } from '../utils/mlAnalysis';
 import { reportCategoryLabel } from '@agapp/shared';
 import { useToast } from '../components/Toast';
+import { ScreenBackground } from '../components/ScreenBackground';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { captureRef } from 'react-native-view-shot';
+import {
+  Car,
+  Drop,
+  Pet,
+  Flash,
+  Camera,
+  Location as LocationIcon,
+  InfoCircle,
+  Trash,
+  ShieldTick,
+  ArrowLeft2,
+  Danger,
+} from 'iconsax-react-native';
 
-// ids must match the reports.category CHECK constraint (supabase/schema.sql)
 const REPORT_CATEGORIES = [
-  { id: 'pothole',          label: 'Pothole / Road Damage', icon: 'car-outline' },
-  { id: 'clogged_drainage', label: 'Drainage / Canal',      icon: 'water-outline' },
-  { id: 'stray_animal',     label: 'Stray Pets',            icon: 'paw-outline' },
-  { id: 'damaged_pole',     label: 'Damaged Pole',          icon: 'flash-outline' },
+  { id: 'pothole',          label: 'Pothole', icon: Car },
+  { id: 'clogged_drainage', label: 'Drainage', icon: Drop },
+  { id: 'stray_animal',     label: 'Stray Pets', icon: Pet },
+  { id: 'damaged_pole',     label: 'Damaged Pole', icon: Flash },
 ];
 
 export function ReportsScreen({ navigation }: any) {
-  const { T } = useTheme();
+  const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { selectedLgu, profile, session } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
@@ -38,14 +49,13 @@ export function ReportsScreen({ navigation }: any) {
   const [locationDenied, setLocationDenied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [checkingPhoto, setCheckingPhoto] = useState(false);
-  // Camera-only capture flow: a freshly taken photo sits here as "pending
-  // review" — the user sees the stamped composite live on-screen and either
-  // retakes or confirms, at which point captureRef() bakes it into imageUri.
   const [rawCaptureUri, setRawCaptureUri] = useState<string | null>(null);
   const [captureTimestamp, setCaptureTimestamp] = useState('');
   const [stamping, setStamping] = useState(false);
   const previewRef = useRef<View>(null);
   const verified = isVerified(profile);
+  const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'reports' | 'my_reports'>('reports');
 
   useEffect(() => {
     if (!profile) return;
@@ -85,7 +95,7 @@ export function ReportsScreen({ navigation }: any) {
   };
 
   const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius of the earth in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -96,10 +106,6 @@ export function ReportsScreen({ navigation }: any) {
     return R * c;
   };
 
-  // Camera only — no gallery picker. Letting a citizen attach an existing
-  // (old/downloaded/unrelated) image is exploitable for fake reports; a live
-  // capture ties the photo to this moment. Also requires a locked GPS fix
-  // first, since the stamp overlay needs real coordinates to draw.
   const takePhoto = async () => {
     if (!location) {
       showToast("We're still getting your location. Please wait a moment and try again.", 'info');
@@ -128,11 +134,6 @@ export function ReportsScreen({ navigation }: any) {
     takePhoto();
   };
 
-  // Bakes the location/time caption into the photo by capturing the
-  // already-on-screen preview composite (see the render section) — an
-  // on-screen capture is used deliberately instead of an off-screen/hidden
-  // view, since a view that's never actually laid out on screen is a common
-  // source of blank-image bugs with react-native-view-shot.
   const confirmStampedPhoto = async () => {
     if (!previewRef.current) return;
     setStamping(true);
@@ -142,8 +143,6 @@ export function ReportsScreen({ navigation }: any) {
       setRawCaptureUri(null);
     } catch (err) {
       console.warn('Photo stamping failed, falling back to the unstamped photo', err);
-      // Never leave the user stuck on a report they can't submit — fall back
-      // to the raw photo (no location caption baked in) rather than block.
       showToast('Could not add the location stamp, but your photo is still attached.', 'error');
       setImageUri(rawCaptureUri);
       setRawCaptureUri(null);
@@ -164,9 +163,6 @@ export function ReportsScreen({ navigation }: any) {
       setLocationDenied(false);
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
 
-      // Reverse geocode for a human-readable place name in the stamp caption.
-      // Best-effort only — falls back to the selected LGU's name so the
-      // caption always has something sensible, never a raw geocoder error.
       let address = '';
       try {
         const geo = await Location.reverseGeocodeAsync({
@@ -191,33 +187,25 @@ export function ReportsScreen({ navigation }: any) {
         address,
       });
     } catch (err) {
-      // Deliberately no Alert here — this now runs automatically on every
-      // focus, and an Alert would fire repeatedly and become spam. The
-      // status card + submit-time validation already explain a missing fix.
       console.warn('Location fetch failed', err);
     } finally {
       setLoadingLoc(false);
     }
   };
 
-  // Automatic GPS: fetch on first mount and every time this tab regains
-  // focus, instead of waiting for a manual tap. Re-keyed off the LGU id so a
-  // guest who changes their selected town also gets a fresh fix.
   useFocusEffect(
     useCallback(() => {
       getLocation();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedLgu?.id])
   );
 
   const submitReport = async () => {
-    // 1. Spam Cooldown check
     try {
       const lastReportTimeStr = await AsyncStorage.getItem('last_report_time');
       if (lastReportTimeStr) {
         const lastReportTime = parseInt(lastReportTimeStr, 10);
         const diff = Date.now() - lastReportTime;
-        if (diff < 120000) { // 2 minutes cooldown
+        if (diff < 120000) {
           const secsLeft = Math.ceil((120000 - diff) / 1000);
           showToast(`Please wait ${secsLeft} seconds before submitting another report.`, 'info');
           return;
@@ -227,20 +215,17 @@ export function ReportsScreen({ navigation }: any) {
       console.warn('AsyncStorage read error', e);
     }
 
-    // 2. Validate input and trim HTML
     const cleanDesc = description.trim().replace(/<[^>]*>/g, '');
     if (cleanDesc.length < 15) {
       showToast('Please write a descriptive explanation of the issue (minimum 15 characters).', 'error');
       return;
     }
 
-    // 3. Validate mandatory photo
     if (!imageUri) {
       showToast('Please attach a photo as evidence of the issue.', 'error');
       return;
     }
 
-    // 4. Validate location
     if (!location) {
       if (locationDenied) {
         Alert.alert(
@@ -258,7 +243,6 @@ export function ReportsScreen({ navigation }: any) {
       return;
     }
 
-    // 5. GPS Boundary Check (Distance <= 15km from selected LGU center)
     if (selectedLgu?.latitude && selectedLgu?.longitude) {
       const dist = getDistanceFromLatLonInKm(location.lat, location.lng, selectedLgu.latitude, selectedLgu.longitude);
       if (dist > 15) {
@@ -272,11 +256,7 @@ export function ReportsScreen({ navigation }: any) {
     setSubmitting(true);
     let publicUrl = null;
 
-    // 6. Upload Photo to storage
     try {
-      // ArrayBuffer, NOT blob: React Native's Blob doesn't serialize through
-      // supabase-js's fetch — uploads die with "Network request failed".
-      // ArrayBuffer is the officially supported RN/Expo upload path.
       const response = await fetch(imageUri);
       const arrayBuffer = await response.arrayBuffer();
 
@@ -303,20 +283,12 @@ export function ReportsScreen({ navigation }: any) {
 
       publicUrl = urlData?.publicUrl;
     } catch (err: any) {
-      // Keep the description/photo/location as-is so the citizen can just
-      // tap Submit again — they shouldn't have to redo the camera capture.
       showToast(`Failed to upload photo: ${err.message}. Your report is still filled in — tap Submit Report to try again.`, 'error');
       setSubmitting(false);
       return;
     }
 
-    // 7. Insert report record (reference_number is set by DB trigger,
-    //    status defaults to 'Submitted')
     try {
-      // ML boundary: needs the UPLOADED public URL (not the local file URI) — the
-      // server-side model fetches the image over HTTP, it can't reach the phone's
-      // local filesystem. Returns nulls ("not analyzed") for any category without
-      // a deployed model, or if the check fails for any reason.
       setCheckingPhoto(true);
       const ml = await analyzeReportPhoto(category, publicUrl, session?.access_token);
       setCheckingPhoto(false);
@@ -347,13 +319,11 @@ export function ReportsScreen({ navigation }: any) {
       setDescription('');
       setImageUri(null);
       setRawCaptureUri(null);
+      setShowForm(false);
+      setActiveTab('my_reports');
       fetchReports();
-      // Re-fetch a fresh fix for a possible next report instead of leaving
-      // the field blank until the citizen navigates away and back.
       getLocation();
     } catch (err: any) {
-      // Keep the description/photo/location as-is so the citizen can just
-      // tap Submit again instead of redoing the whole report.
       showToast(`Submission error: ${err.message}. Your report is still filled in — tap Submit Report to try again.`, 'error');
     } finally {
       setSubmitting(false);
@@ -361,257 +331,464 @@ export function ReportsScreen({ navigation }: any) {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    let bgColor = '#E5E7EB';
+    let textColor = '#374151';
+
+    switch (status?.toLowerCase()) {
+      case 'submitted':
+        bgColor = '#E0F2FE';
+        textColor = '#0369A1';
+        break;
+      case 'in progress':
+      case 'processing':
+        bgColor = '#FEF3C7';
+        textColor = '#D97706';
+        break;
+      case 'resolved':
+      case 'completed':
+      case 'approved':
+        bgColor = '#D1FAE5';
+        textColor = '#059669';
+        break;
+      case 'rejected':
+      case 'cancelled':
+        bgColor = '#FEE2E2';
+        textColor = '#DC2626';
+        break;
+    }
+
+    return (
+      <View style={{
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 999,
+        backgroundColor: bgColor,
+      }}>
+        <Text style={{
+          fontSize: 9,
+          fontFamily: 'Octarine-Bold',
+          color: textColor,
+          textTransform: 'uppercase',
+        }}>{status}</Text>
+      </View>
+    );
+  };
+
+
+  if (showForm) {
+    return (
+      <ScreenBackground>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <TouchableOpacity
+              style={{ marginBottom: 16 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setShowForm(false)}
+            >
+              <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+            </TouchableOpacity>
+
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 28, lineHeight: 32 }}>
+              {REPORT_CATEGORIES.find(c => c.id === category)?.label || 'Report incident'}
+            </Text>
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 4, marginBottom: 24, fontSize: 13 }}>
+              Filing form · automatic timestamp & location stamp
+            </Text>
+
+            {!verified && (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 16,
+                borderRadius: 16,
+                backgroundColor: '#FEF3C7',
+                borderWidth: 1,
+                borderColor: '#F59E0B',
+                marginBottom: 16,
+                gap: 10,
+              }}>
+                <ShieldTick size={24} color="#B45309" variant="Bold" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Verification Required</Text>
+                  <Text style={{ color: '#A16207', fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Verify your identity to submit community reports.</Text>
+                </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#B45309',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 10,
+                  }}
+                  onPress={() => navigation.navigate('VerifyIdentity')}
+                >
+                  <Text style={{ color: '#fff', fontFamily: 'Octarine-Bold', fontSize: 12 }}>Verify</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={{
+              backgroundColor: T.card,
+              borderWidth: 1,
+              borderColor: T.border,
+              borderRadius: 24,
+              padding: 20,
+            }}>
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>DESCRIPTION</Text>
+              <TextInput
+                style={{
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  backgroundColor: T.cardAlt,
+                  color: T.text,
+                  fontFamily: 'Inter-Medium',
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  fontSize: 14,
+                  height: 96,
+                  textAlignVertical: 'top',
+                  marginBottom: 16,
+                }}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Provide details (e.g. Deep pothole near the school gate, leaning electric pole...)"
+                placeholderTextColor={T.textMuted}
+                multiline
+              />
+
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>PHOTO EVIDENCE (MANDATORY — LIVE CAMERA ONLY)</Text>
+              {rawCaptureUri ? (
+                <View style={{
+                  padding: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  backgroundColor: T.cardAlt,
+                  marginBottom: 16,
+                }}>
+                  <View ref={previewRef} collapsable={false} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000' }}>
+                    <Image source={{ uri: rawCaptureUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10 }}>
+                      <Text style={{ color: '#FFFFFF', fontFamily: 'Octarine-Bold', fontSize: 12 }} numberOfLines={1}>
+                        {location?.address || 'Location unavailable'}
+                      </Text>
+                      <Text style={{ color: '#E5E7EB', fontFamily: 'Inter-Medium', fontSize: 10, marginTop: 2 }}>
+                        {location ? `Lat ${location.lat.toFixed(6)}  Long ${location.lng.toFixed(6)}` : ''}
+                      </Text>
+                      <Text style={{ color: '#E5E7EB', fontFamily: 'Inter-Medium', fontSize: 10 }}>{captureTimestamp}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        height: 44,
+                        borderRadius: 999,
+                        backgroundColor: T.card,
+                        borderColor: T.border,
+                        borderWidth: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                      onPress={retakePhoto}
+                      disabled={stamping}
+                    >
+                      <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 13 }}>Retake</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        height: 44,
+                        borderRadius: 999,
+                        backgroundColor: T.accentSoft,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                      onPress={confirmStampedPhoto}
+                      disabled={stamping}
+                    >
+                      {stamping ? <ActivityIndicator size="small" color="#292929" /> : <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 13 }}>Use Photo</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={{
+                    padding: 12,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    backgroundColor: T.cardAlt,
+                    marginBottom: 16,
+                  }}
+                  onPress={takePhoto}
+                >
+                  {imageUri ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Image source={{ uri: imageUri }} style={{ width: 48, height: 48, borderRadius: 10 }} />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 14 }}>Photo attached</Text>
+                        <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Tap to retake photo</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: T.card, justifyContent: 'center', alignItems: 'center' }}
+                        onPress={() => setImageUri(null)}
+                      >
+                        <Trash size={16} color="#DC2626" variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+                      <Camera size={24} color={T.textMuted} variant="Bold" style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 14 }}>Take incident photo</Text>
+                        <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Live camera required (no uploads) to prevent fraud.</Text>
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>LOCATION (AUTOMATIC)</Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: locationDenied ? '#DC2626' : T.border,
+                  backgroundColor: T.cardAlt,
+                  marginBottom: 12,
+                }}
+                onPress={getLocation}
+                disabled={loadingLoc}
+              >
+                <View style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: location ? T.accentSoft : locationDenied ? '#FEE2E2' : T.card,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12,
+                }}>
+                  {loadingLoc ? (
+                    <ActivityIndicator size="small" color={T.text} />
+                  ) : (
+                    <LocationIcon size={18} color={locationDenied ? '#DC2626' : location ? '#292929' : T.text} variant="Bold" />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: locationDenied ? '#DC2626' : T.text, fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                    {loadingLoc ? 'Getting coordinates…' : location ? 'GPS coordinates locked' : locationDenied ? 'GPS is disabled' : 'Waiting for GPS…'}
+                  </Text>
+                  <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                    {location ? location.address : locationDenied ? 'Enable location services, then tap to retry' : 'Locating automatically…'}
+                  </Text>
+                </View>
+                {locationDenied && (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginLeft: 8 }}
+                    onPress={() => Linking.openSettings()}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 12, fontFamily: 'Octarine-Bold' }}>Settings</Text>
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+
+              {location && (
+                <View style={{ height: 140, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: T.border, marginBottom: 16 }}>
+                  <MapView
+                    style={StyleSheet.absoluteFillObject}
+                    initialRegion={{
+                      latitude: location.lat,
+                      longitude: location.lng,
+                      latitudeDelta: 0.003,
+                      longitudeDelta: 0.003,
+                    }}
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                  >
+                    <Marker coordinate={{ latitude: location.lat, longitude: location.lng }} />
+                  </MapView>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={{
+                  height: 52,
+                  borderRadius: 999,
+                  backgroundColor: !verified ? '#D1D5DB' : '#292929',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+                onPress={verified ? submitReport : () => navigation.navigate('VerifyIdentity')}
+                disabled={submitting || !verified}
+              >
+                <Text style={{
+                  color: !verified ? '#9CA3AF' : '#FFFCF5',
+                  fontFamily: 'Octarine-Bold',
+                  fontSize: 15,
+                }}>
+                  {!verified ? 'Verify to Submit' : checkingPhoto ? 'Verifying photo…' : submitting ? 'Submitting...' : 'Submit Report'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ScreenBackground>
+  );
+}
+
+  // ── Catalog list view ───────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-      <View style={[globalStyles.screen, { backgroundColor: T.bg }]}>
+    <ScreenBackground>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
         <View style={{ padding: 20, paddingBottom: 10 }}>
-          <Text style={[globalStyles.serif, { color: T.text, fontSize: 28 }]}>Report.</Text>
-          <Text style={[globalStyles.muted, { color: T.textMuted, marginTop: 6, marginBottom: 16 }]}>
-            Help your barangay · live photo + automatic GPS
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>Report.</Text>
+          <Text style={{ fontFamily: 'Inter-Medium', color: T.text, marginTop: 4, fontSize: 14, lineHeight: 18 }}>
+            Help us improve our city. File a report for local issues directly to the municipal departments.
           </Text>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
-          {!verified && (
-            <View style={[styles.verificationBanner, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="shield-checkmark-outline" size={22} color="#B45309" />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 14 }}>Verification Required</Text>
-                  <Text style={{ color: '#A16207', fontSize: 12, marginTop: 2 }}>Verify your identity to submit community reports.</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.verifyBtn, { backgroundColor: '#B45309' }]}
-                  onPress={() => navigation.navigate('VerifyIdentity')}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border }]}>
-            <Text style={[globalStyles.label, { color: T.textMuted }]}>CATEGORY</Text>
-            <View style={styles.catGrid}>
+        {/* Tab navigation under title */}
+        <View style={{
+          flexDirection: 'row',
+          paddingHorizontal: 20,
+          marginTop: 8,
+          marginBottom: 12,
+          gap: 36,
+        }}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('reports')}
+            activeOpacity={0.8}
+            style={{ paddingBottom: 6 }}
+          >
+            <Text style={{
+              color: activeTab === 'reports' ? T.text : T.textMuted,
+              fontFamily: 'Octarine-Bold',
+              fontSize: 18,
+            }}>
+              Reports
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveTab('my_reports')}
+            activeOpacity={0.8}
+            style={{ paddingBottom: 6 }}
+          >
+            <Text style={{
+              color: activeTab === 'my_reports' ? T.text : T.textMuted,
+              fontFamily: 'Octarine-Bold',
+              fontSize: 18,
+            }}>
+              My Reports
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          {activeTab === 'reports' ? (
+            /* Flat category selection card grid */
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
               {REPORT_CATEGORIES.map(cat => {
-                const active = category === cat.id;
+                const IconComp = cat.icon;
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.catItem, { backgroundColor: active ? T.text : T.cardAlt, borderColor: T.border }]}
-                    onPress={() => setCategory(cat.id)}
+                    style={{
+                      width: '48%',
+                      backgroundColor: T.card,
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 12,
+                    }}
+                    onPress={() => {
+                      setCategory(cat.id);
+                      setShowForm(true);
+                    }}
                   >
-                    <Ionicons name={cat.icon as any} size={18} color={active ? T.bg : T.text} style={{ marginRight: 8 }} />
-                    <Text style={{ color: active ? T.bg : T.text, fontSize: 13, fontWeight: '600' }}>{cat.label}</Text>
+                    <View style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: T.accent,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: 12,
+                    }}>
+                      <IconComp size={18} color="#292929" variant="Bold" />
+                    </View>
+                    <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 18 }}>{cat.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            <Text style={[globalStyles.label, { color: T.textMuted, marginTop: 14 }]}>DESCRIPTION</Text>
-            <TextInput
-              style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border, height: 80, textAlignVertical: 'top' }]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Provide detail (e.g. Deep pothole near the school gate, leaning electric pole...)"
-              placeholderTextColor={T.textMuted}
-              multiline
-            />
-
-            <Text style={[globalStyles.label, { color: T.textMuted, marginTop: 14 }]}>PHOTO EVIDENCE (MANDATORY — LIVE CAMERA ONLY)</Text>
-            {rawCaptureUri ? (
-              /* Review step: the stamp composite is rendered ON-SCREEN (not
-                 hidden/off-screen) so the capture below is reliable — this
-                 view is what captureRef() bakes into the final photo. */
-              <View style={[styles.stampPreviewCard, { backgroundColor: T.cardAlt, borderColor: T.border }]}>
-                <View ref={previewRef} collapsable={false} style={styles.stampComposite}>
-                  <Image source={{ uri: rawCaptureUri }} style={styles.stampImage} resizeMode="cover" />
-                  <View style={styles.stampCaptionBar}>
-                    <Text style={styles.stampCaptionTitle} numberOfLines={1}>
-                      {location?.address || 'Location unavailable'}
-                    </Text>
-                    <Text style={styles.stampCaptionSub}>
-                      {location ? `Lat ${location.lat.toFixed(6)}  Long ${location.lng.toFixed(6)}` : ''}
-                    </Text>
-                    <Text style={styles.stampCaptionSub}>{captureTimestamp}</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                  <TouchableOpacity
-                    style={[styles.stampActionBtn, { backgroundColor: T.card, borderColor: T.border, borderWidth: 1 }]}
-                    onPress={retakePhoto}
-                    disabled={stamping}
-                  >
-                    <Text style={{ color: T.text, fontWeight: '600' }}>Retake</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.stampActionBtn, { backgroundColor: ACCENT }]}
-                    onPress={confirmStampedPhoto}
-                    disabled={stamping}
-                  >
-                    {stamping ? <ActivityIndicator size="small" color="#1A1A1A" /> : <Text style={{ color: '#1A1A1A', fontWeight: '700' }}>Use This Photo</Text>}
-                  </TouchableOpacity>
-                </View>
+          ) : (
+            /* Reports list directly inline */
+            reports.length === 0 ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <Danger size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center' }}>
+                  You haven't submitted any incident reports yet.
+                </Text>
               </View>
             ) : (
-              <TouchableOpacity
-                style={[styles.photoCard, { backgroundColor: T.cardAlt, borderColor: T.border }]}
-                onPress={takePhoto}
-              >
-                {imageUri ? (
-                  <View style={styles.imageAttachedContainer}>
-                    <Image source={{ uri: imageUri }} style={styles.attachedImage} />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ color: T.text, fontWeight: '600', fontSize: 14 }}>Photo attached</Text>
-                      <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Tap to retake photo</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.removeImageBtn, { backgroundColor: T.border, marginRight: 4 }]}
-                      onPress={() => setImageUri(null)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#E11D48" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.imagePlaceholderContainer}>
-                    <Ionicons name="camera-outline" size={24} color={T.textMuted} style={{ marginRight: 12 }} />
-                    <View>
-                      <Text style={{ color: T.text, fontWeight: '600', fontSize: 14 }}>Take incident photo</Text>
-                      <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>Live camera only — required to prevent false/troll reports</Text>
-                    </View>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-
-            <Text style={[globalStyles.label, { color: T.textMuted, marginTop: 4 }]}>LOCATION (AUTOMATIC)</Text>
-            <TouchableOpacity
-              style={[styles.locationCard, { backgroundColor: T.cardAlt, borderColor: locationDenied ? '#F87171' : T.border }]}
-              onPress={getLocation}
-              disabled={loadingLoc}
-            >
-              <View style={[styles.locationIcon, { backgroundColor: location ? PASTELS.sage : locationDenied ? '#FEE2E2' : T.card }]}>
-                {loadingLoc ? (
-                  <ActivityIndicator size="small" color={T.text} />
-                ) : (
-                  <Ionicons name={locationDenied ? 'warning-outline' : 'location-outline'} size={20} color={locationDenied ? '#DC2626' : T.text} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: locationDenied ? '#DC2626' : T.text, fontWeight: '600', fontSize: 14 }}>
-                  {loadingLoc ? 'Getting your location…' : location ? 'GPS location locked' : locationDenied ? 'Location is off' : 'Waiting for location…'}
-                </Text>
-                <Text style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-                  {location
-                    ? location.address
-                    : locationDenied
-                    ? 'Enable location access, then tap to retry'
-                    : 'Fetching GPS automatically…'}
-                </Text>
-              </View>
-              {locationDenied && (
-                <TouchableOpacity
-                  style={[styles.settingsBtn, { backgroundColor: '#DC2626' }]}
-                  onPress={() => Linking.openSettings()}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Settings</Text>
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-
-            {location && (
-              <View style={[styles.mapContainer, { borderColor: T.border }]}>
-                <MapView
-                  style={StyleSheet.absoluteFillObject}
-                  initialRegion={{
-                    latitude: location.lat,
-                    longitude: location.lng,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                  }}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                >
-                  <Marker coordinate={{ latitude: location.lat, longitude: location.lng }} />
-                </MapView>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: !verified ? '#D1D5DB' : ACCENT, marginTop: 14 }]}
-              onPress={verified ? submitReport : () => navigation.navigate('VerifyIdentity')}
-              disabled={submitting || !verified}
-            >
-              <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
-                {!verified ? 'Verify to Submit' : checkingPhoto ? 'Checking photo…' : submitting ? 'Submitting...' : 'Submit Report'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {reports.length > 0 && (
-            <>
-              <View style={globalStyles.sectionHeader}>
-                <Text style={[globalStyles.sectionTitle, { color: T.text }]}>My reports</Text>
-              </View>
-              {reports.map(r => (
+              reports.map(r => (
                 <TouchableOpacity
                   key={r.id}
-                  style={[styles.requestCard, { backgroundColor: T.card, borderColor: T.border }]}
-                  onPress={() => navigation.navigate('TrackingDetail', { id: r.id, type: 'report' })}
+                  style={{
+                    flexDirection: 'row',
+                    padding: 16,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    backgroundColor: T.card,
+                    alignItems: 'center',
+                    marginBottom: 12,
+                  }}
+                  onPress={() => {
+                    navigation.navigate('TrackingDetail', { id: r.id, type: 'report' });
+                  }}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: T.textMuted, fontSize: 12, fontWeight: '600' }}>{r.reference_number}</Text>
-                    <Text style={{ color: T.text, fontSize: 16, fontWeight: '600', marginTop: 2 }}>{reportCategoryLabel(r.category)}</Text>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ color: T.textMuted, fontSize: 11, fontFamily: 'Inter-Medium' }}>{r.reference_number}</Text>
+                    <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Octarine-Bold', marginTop: 2 }} numberOfLines={1}>{reportCategoryLabel(r.category)}</Text>
                   </View>
                   {r.status === 'Submitted' && (
                     <TouchableOpacity
-                      style={[styles.withdrawBtn, { borderColor: T.border }]}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        marginRight: 8,
+                        backgroundColor: T.cardAlt,
+                      }}
                       onPress={(e) => { e.stopPropagation(); withdrawReport(r.id); }}
                     >
-                      <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>Withdraw</Text>
+                      <Text style={{ color: '#DC2626', fontSize: 11, fontFamily: 'Octarine-Bold' }}>Withdraw</Text>
                     </TouchableOpacity>
                   )}
-                  <View style={[styles.statusPill, { backgroundColor: PASTELS.blue }]}>
-                    <Text style={styles.statusPillText}>{r.status}</Text>
-                  </View>
+                  {getStatusBadge(r.status)}
                 </TouchableOpacity>
-              ))}
-            </>
+              ))
+            )
           )}
         </ScrollView>
       </View>
-      </KeyboardAvoidingView>
     </SafeAreaView>
+    </ScreenBackground>
   );
 }
-
-const styles = StyleSheet.create({
-  verificationBanner: { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
-  verifyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catItem: { flex: 1, minWidth: '45%', padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
-  catLabel: { fontSize: 14, fontWeight: '600', marginLeft: 8 },
-  locationCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1 },
-  locationIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  requestCard: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
-  statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
-  statusPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
-  withdrawBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, marginRight: 8 },
-  mapContainer: { height: 150, borderRadius: 12, overflow: 'hidden', marginTop: 12, borderWidth: 1 },
-  photoCard: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 14 },
-  imageAttachedContainer: { flexDirection: 'row', alignItems: 'center' },
-  attachedImage: { width: 50, height: 50, borderRadius: 8 },
-  removeImageBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  imagePlaceholderContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  settingsBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginLeft: 8 },
-  stampPreviewCard: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 14 },
-  stampComposite: { width: '100%', aspectRatio: 4 / 3, borderRadius: 10, overflow: 'hidden', backgroundColor: '#000' },
-  stampImage: { width: '100%', height: '100%' },
-  stampCaptionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 8 },
-  stampCaptionTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  stampCaptionSub: { color: '#E5E7EB', fontSize: 11, marginTop: 2 },
-  stampActionBtn: { flex: 1, height: 46, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-});

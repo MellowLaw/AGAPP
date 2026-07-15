@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { TOKENS } from '../theme';
+import { TOKENS, ACCENT, softenColor } from '../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ThemeContextType = {
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
-  T: typeof TOKENS.light;
+  accent: string;
+  setAccent: (color: string) => void;
+  T: typeof TOKENS.light & { accent: string; accentSoft: string };
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDarkMode, setIsDarkModeState] = useState(false);
+  const [accent, setAccent] = useState(ACCENT);
 
   useEffect(() => {
     AsyncStorage.getItem('isDarkMode').then(val => {
@@ -24,10 +27,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('isDarkMode', String(val));
   };
 
-  const T = isDarkMode ? TOKENS.dark : TOKENS.light;
+  // Soft variant for large fills (tab bar pill, toggle tracks) — blended less
+  // aggressively in dark mode so it doesn't lose contrast against the dark bg.
+  const accentSoft = softenColor(accent, isDarkMode ? 0.3 : 0.45);
+  const T = { ...(isDarkMode ? TOKENS.dark : TOKENS.light), accent, accentSoft };
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, setIsDarkMode, T }}>
+    <ThemeContext.Provider value={{ isDarkMode, setIsDarkMode, accent, setAccent, T }}>
       {children}
     </ThemeContext.Provider>
   );

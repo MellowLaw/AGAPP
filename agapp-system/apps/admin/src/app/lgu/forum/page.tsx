@@ -11,18 +11,7 @@ import { TextArea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import {
-  ChatCircle,
-  User,
-  Clock,
-  Check,
-  X,
-  Pencil,
-  MagnifyingGlass,
-  ChatDots,
-  CaretDown,
-  CaretUp
-} from '@phosphor-icons/react';
+import { MessageSquare, User, Clock, TickSquare, CloseCircle, Edit, SearchNormal1, MessageText, ArrowDown2, ArrowUp2 } from 'iconsax-react';
 
 export default function ForumPage() {
   const [postsList, setPostsList] = useState<any[]>([]);
@@ -243,7 +232,7 @@ export default function ForumPage() {
       {/* Search */}
       <Card padding="sm" className="mb-6">
         <div className="relative">
-          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
             placeholder="Search posts by author or keyword..."
@@ -265,13 +254,13 @@ export default function ForumPage() {
                   {post.avatar ? (
                     <img src={post.avatar} alt="" className="w-full h-full rounded-full object-cover" />
                   ) : (
-                    <User className="w-5 h-5 text-text-muted" />
+                    <User variant="Bold" className="w-5 h-5 text-text-muted" />
                   )}
                 </div>
                 <div>
                   <p className="font-medium text-text-primary">{post.author}</p>
                   <div className="flex items-center gap-2 text-sm text-text-muted">
-                    <Clock className="w-3 h-3" />
+                    <Clock variant="Bold" className="w-3 h-3" />
                     {post.time}
                   </div>
                 </div>
@@ -305,9 +294,9 @@ export default function ForumPage() {
                 className="flex items-center gap-1 hover:text-text-primary transition-colors"
                 onClick={() => setExpandedPost(expandedPost === post.id ? null : post.id)}
               >
-                <ChatDots className="w-4 h-4" />
+                <MessageText className="w-4 h-4" />
                 {post.comments} comment{post.comments === 1 ? '' : 's'}
-                {post.comments > 0 && (expandedPost === post.id ? <CaretUp className="w-3 h-3" /> : <CaretDown className="w-3 h-3" />)}
+                {post.comments > 0 && (expandedPost === post.id ? <ArrowUp2 className="w-3 h-3" /> : <ArrowDown2 className="w-3 h-3" />)}
               </button>
             </div>
 
@@ -330,7 +319,7 @@ export default function ForumPage() {
                     <div key={c.id} className="bg-surface-alt rounded-md p-3">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-text-muted" />
+                          <User variant="Bold" className="w-3.5 h-3.5 text-text-muted" />
                           <span className="text-sm font-medium text-text-primary">{c.citizen_name || 'Citizen'}</span>
                           <span className="text-xs text-text-faint">{new Date(c.created_at).toLocaleString()}</span>
                         </div>
@@ -347,11 +336,11 @@ export default function ForumPage() {
                       {!c.is_approved && (
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" onClick={() => handleApproveComment(c.id, post.id)}>
-                            <Check className="w-3.5 h-3.5 mr-1" />
+                            <TickSquare className="w-3.5 h-3.5 mr-1" />
                             Approve
                           </Button>
                           <Button size="sm" variant="danger" onClick={() => handleDeleteComment(c.id, post.id)}>
-                            <X className="w-3.5 h-3.5 mr-1" />
+                            <CloseCircle className="w-3.5 h-3.5 mr-1" />
                             Delete
                           </Button>
                         </div>
@@ -366,15 +355,15 @@ export default function ForumPage() {
             {post.status !== 'approved' && editingPost !== post.id && (
               <div className="flex gap-3 pt-4 border-t border-theme">
                 <Button variant="primary" onClick={() => handleApprove(post.id)}>
-                  <Check className="w-4 h-4 mr-1" />
+                  <TickSquare className="w-4 h-4 mr-1" />
                   Approve
                 </Button>
                 <Button variant="secondary" onClick={() => handleEdit(post)}>
-                  <Pencil className="w-4 h-4 mr-1" />
+                  <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
                 <Button variant="danger" onClick={() => handleReject(post.id)}>
-                  <X className="w-4 h-4 mr-1" />
+                  <CloseCircle className="w-4 h-4 mr-1" />
                   Reject
                 </Button>
               </div>
@@ -385,7 +374,7 @@ export default function ForumPage() {
         {filteredPosts.length === 0 && (
           <Card>
             <div className="text-center py-8 text-text-muted">
-              <ChatCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No posts found matching your criteria</p>
             </div>
           </Card>

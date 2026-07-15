@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { ReportsMap, type ReportPin } from '@/components/map';
-import { Warning, FileText, CheckCircle, ArrowRight, MapPin, IdentificationBadge } from '@phosphor-icons/react';
+import { Danger, DocumentText, TickCircle, ArrowRight, Location, Personalcard } from 'iconsax-react';
 
 type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
 
@@ -138,22 +138,22 @@ export default function DashboardPage() {
         label: 'Pending Reports',
         value: submittedCount.toString(),
         change: underReviewCount > 0 ? `${underReviewCount} under review` : 'none under review',
-        icon: Warning,
+        icon: Danger,
       },
       {
         label: 'Service Requests',
         value: totalServiceRequests.toString(),
         change: activeBarangays > 0 ? `${activeBarangays} barangays active` : '',
-        icon: FileText,
+        icon: DocumentText,
       },
       {
         label: 'Pending Verifications',
         value: pendingVerifications.toString(),
         change: pendingVerifications > 0 ? 'field agents dispatched' : 'all caught up',
-        icon: IdentificationBadge,
+        icon: Personalcard,
         href: verifHref,
       },
-      { label: 'Resolved This Week', value: resolvedThisWeek.toString(), change: '', icon: CheckCircle },
+      { label: 'Resolved This Week', value: resolvedThisWeek.toString(), change: '', icon: TickCircle },
     ];
   }, [reportRows, serviceRows, pendingVerifications, lguParam]);
 
@@ -240,7 +240,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <p className="text-sm font-bold text-text-primary">{stat.label}</p>
                 <div className="p-1.5 rounded-lg bg-surface-alt border border-theme">
-                  <Icon className="w-4 h-4 text-accent" />
+                  <Icon className="w-4 h-4 text-accent" variant="Bold" />
                 </div>
               </div>
               <div className="mt-4">
@@ -269,11 +269,9 @@ export default function DashboardPage() {
                 {lguParam} · Live locations of citizen reports
               </p>
             </div>
-            <Link href={reportsHref}>
-              <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+            <Link href={reportsHref} className="flex items-center gap-1 text-sm font-bold text-accent hover:opacity-80 transition-opacity">
+              View All
+              <ArrowRight variant="Linear" className="w-4 h-4" />
             </Link>
           </div>
           {!loading && reportPins.length === 0 ? (
@@ -329,11 +327,9 @@ export default function DashboardPage() {
           <div>
             <h3 className="text-2xl font-bold text-text-primary">Recent Submissions</h3>
           </div>
-          <Link href={reportsHref}>
-            <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90">
-              View All
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+          <Link href={reportsHref} className="flex items-center gap-1 text-sm font-bold text-accent hover:opacity-80 transition-opacity">
+            View All
+            <ArrowRight variant="Linear" className="w-4 h-4" />
           </Link>
         </div>
 
@@ -359,7 +355,7 @@ export default function DashboardPage() {
                   <td className="py-5 px-4 text-sm text-text-primary">{report.category}</td>
                   <td className="py-5 px-4 text-sm text-text-primary/80">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-accent" />
+                      <Location className="w-4 h-4 text-accent" />
                       {report.location}
                     </div>
                   </td>

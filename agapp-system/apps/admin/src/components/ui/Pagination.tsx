@@ -1,5 +1,5 @@
 import React from 'react';
-import { CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { ArrowLeft2, ArrowRight2 } from 'iconsax-react';
 import { Button } from './Button';
 
 interface PaginationProps {
@@ -64,7 +64,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
         >
-          <CaretLeft className="w-4 h-4" />
+          <ArrowLeft2 className="w-4 h-4" />
         </Button>
         
         {getPageNumbers().map((page, index) => (
@@ -89,7 +89,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
         >
-          <CaretRight className="w-4 h-4" />
+          <ArrowRight2 className="w-4 h-4" />
         </Button>
       </div>
     </div>

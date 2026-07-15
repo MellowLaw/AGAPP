@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MagnifyingGlass, X } from '@phosphor-icons/react';
+import { SearchNormal1, CloseCircle } from 'iconsax-react';
 
 interface SearchProps {
   placeholder?: string;
@@ -37,7 +37,7 @@ export const Search: React.FC<SearchProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className={`relative ${className}`}>
-      <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+      <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
       
       <input
         type="text"
@@ -57,7 +57,7 @@ export const Search: React.FC<SearchProps> = ({
           onClick={handleClear}
           className="absolute right-3 top-1/2 -translate-y-1/2"
         >
-          <X className="w-4 h-4 text-text-muted hover:text-text-primary" />
+          <CloseCircle className="w-4 h-4 text-text-muted hover:text-text-primary" />
         </button>
       )}
     </form>

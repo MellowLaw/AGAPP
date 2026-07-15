@@ -13,18 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { timeAgo } from '@/lib/timeAgo';
 import { ReportsMap } from '@/components/map';
-import {
-  Warning,
-  MapPin,
-  User,
-  Calendar,
-  Check,
-  X,
-  ArrowsClockwise,
-  MagnifyingGlass,
-  Funnel,
-  Download
-} from '@phosphor-icons/react';
+import { Danger, Location, User, Calendar, TickSquare, CloseCircle, Refresh, SearchNormal1, Filter, DocumentDownload } from 'iconsax-react';
 
 type ReportStatus = 'submitted' | 'under_review' | 'in_progress' | 'resolved' | 'rejected';
 
@@ -398,7 +387,7 @@ export default function ReportsPage() {
           <Card padding="sm" noBorder>
             <div className="flex gap-3 items-center">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
+                <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
                   placeholder="Search reports..."
@@ -419,7 +408,7 @@ export default function ReportsPage() {
                 <option value="resolved">Resolved</option>
               </select>
               <Button variant="secondary" className="h-10 !bg-accent !text-white !border-0 hover:opacity-90" onClick={handleExportCsv}>
-                <Download className="w-4 h-4 mr-1" />
+                <DocumentDownload className="w-4 h-4 mr-1" />
                 Export CSV
               </Button>
             </div>
@@ -467,11 +456,11 @@ export default function ReportsPage() {
                   <p className="text-text-primary mb-3">{report.category}{report.subType ? ` - ${report.subType}` : ''}</p>
                   <div className="space-y-1 text-xs text-text-primary/70">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <Location className="w-3.5 h-3.5 text-accent shrink-0" />
                       <span className="truncate">{report.location}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <Calendar variant="Bold" className="w-3.5 h-3.5 text-accent shrink-0" />
                       <span>{report.submittedAt}</span>
                     </div>
                   </div>
@@ -510,7 +499,7 @@ export default function ReportsPage() {
                     />
                   ) : (
                     <div className="text-center">
-                      <Warning className="w-12 h-12 text-text-primary mx-auto mb-2" />
+                      <Danger className="w-12 h-12 text-text-primary mx-auto mb-2" />
                       <p className="text-text-primary">No photo proof attached</p>
                     </div>
                   )}
@@ -527,7 +516,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted By</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <User className="w-4 h-4 text-accent" />
+                      <User variant="Bold" className="w-4 h-4 text-accent" />
                       <span className="text-text-primary">{selectedReport.submittedBy}</span>
                       {!selectedReport.citizenId ? (
                         <Badge variant="default">Account deleted</Badge>
@@ -560,7 +549,7 @@ export default function ReportsPage() {
                       {selectedReport.dbCategory === 'stray_animal' ? 'Last Seen' : 'Location'}
                     </p>
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-accent mt-0.5" />
+                      <Location className="w-4 h-4 text-accent mt-0.5" />
                       <div>
                         <p className="text-text-primary">
                           {selectedReport.location}
@@ -576,7 +565,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted</p>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-accent" />
+                      <Calendar variant="Bold" className="w-4 h-4 text-accent" />
                       <span className="text-text-primary">
                         {selectedReport.submittedAt}
                         {selectedReport.dbCategory === 'stray_animal' && selectedReport.createdAtIso && (
@@ -617,14 +606,14 @@ export default function ReportsPage() {
                 {selectedReport.aiVerified !== null && (
                   selectedReport.aiVerified ? (
                     <div className="flex items-center gap-2 p-3 bg-green-600 text-white rounded-md font-semibold">
-                      <Check className="w-4 h-4" />
+                      <TickSquare className="w-4 h-4" />
                       <span className="text-sm">
                         AI Verified — {ML_SUBJECT_LABEL[selectedReport.dbCategory] || 'subject'} detected in photo ({Math.round((selectedReport.aiConfidence || 0) * 100)}%)
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 p-3 bg-amber-500 text-white rounded-md font-semibold">
-                      <Warning className="w-4 h-4" />
+                      <Danger className="w-4 h-4" />
                       <span className="text-sm">
                         No {ML_SUBJECT_LABEL[selectedReport.dbCategory] || 'match'} detected — review photo
                       </span>
@@ -653,21 +642,21 @@ export default function ReportsPage() {
                   {selectedReport.status === 'submitted' || selectedReport.status === 'under_review' ? (
                     <>
                       <Button variant="primary" onClick={handleAcknowledge}>
-                        <Check className="w-4 h-4 mr-1" />
+                        <TickSquare className="w-4 h-4 mr-1" />
                         Acknowledge
                       </Button>
                       <Button variant="secondary" onClick={handleReassign}>
-                        <ArrowsClockwise className="w-4 h-4 mr-1" />
+                        <Refresh className="w-4 h-4 mr-1" />
                         Reassign
                       </Button>
                       <Button variant="danger" onClick={handleReject}>
-                        <X className="w-4 h-4 mr-1" />
+                        <CloseCircle className="w-4 h-4 mr-1" />
                         Reject
                       </Button>
                     </>
                   ) : selectedReport.status === 'in_progress' ? (
                     <Button variant="primary" onClick={handleResolve}>
-                      <Check className="w-4 h-4 mr-1" />
+                      <TickSquare className="w-4 h-4 mr-1" />
                       Mark Resolved
                     </Button>
                   ) : (

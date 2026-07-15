@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
-import { AgappLogo } from '../components/AgappLogo';
-import { ACCENT, globalStyles } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import { Eye, EyeSlash, Check } from 'iconsax-react-native';
 
 export function LoginScreen({ navigation }: any) {
-  const { T } = useTheme();
+  const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
+  const { hasCompletedGuestLguChoice } = useAuth();
+  const insets = useSafeAreaInsets();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,18 +25,14 @@ export function LoginScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Input Validation
   const isValidEmail = (email: string) => {
-    // Basic email regex
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const isStrongPassword = (password: string) => {
-    // At least 8 chars
     return password.length >= 8;
   };
 
-  // Sanitize input (basic trimming to prevent accidental trailing spaces)
   const sanitize = (str: string) => str.trim();
 
   const handleLogin = async () => {
@@ -89,11 +88,6 @@ export function LoginScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      // Profile creation lives in a DB trigger (handle_new_citizen_signup, on
-      // auth.users) now, not here — a client-side insert right after signUp()
-      // raced against session propagation (RLS 42501 the moment there's any
-      // gap, e.g. email confirmation enabled). The trigger reads full_name
-      // from this metadata and is atomic with the auth row, so it can't race.
       const fullName = `${cleanFirstName} ${cleanLastName}`;
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -105,9 +99,6 @@ export function LoginScreen({ navigation }: any) {
       if (data.session) {
         showToast('Account created successfully!', 'success');
       } else {
-        // No session yet means the project requires email confirmation —
-        // the profile row still gets created by the trigger either way, but
-        // the citizen can't log in until they confirm.
         showToast('Please confirm your email address, then sign in.', 'info');
       }
     } catch (err: any) {
@@ -140,9 +131,16 @@ export function LoginScreen({ navigation }: any) {
     }
   };
 
+  const handleContinueAsGuest = () => {
+    if (!hasCompletedGuestLguChoice) {
+      navigation.navigate('GuestLguDetect');
+    } else {
+      navigation.replace('Main');
+    }
+  };
+
   const switchMode = () => {
     setIsLoginMode(!isLoginMode);
-    // Reset fields on mode switch
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -151,28 +149,90 @@ export function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[globalStyles.screen, { backgroundColor: T.bg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 60, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <View style={{ alignItems: 'center', marginTop: 40, marginBottom: 30 }}>
-            <View style={{ marginBottom: 30, alignItems: 'center' }}>
-              <AgappLogo size={56} bgColor="#1A1A1A" textColor="#FFFFFF" showText={true} />
-            </View>
-            <Text style={[globalStyles.serif, { color: T.text, fontSize: 26 }]}>
-              {isLoginMode ? 'Welcome back.' : 'Join AGAPP.'}
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      {/* Top Swirl Decor — soft pastel ribbons that melt into the cream behind the form.
+          The gradient uses the theme bg at 0/70/100% alpha (`${T.bg}00` etc.) instead of
+          the keyword 'transparent', which fades through a faint dark halo on RN. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 300, zIndex: 0 }}>
+        <Image
+          source={require('../../assets/brand/swirl.png')}
+          style={{
+            width: '100%',
+            height: '100%',
+            opacity: 0.6,
+            resizeMode: 'cover',
+          }}
+        />
+        <LinearGradient
+          colors={[`${T.bg}00`, `${T.bg}20`, `${T.bg}90`, `${T.bg}F5`, T.bg]}
+          locations={[0, 0.18, 0.38, 0.58, 1]}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      </View>
+
+      {/* Bottom Swirl Decor — mirror of the top, fades upward into the cream. */}
+      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 300, zIndex: 0 }}>
+        <Image
+          source={require('../../assets/brand/swirl.png')}
+          style={{
+            width: '100%',
+            height: '100%',
+            opacity: 0.6,
+            resizeMode: 'cover',
+            transform: [{ rotate: '180deg' }],
+          }}
+        />
+        <LinearGradient
+          colors={[T.bg, `${T.bg}F5`, `${T.bg}90`, `${T.bg}20`, `${T.bg}00`]}
+          locations={[0, 0.42, 0.62, 0.82, 1]}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      </View>
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, zIndex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 24,
+            paddingTop: insets.top + 20,
+            paddingBottom: insets.bottom + 40,
+            flexGrow: 1,
+            justifyContent: 'center',
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          
+          {/* Welcome Header */}
+          <View style={{ alignItems: 'center', marginBottom: 32, marginTop: 16 }}>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, textAlign: 'center' }}>
+              {isLoginMode ? 'Welcome to agapp.' : 'Join agapp.'}
             </Text>
-            <Text style={[globalStyles.muted, { color: T.textMuted, marginTop: 6, textAlign: 'center' }]}>
-              {isLoginMode ? 'Sign in to access national citizen services.' : 'Create an account to securely access government services.'}
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.text, marginTop: 12, fontSize: 14, textAlign: 'center', paddingHorizontal: 12, lineHeight: 20 }}>
+              {isLoginMode
+                ? 'Enter your email to log-in to an existing\naccount or instantly set up your new account'
+                : 'Create an account to securely access government services.'}
             </Text>
           </View>
 
-          <View style={[globalStyles.card, { backgroundColor: T.card, borderColor: T.border }]}>
+          {/* Flat Form container (No box or outline, blends flat with screen) */}
+          <View style={{ paddingHorizontal: 4 }}>
             
+            {/* TODO(auth-phone): Migrate authentication to phone-number-first UI when SMS provider is set up */}
             {!isLoginMode && (
               <>
-                <Text style={[globalStyles.label, { color: T.textMuted }]}>FIRST NAME</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8 }}>FIRST NAME</Text>
                 <TextInput
-                  style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
+                  style={{
+                    height: 48,
+                    borderRadius: 999, // Pill layout
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    backgroundColor: T.card,
+                    color: T.text,
+                    fontFamily: 'Inter-Medium',
+                    paddingHorizontal: 20,
+                    fontSize: 14,
+                    marginBottom: 16,
+                  }}
                   value={firstName}
                   onChangeText={setFirstName}
                   placeholder="Juan"
@@ -180,9 +240,20 @@ export function LoginScreen({ navigation }: any) {
                   autoCapitalize="words"
                 />
 
-                <Text style={[globalStyles.label, { color: T.textMuted }]}>LAST NAME</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8 }}>LAST NAME</Text>
                 <TextInput
-                  style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
+                  style={{
+                    height: 48,
+                    borderRadius: 999, // Pill layout
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    backgroundColor: T.card,
+                    color: T.text,
+                    fontFamily: 'Inter-Medium',
+                    paddingHorizontal: 20,
+                    fontSize: 14,
+                    marginBottom: 16,
+                  }}
                   value={lastName}
                   onChangeText={setLastName}
                   placeholder="Dela Cruz"
@@ -192,9 +263,20 @@ export function LoginScreen({ navigation }: any) {
               </>
             )}
 
-            <Text style={[globalStyles.label, { color: T.textMuted }]}>EMAIL ADDRESS</Text>
+            <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8 }}>EMAIL ADDRESS</Text>
             <TextInput
-              style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
+              style={{
+                height: 48,
+                borderRadius: 999, // Pill layout
+                borderWidth: 1,
+                borderColor: T.border,
+                backgroundColor: T.card,
+                color: T.text,
+                fontFamily: 'Inter-Medium',
+                paddingHorizontal: 20,
+                fontSize: 14,
+                marginBottom: 16,
+              }}
               value={email}
               onChangeText={setEmail}
               placeholder="you@email.com"
@@ -203,10 +285,21 @@ export function LoginScreen({ navigation }: any) {
               keyboardType="email-address"
             />
 
-            <Text style={[globalStyles.label, { color: T.textMuted }]}>PASSWORD</Text>
-            <View>
+            <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8 }}>PASSWORD</Text>
+            <View style={{ marginBottom: 20 }}>
               <TextInput
-                style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border, paddingRight: 40 }]}
+                style={{
+                  height: 48,
+                  borderRadius: 999, // Pill layout
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  backgroundColor: T.card,
+                  color: T.text,
+                  fontFamily: 'Inter-Medium',
+                  paddingHorizontal: 20,
+                  fontSize: 14,
+                  paddingRight: 48,
+                }}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="••••••••"
@@ -214,19 +307,34 @@ export function LoginScreen({ navigation }: any) {
                 secureTextEntry={!showPassword}
               />
               <TouchableOpacity
-                style={{ position: 'absolute', right: 12, height: '100%', justifyContent: 'center' }}
+                style={{ position: 'absolute', right: 18, height: 48, justifyContent: 'center' }}
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={T.textMuted} />
+                {showPassword ? (
+                  <EyeSlash size={18} color={T.textMuted} variant="Bold" />
+                ) : (
+                  <Eye size={18} color={T.textMuted} variant="Bold" />
+                )}
               </TouchableOpacity>
             </View>
 
             {!isLoginMode && (
               <>
-                <Text style={[globalStyles.label, { color: T.textMuted }]}>CONFIRM PASSWORD</Text>
-                <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8 }}>CONFIRM PASSWORD</Text>
+                <View style={{ marginBottom: 20 }}>
                   <TextInput
-                    style={[globalStyles.input, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border, paddingRight: 40 }]}
+                    style={{
+                      height: 48,
+                      borderRadius: 999, // Pill layout
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      backgroundColor: T.card,
+                      color: T.text,
+                      fontFamily: 'Inter-Medium',
+                      paddingHorizontal: 20,
+                      fontSize: 14,
+                      paddingRight: 48,
+                    }}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="••••••••"
@@ -234,52 +342,104 @@ export function LoginScreen({ navigation }: any) {
                     secureTextEntry={!showConfirmPassword}
                   />
                   <TouchableOpacity
-                    style={{ position: 'absolute', right: 12, height: '100%', justifyContent: 'center' }}
+                    style={{ position: 'absolute', right: 18, height: 48, justifyContent: 'center' }}
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
-                    <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color={T.textMuted} />
+                    {showConfirmPassword ? (
+                      <EyeSlash size={18} color={T.textMuted} variant="Bold" />
+                    ) : (
+                      <Eye size={18} color={T.textMuted} variant="Bold" />
+                    )}
                   </TouchableOpacity>
                 </View>
 
-                <Pressable onPress={() => setPrivacyAccepted(!privacyAccepted)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                  <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 1, borderColor: T.border, backgroundColor: privacyAccepted ? ACCENT : 'transparent', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                    {privacyAccepted && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                <Pressable onPress={() => setPrivacyAccepted(!privacyAccepted)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingHorizontal: 4 }}>
+                  <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1, borderColor: T.border, backgroundColor: privacyAccepted ? T.accent : 'transparent', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+                    {privacyAccepted && <Check size={12} color="#292929" variant="Bold" />}
                   </View>
-                  <Text style={{ color: T.textMuted, fontSize: 13, flex: 1, lineHeight: 18 }}>
-                    I accept the <Text style={{ color: ACCENT, fontWeight: '700' }}>Privacy Notice</Text> and consent to GPS sharing under RA 10173.
+                  <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 12, flex: 1, lineHeight: 16 }}>
+                    I accept the <Text style={{ color: T.text, fontWeight: '700' }}>Privacy Notice</Text> and consent to GPS sharing under RA 10173.
                   </Text>
                 </Pressable>
               </>
             )}
 
+            {/* Gradient Auth Button */}
             <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: (!isLoginMode && !privacyAccepted) ? T.chip : T.text }]}
               onPress={isLoginMode ? handleLogin : handleRegister}
               disabled={(!isLoginMode && !privacyAccepted) || loading}
+              activeOpacity={0.9}
             >
-              {loading ? <ActivityIndicator color={(!isLoginMode && !privacyAccepted) ? T.textMuted : T.bg} /> : (
-                <Text style={[globalStyles.primaryButtonText, { color: (!isLoginMode && !privacyAccepted) ? T.textMuted : T.bg }]}>
-                  {isLoginMode ? 'Sign in' : 'Create account'}
-                </Text>
-              )}
+              <LinearGradient
+                // Soft pastel rainbow sweep sampled from the mockup's "Sign up"
+                // pill (mint green → warm peach → soft pink → yellow-green),
+                // run diagonally to match its top-left-to-bottom-right drift.
+                colors={((!isLoginMode && !privacyAccepted) || loading) ? ['#E5E7EB', '#E5E7EB'] : ['#C3E8B8', '#F5DCB0', '#F3C4C4', '#DCEE8C']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  height: 52,
+                  borderRadius: 999, // Pill layout
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginTop: 12,
+                }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#292929" />
+                ) : (
+                  <Text style={{
+                    color: '#292929',
+                    fontFamily: 'Octarine-Bold',
+                    fontSize: 15,
+                  }}>
+                    {isLoginMode ? 'Sign in' : 'Create account'}
+                  </Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, alignItems: 'center', paddingHorizontal: 4 }}>
               <TouchableOpacity onPress={switchMode}>
-                <Text style={{ color: T.textMuted, fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 13, fontWeight: '600' }}>
                   {isLoginMode ? 'Create new account' : 'Sign in instead'}
                 </Text>
               </TouchableOpacity>
               {isLoginMode && (
                 <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600' }}>Forgot password?</Text>
+                  <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
+
+          {/* Continue as Guest */}
+          <TouchableOpacity
+            onPress={handleContinueAsGuest}
+            activeOpacity={0.8}
+            style={{ alignSelf: 'center', marginTop: 32, padding: 8 }}
+          >
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 15, textDecorationLine: 'underline' }}>
+              Continue as Guest
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={{
+            fontSize: 12,
+            fontFamily: 'Inter-Medium',
+            color: T.text,
+            textAlign: 'center',
+            marginTop: 32,
+            paddingHorizontal: 20,
+            lineHeight: 18,
+          }}>
+            By continuing, you agree to our{' '}
+            <Text style={{ color: T.text, fontWeight: '700', textDecorationLine: 'underline' }}>Terms &{'\n'}Conditions</Text> and verify that you have read{'\n'}our{' '}
+            <Text style={{ color: T.text, fontWeight: '700', textDecorationLine: 'underline' }}>Privacy Policy</Text>.
+          </Text>
+
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
-

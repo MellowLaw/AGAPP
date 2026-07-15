@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, CheckCircle, Warning, Info } from '@phosphor-icons/react';
+import { CloseCircle, TickCircle, Danger, InfoCircle } from 'iconsax-react';
 
 interface ToastProps {
   message: string;
@@ -28,9 +28,9 @@ export const Toast: React.FC<ToastProps> = ({
   }, [duration, onClose]);
 
   const icons = {
-    success: <CheckCircle className="w-5 h-5 text-[#16a34a]" />,
-    error: <Warning className="w-5 h-5 text-[#dc2626]" />,
-    info: <Info className="w-5 h-5 text-[#2563eb]" />,
+    success: <TickCircle className="w-5 h-5 text-[#16a34a]" />,
+    error: <Danger className="w-5 h-5 text-[#dc2626]" />,
+    info: <InfoCircle className="w-5 h-5 text-[#2563eb]" />,
   };
 
   const bgColors = {
@@ -51,7 +51,7 @@ export const Toast: React.FC<ToastProps> = ({
       {icons[type]}
       <span className="text-sm font-medium text-text-primary">{message}</span>
       <button onClick={() => setIsVisible(false)} className="ml-2">
-        <X className="w-4 h-4 text-text-muted hover:text-text-primary" />
+        <CloseCircle className="w-4 h-4 text-text-muted hover:text-text-primary" />
       </button>
     </div>
   );

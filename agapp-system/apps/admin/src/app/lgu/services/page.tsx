@@ -11,16 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import {
-  User,
-  Calendar,
-  Check,
-  X,
-  Clock,
-  QrCode,
-  MagnifyingGlass,
-  Download
-} from '@phosphor-icons/react';
+import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload } from 'iconsax-react';
 
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
 
@@ -114,7 +105,7 @@ export default function ServicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lguId]);
 
-  // ── Print / Download Document ─────────────────────────────────────────────
+  // ── Print / DocumentDownload Document ─────────────────────────────────────────────
   const handlePrintDocument = (req: ServiceRequestItem) => {
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
@@ -327,7 +318,7 @@ export default function ServicesPage() {
           <Card padding="sm" noBorder>
             <div className="flex gap-3 items-center">
               <div className="flex-1 relative">
-                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
+                <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
                   placeholder="Search requests..."
@@ -350,7 +341,7 @@ export default function ServicesPage() {
                 <option value="Rejected">Rejected</option>
               </select>
               <Button variant="secondary" className="h-10 !bg-accent !text-white !border-0 hover:opacity-90" onClick={handleExportCsv}>
-                <Download className="w-4 h-4 mr-1" />
+                <DocumentDownload className="w-4 h-4 mr-1" />
                 Export CSV
               </Button>
             </div>
@@ -393,7 +384,7 @@ export default function ServicesPage() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <QrCode className="w-4 h-4 text-accent shrink-0" />
+                      <Barcode className="w-4 h-4 text-accent shrink-0" />
                       <span className="font-medium text-text-primary">{request.id}</span>
                     </div>
                     <ServiceStatusBadge status={request.status} />
@@ -401,11 +392,11 @@ export default function ServicesPage() {
                   <p className="text-text-primary mb-3">{request.serviceType}</p>
                   <div className="space-y-1 text-xs text-text-primary/70">
                     <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <User variant="Bold" className="w-3.5 h-3.5 text-accent shrink-0" />
                       <span className="truncate">{request.submittedBy}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <Calendar variant="Bold" className="w-3.5 h-3.5 text-accent shrink-0" />
                       <span>{request.submittedAt}</span>
                     </div>
                   </div>
@@ -430,13 +421,13 @@ export default function ServicesPage() {
                 <div className="flex items-start justify-between pb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <QrCode className="w-5 h-5 text-accent" />
+                      <Barcode className="w-5 h-5 text-accent" />
                       <h2 className="text-lg font-semibold text-text-primary">{selectedRequest.id}</h2>
                     </div>
                     <ServiceStatusBadge status={selectedRequest.status} />
                   </div>
                   <Button variant="secondary" size="sm" onClick={() => handlePrintDocument(selectedRequest)}>
-                    <Download className="w-4 h-4 mr-1" />
+                    <DocumentDownload className="w-4 h-4 mr-1" />
                     Print
                   </Button>
                 </div>
@@ -453,7 +444,7 @@ export default function ServicesPage() {
                     <div>
                       <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted By</p>
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-accent" />
+                        <User variant="Bold" className="w-4 h-4 text-accent" />
                         <span className="text-text-primary">{selectedRequest.submittedBy}</span>
                       </div>
                     </div>
@@ -461,7 +452,7 @@ export default function ServicesPage() {
                     <div>
                       <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Submitted</p>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-accent" />
+                        <Calendar variant="Bold" className="w-4 h-4 text-accent" />
                         <span className="text-text-primary">{selectedRequest.submittedAt}</span>
                       </div>
                     </div>
@@ -480,7 +471,7 @@ export default function ServicesPage() {
                       <ul className="space-y-1">
                         {selectedRequest.requirements.map((req, i) => (
                           <li key={i} className="flex items-center gap-2 text-sm text-text-primary">
-                            <Check className="w-3.5 h-3.5 text-accent" />
+                            <TickSquare className="w-3.5 h-3.5 text-accent" />
                             {req}
                           </li>
                         ))}
@@ -526,42 +517,42 @@ export default function ServicesPage() {
                 <div className="flex flex-wrap gap-3 pt-4">
                   {selectedRequest.status === 'Submitted' && (
                     <Button onClick={() => updateStatus('Under Review')} disabled={actionBusy}>
-                      <Clock className="w-4 h-4 mr-1" />
+                      <Clock variant="Bold" className="w-4 h-4 mr-1" />
                       Start Review
                     </Button>
                   )}
 
                   {selectedRequest.status === 'Under Review' && (
                     <Button onClick={() => updateStatus('In Progress')} disabled={actionBusy}>
-                      <Clock className="w-4 h-4 mr-1" />
+                      <Clock variant="Bold" className="w-4 h-4 mr-1" />
                       Start Processing
                     </Button>
                   )}
 
                   {selectedRequest.status === 'In Progress' && (
                     <Button onClick={handleMarkReady} disabled={actionBusy}>
-                      <Check className="w-4 h-4 mr-1" />
+                      <TickSquare className="w-4 h-4 mr-1" />
                       Mark Ready
                     </Button>
                   )}
 
                   {selectedRequest.status === 'Ready for Pickup' && (
                     <Button onClick={handleManualRelease} disabled={actionBusy}>
-                      <Check className="w-4 h-4 mr-1" />
+                      <TickSquare className="w-4 h-4 mr-1" />
                       Mark Released (manual override)
                     </Button>
                   )}
 
                   {(selectedRequest.status === 'Submitted' || selectedRequest.status === 'Under Review' || selectedRequest.status === 'In Progress') && (
                     <Button variant="danger" onClick={() => setRejectModal(true)} disabled={actionBusy}>
-                      <X className="w-4 h-4 mr-1" />
+                      <CloseCircle className="w-4 h-4 mr-1" />
                       Reject
                     </Button>
                   )}
 
                   <Button variant="secondary" onClick={() => handlePrintDocument(selectedRequest)}>
-                    <Download className="w-4 h-4 mr-1" />
-                    Download / Print Document
+                    <DocumentDownload className="w-4 h-4 mr-1" />
+                    DocumentDownload / Print Document
                   </Button>
                 </div>
               </motion.div>

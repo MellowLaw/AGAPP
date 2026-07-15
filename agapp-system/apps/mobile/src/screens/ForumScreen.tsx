@@ -1,14 +1,36 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { globalStyles, ACCENT, PASTELS } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
+import { globalStyles, PASTELS } from '../theme';
 import { useToast } from '../components/Toast';
+import { ScreenBackground } from '../components/ScreenBackground';
 import * as Clipboard from 'expo-clipboard';
+import {
+  SearchNormal1,
+  Add,
+  Send2,
+  ArrowLeft2,
+  Link,
+  MessageText1,
+  Edit2,
+  CloseSquare,
+  InfoCircle,
+  ShieldTick,
+  EmojiHappy,
+  Bookmark,
+  Bookmark2,
+  Danger,
+  MessageQuestion,
+  Calendar,
+  More,
+  TickCircle,
+  Heart,
+} from 'iconsax-react-native';
 
 type ViewState = 'list' | 'detail' | 'create';
 
@@ -22,7 +44,6 @@ const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   'Events': { bg: 'rgba(212,204,224,0.25)', text: '#5D447A' },      // Pastel Lilac
 };
 
-// Preset images for local thread attachments
 const PRESET_IMAGES = [
   { name: 'Town Plaza', url: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=500&auto=format&fit=crop&q=60' },
   { name: 'Community Path', url: 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=500&auto=format&fit=crop&q=60' },
@@ -82,6 +103,9 @@ export function ForumScreen({ navigation }: any) {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [activeTab, setActiveTab] = useState<'foryou' | 'bookmarks'>('foryou');
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+  const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
 
   // Form State (New Post / Thread)
   const [newTitle, setNewTitle] = useState('');
@@ -96,6 +120,25 @@ export function ForumScreen({ navigation }: any) {
   const verified = isVerified(profile);
   
   const commentScrollViewRef = useRef<ScrollView>(null);
+
+  // Load bookmarks & likes
+  useEffect(() => {
+    const loadBookmarksAndLikes = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('bookmarked_posts');
+        if (stored) {
+          setBookmarkedIds(JSON.parse(stored));
+        }
+        const storedLikes = await AsyncStorage.getItem('liked_posts');
+        if (storedLikes) {
+          setLikedPostIds(JSON.parse(storedLikes));
+        }
+      } catch (err) {
+        console.warn('Failed to load bookmarks or likes', err);
+      }
+    };
+    loadBookmarksAndLikes();
+  }, []);
 
   // 1. Fetch Posts subscription
   useEffect(() => {
@@ -222,7 +265,6 @@ export function ForumScreen({ navigation }: any) {
 
       if (error) throw error;
       
-      // Clear form
       setNewTitle('');
       setNewContent('');
       setNewTags([]);
@@ -254,7 +296,6 @@ export function ForumScreen({ navigation }: any) {
     }
     const contentText = textToSend.trim();
 
-    // Auto-moderation profanity checker fallback
     const profanities = ['putang ina', 'gago', 'tarantado', 'pota', 'ulol', 'shet'];
     const flagged = profanities.filter(word => contentText.toLowerCase().includes(word));
     const isApproved = flagged.length === 0;
@@ -277,7 +318,6 @@ export function ForumScreen({ navigation }: any) {
       
       if (isApproved) {
         fetchPostComments(selectedPost.id);
-        // also update comments count locally in post detail view
         setSelectedPost((prev: any) => prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : null);
       } else {
         showToast(
@@ -319,7 +359,46 @@ export function ForumScreen({ navigation }: any) {
     return colors[sum % colors.length];
   };
 
-  // Filter & Search computation
+  const toggleBookmark = async (postId: string) => {
+    try {
+      let updated: string[];
+      if (bookmarkedIds.includes(postId)) {
+        updated = bookmarkedIds.filter(id => id !== postId);
+        showToast('Removed from Bookmarks', 'success');
+      } else {
+        updated = [...bookmarkedIds, postId];
+        showToast('Saved to Bookmarks', 'success');
+      }
+      setBookmarkedIds(updated);
+      await AsyncStorage.setItem('bookmarked_posts', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Failed to save bookmark', err);
+    }
+  };
+
+  const toggleLike = async (postId: string) => {
+    try {
+      let updated: string[];
+      if (likedPostIds.includes(postId)) {
+        updated = likedPostIds.filter(id => id !== postId);
+        showToast('Removed like', 'success');
+      } else {
+        updated = [...likedPostIds, postId];
+        showToast('Liked post', 'success');
+      }
+      setLikedPostIds(updated);
+      await AsyncStorage.setItem('liked_posts', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Failed to save like', err);
+    }
+  };
+
+  const getLikeCount = (post: any) => {
+    const sum = post.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+    const base = (sum % 15) + 3;
+    return likedPostIds.includes(post.id) ? base + 1 : base;
+  };
+
   const filteredPosts = posts.filter(post => {
     const matchesSearch = 
       (post.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -330,127 +409,197 @@ export function ForumScreen({ navigation }: any) {
       selectedFilter === 'All' || 
       (post.tags && post.tags.includes(selectedFilter));
 
-    return matchesSearch && matchesTag;
+    const matchesTab = 
+      activeTab === 'foryou' || 
+      bookmarkedIds.includes(post.id);
+
+    return matchesSearch && matchesTag && matchesTab;
   });
 
   // ──────── LAYOUT RENDERING ────────
 
   if (viewState === 'create') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.card }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={[globalStyles.screen, { backgroundColor: T.card }]}>
-          <View style={[styles.headerBar, { borderBottomColor: T.border }]}>
-            <TouchableOpacity onPress={() => setViewState('list')} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={24} color={T.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerBarTitle, { color: T.text }]}>New Forum Thread</Text>
-          </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+        <Image
+          source={isDarkMode ? require('../../assets/brand/bg-map-2.png') : require('../../assets/brand/bg-map-1.png')}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+            opacity: isDarkMode ? 0.04 : 0.07,
+            tintColor: T.accent,
+          }}
+          resizeMode="cover"
+        />
 
-          <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
-            {!verified && (
-              <View style={[styles.verificationBanner, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="shield-checkmark-outline" size={22} color="#B45309" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 14 }}>Verification Required</Text>
-                    <Text style={{ color: '#A16207', fontSize: 12, marginTop: 2 }}>Verify your identity to post in the community forum.</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.verifyBtn, { backgroundColor: '#B45309' }]}
-                    onPress={() => navigation.navigate('VerifyIdentity')}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Verify</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-            <Text style={[styles.fieldLabel, { color: T.textMuted }]}>TITLE</Text>
-            <TextInput
-              style={[styles.titleInput, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
-              value={newTitle}
-              onChangeText={setNewTitle}
-              placeholder="Give your post a concise title..."
-              placeholderTextColor={T.textMuted}
-              maxLength={100}
-            />
-
-            <Text style={[styles.fieldLabel, { color: T.textMuted, marginTop: 14 }]}>CONTENT</Text>
-            <TextInput
-              style={[styles.contentInput, { color: T.text, backgroundColor: T.cardAlt, borderColor: T.border }]}
-              value={newContent}
-              onChangeText={setNewContent}
-              placeholder="What would you like to discuss with the community?"
-              placeholderTextColor={T.textMuted}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <Text style={[styles.fieldLabel, { color: T.textMuted, marginTop: 14 }]}>SELECT TAGS</Text>
-            <View style={styles.tagGrid}>
-              {AVAILABLE_TAGS.map(tag => {
-                const isSelected = newTags.includes(tag);
-                const tagColor = TAG_COLORS[tag];
-                return (
-                  <TouchableOpacity
-                    key={tag}
-                    onPress={() => toggleTagSelection(tag)}
-                    style={[
-                      styles.tagSelectorPill,
-                      { 
-                        backgroundColor: isSelected ? tagColor.bg : T.cardAlt,
-                        borderColor: isSelected ? tagColor.text : T.border 
-                      }
-                    ]}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? tagColor.text : T.textMuted }}>
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: T.border }}>
+              <TouchableOpacity onPress={() => setViewState('list')} style={{ padding: 4, marginRight: 8 }}>
+                <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+              </TouchableOpacity>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>New Forum Thread</Text>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: T.textMuted, marginTop: 18 }]}>ATTACH IMAGE PRESET (OPTIONAL)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetsRow}>
-              {PRESET_IMAGES.map((img, index) => {
-                const isSelected = newPhotoUrl === img.url;
-                return (
-                  <TouchableOpacity 
-                    key={index}
-                    onPress={() => setNewPhotoUrl(isSelected ? null : img.url)}
-                    style={[
-                      styles.presetCard, 
-                      { 
-                        borderColor: isSelected ? ACCENT : T.border,
-                        borderWidth: isSelected ? 2 : 1,
-                        backgroundColor: T.cardAlt
-                      }
-                    ]}
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+              {!verified && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 16,
+                  borderRadius: 16,
+                  backgroundColor: '#FEF3C7',
+                  borderWidth: 1,
+                  borderColor: '#F59E0B',
+                  marginBottom: 16,
+                  gap: 10,
+                }}>
+                  <ShieldTick size={24} color="#B45309" variant="Bold" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Verification Required</Text>
+                    <Text style={{ color: '#A16207', fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Verify your identity to post in the community forum.</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#B45309',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 10,
+                    }}
+                    onPress={() => navigation.navigate('VerifyIdentity')}
                   >
-                    <Image source={{ uri: img.url }} style={styles.presetThumb} />
-                    <Text style={[styles.presetText, { color: T.text }]} numberOfLines={1}>{img.name}</Text>
+                    <Text style={{ color: '#fff', fontFamily: 'Octarine-Bold', fontSize: 12 }}>Verify</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                </View>
+              )}
 
-            <TouchableOpacity
-              style={[globalStyles.primaryButton, { backgroundColor: !verified ? '#D1D5DB' : ACCENT, marginTop: 24 }]}
-              onPress={verified ? handleCreatePost : () => navigation.navigate('VerifyIdentity')}
-              disabled={loading || !verified || !newTitle.trim() || !newContent.trim()}
-            >
-              <Text style={[globalStyles.primaryButtonText, { color: !verified ? '#9CA3AF' : '#1A1A1A' }]}>
-                {!verified ? 'Verify to Post' : loading ? 'Publishing...' : 'Create Thread'}
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>TITLE</Text>
+              <TextInput
+                style={{
+                  height: 48,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  backgroundColor: T.cardAlt,
+                  color: T.text,
+                  fontFamily: 'Inter-Medium',
+                  paddingHorizontal: 16,
+                  fontSize: 14,
+                  marginBottom: 16,
+                }}
+                value={newTitle}
+                onChangeText={setNewTitle}
+                placeholder="Give your post a concise title..."
+                placeholderTextColor={T.textMuted}
+                maxLength={100}
+              />
+
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>CONTENT</Text>
+              <TextInput
+                style={{
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  backgroundColor: T.cardAlt,
+                  color: T.text,
+                  fontFamily: 'Inter-Medium',
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  fontSize: 14,
+                  minHeight: 120,
+                  textAlignVertical: 'top',
+                  marginBottom: 16,
+                }}
+                value={newContent}
+                onChangeText={setNewContent}
+                placeholder="What would you like to discuss with the community?"
+                placeholderTextColor={T.textMuted}
+                multiline
+                numberOfLines={6}
+              />
+
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>SELECT TAGS</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {AVAILABLE_TAGS.map(tag => {
+                  const isSelected = newTags.includes(tag);
+                  const tagColor = TAG_COLORS[tag];
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => toggleTagSelection(tag)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 999, // Pill layout
+                        borderWidth: 1,
+                        borderColor: isSelected ? tagColor.text : T.border,
+                        backgroundColor: isSelected ? tagColor.bg : T.cardAlt,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: isSelected ? tagColor.text : T.textMuted }}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>ATTACH IMAGE PRESET (OPTIONAL)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4, marginBottom: 20 }}>
+                {PRESET_IMAGES.map((img, index) => {
+                  const isSelected = newPhotoUrl === img.url;
+                  return (
+                    <TouchableOpacity 
+                      key={index}
+                      onPress={() => setNewPhotoUrl(isSelected ? null : img.url)}
+                      style={{
+                        width: 90,
+                        borderRadius: 14,
+                        overflow: 'hidden',
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? T.accent : T.border,
+                        backgroundColor: T.cardAlt,
+                        alignItems: 'center',
+                        paddingBottom: 6,
+                      }}
+                    >
+                      <Image source={{ uri: img.url }} style={{ width: '100%', height: 60, marginBottom: 4 }} />
+                      <Text style={{ fontSize: 10, fontFamily: 'Inter-Medium', color: T.text, paddingHorizontal: 4 }} numberOfLines={1}>{img.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={{
+                  height: 52,
+                  borderRadius: 999,
+                  backgroundColor: !verified ? '#D1D5DB' : '#292929',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+                onPress={verified ? handleCreatePost : () => navigation.navigate('VerifyIdentity')}
+                disabled={loading || !verified || !newTitle.trim() || !newContent.trim()}
+              >
+                <Text style={{
+                  color: !verified ? '#9CA3AF' : '#FFFCF5',
+                  fontFamily: 'Octarine-Bold',
+                  fontSize: 15,
+                }}>
+                  {!verified ? 'Verify to Post' : loading ? 'Publishing...' : 'Create Thread'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -458,29 +607,43 @@ export function ForumScreen({ navigation }: any) {
   if (viewState === 'detail' && selectedPost) {
     const avatarOPBg = getAvatarBg(selectedPost.citizen_name);
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.card }} edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.card }} edges={['top']}>
         <KeyboardAvoidingView 
           style={{ flex: 1, backgroundColor: T.card }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Harmonized Detail Header Bar */}
-          <View style={[styles.headerBar, { borderBottomColor: T.border, backgroundColor: T.card }]}>
+          {/* Detail Header Bar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: T.border,
+            backgroundColor: T.card,
+          }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="chatbox-ellipses" size={18} color={ACCENT} style={{ marginRight: 8 }} />
-              <Text style={[styles.headerBarTitle, { color: T.text }]} numberOfLines={1}>
+              <MessageText1 size={18} color={T.accent} variant="Bold" style={{ marginRight: 8 }} />
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 16, flex: 1 }} numberOfLines={1}>
                 {selectedPost.title || 'Discussion'}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <TouchableOpacity onPress={() => toggleBookmark(selectedPost.id)}>
+                {bookmarkedIds.includes(selectedPost.id) ? (
+                  <Bookmark size={18} color={T.accent} variant="Bold" />
+                ) : (
+                  <Bookmark size={18} color={T.textMuted} variant="Bold" />
+                )}
+              </TouchableOpacity>
               <TouchableOpacity onPress={async () => {
                 await Clipboard.setStringAsync(`agapp://forum/${selectedPost.id}`);
                 showToast('Thread link copied to clipboard.', 'success');
               }}>
-                <Ionicons name="link-outline" size={20} color={T.textMuted} />
+                <Link size={18} color={T.textMuted} variant="Bold" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setSelectedPost(null); setViewState('list'); }} style={{ marginLeft: 4 }}>
-                <Ionicons name="close" size={22} color={T.text} />
+                <CloseSquare size={20} color={T.text} variant="Bold" />
               </TouchableOpacity>
             </View>
           </View>
@@ -491,61 +654,61 @@ export function ForumScreen({ navigation }: any) {
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
           >
-            {/* Original Post — flat Discord style */}
-            <View style={[styles.discordRow, { paddingTop: 16, paddingBottom: 12 }]}>
-              <View style={[styles.discordAvatar, { backgroundColor: avatarOPBg, width: 42, height: 42, borderRadius: 21 }]}>
-                <Text style={{ color: '#1A1A1A', fontWeight: '700', fontSize: 16 }}>
+            {/* Original Post */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, alignItems: 'flex-start', gap: 12 }}>
+              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: avatarOPBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 16 }}>
                   {selectedPost.citizen_name.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <View style={[styles.discordMeta, { marginBottom: 6 }]}>
-                  <Text style={[styles.discordAuthor, { color: T.text, fontSize: 15 }]}>{selectedPost.citizen_name}</Text>
-                  <Text style={[styles.discordTimestamp, { color: T.textMuted }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 15 }}>{selectedPost.citizen_name}</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 11 }}>
                     {getRelativeTime(selectedPost.created_at)}
                   </Text>
                   {!selectedPost.is_approved && (
-                    <View style={styles.pendingBadge}>
-                      <Text style={styles.pendingText}>PENDING</Text>
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#854D0E', fontSize: 9, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.detailThreadTitle, { color: T.text, marginTop: 0, marginBottom: 6, fontSize: 17 }]}>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18, marginTop: 4, marginBottom: 6 }}>
                   {selectedPost.title}
                 </Text>
-                {/* Tag Pills */}
+                
                 {selectedPost.tags && selectedPost.tags.length > 0 && (
-                  <View style={[styles.tagsContainer, { marginBottom: 8 }]}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {selectedPost.tags.map((t: string) => {
                       const tagColor = TAG_COLORS[t] || { bg: T.cardAlt, text: T.textMuted };
                       return (
-                        <View key={t} style={[styles.tagBadge, { backgroundColor: tagColor.bg }]}>
-                          <Text style={[styles.tagBadgeText, { color: tagColor.text }]}>#{t}</Text>
+                        <View key={t} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: tagColor.bg }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'Inter-Medium', color: tagColor.text }}>#{t}</Text>
                         </View>
                       );
                     })}
                   </View>
                 )}
-                <Text style={[styles.detailThreadContent, { color: T.text, marginBottom: 4 }]}>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 14, lineHeight: 20 }}>
                   {selectedPost.content}
                 </Text>
                 {selectedPost.photo_url && (
-                  <Image source={{ uri: selectedPost.photo_url }} style={[styles.threadOPImage, { marginTop: 8 }]} resizeMode="cover" />
+                  <Image source={{ uri: selectedPost.photo_url }} style={{ width: '100%', height: 180, borderRadius: 12, marginTop: 8 }} resizeMode="cover" />
                 )}
               </View>
             </View>
 
-            {/* Clean Divider Line */}
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, { backgroundColor: T.border }]} />
-              <Text style={[styles.dividerText, { color: T.textMuted }]}>DISCUSSION REPLIES</Text>
-              <View style={[styles.dividerLine, { backgroundColor: T.border }]} />
+            {/* Replies Divider */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10, paddingHorizontal: 16 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: T.border, opacity: 0.2 }} />
+              <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted, letterSpacing: 1.2 }}>REPLIES</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: T.border, opacity: 0.2 }} />
             </View>
 
             {commentsLoading ? (
-              <Text style={[styles.statusMsg, { color: T.textMuted }]}>Loading replies...</Text>
+              <ActivityIndicator color={T.textMuted} style={{ marginTop: 20 }} />
             ) : comments.length === 0 ? (
-              <Text style={[styles.statusMsg, { color: T.textMuted }]}>No replies yet. Be the first to start the discussion!</Text>
+              <Text style={{ textAlign: 'center', color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, marginTop: 12 }}>No replies yet. Be the first to start the discussion!</Text>
             ) : (
               comments.map(c => {
                 const commentAvatarBg = getAvatarBg(c.citizen_name);
@@ -556,50 +719,50 @@ export function ForumScreen({ navigation }: any) {
                 return (
                   <SwipeableRow key={c.id} onSwipe={() => setReplyTarget(c)}>
                     <TouchableOpacity 
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
                       onLongPress={() => setReplyTarget(c)}
-                      style={styles.discordRow}
+                      style={{
+                        flexDirection: 'row',
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        alignItems: 'flex-start',
+                        gap: 12,
+                      }}
                     >
-                      {/* Avatar column */}
-                      <View style={[styles.discordAvatar, { backgroundColor: commentAvatarBg }]}>
-                        <Text style={{ color: '#1A1A1A', fontWeight: '700', fontSize: 14 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                        <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
                           {c.citizen_name.charAt(0).toUpperCase()}
                         </Text>
                       </View>
 
-                      {/* Message column */}
                       <View style={{ flex: 1 }}>
-                        {/* Discord reply quote bar */}
                         {parentComment && (
-                          <View style={styles.discordReplyBar}>
-                            <View style={[styles.discordReplyAccent, { backgroundColor: ACCENT }]} />
-                            <Text style={[styles.discordReplyText, { color: T.textMuted }]} numberOfLines={1}>
-                              <Text style={{ fontWeight: '700', color: T.text }}>@{parentComment.citizen_name}</Text>
-                              {'  '}{parentComment.content}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 }}>
+                            <View style={{ width: 2, height: 12, backgroundColor: T.accent }} />
+                            <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }} numberOfLines={1}>
+                              Replying to <Text style={{ fontFamily: 'Octarine-Bold', color: T.text }}>@{parentComment.citizen_name}</Text>
                             </Text>
                           </View>
                         )}
 
-                        {/* Author + timestamp row */}
-                        <View style={styles.discordMeta}>
-                          <Text style={[styles.discordAuthor, { color: T.text }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>
                             {c.citizen_name}
                           </Text>
-                          <Text style={[styles.discordTimestamp, { color: T.textMuted }]}>
+                          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 10 }}>
                             {getRelativeTime(c.createdAt || c.created_at)}
                           </Text>
                           {!c.is_approved && (
-                            <View style={styles.pendingBadge}>
-                              <Text style={styles.pendingText}>PENDING</Text>
+                            <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                              <Text style={{ color: '#854D0E', fontSize: 8, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
                             </View>
                           )}
-                          <TouchableOpacity onPress={() => setReplyTarget(c)} style={styles.discordReplyBtn}>
-                            <Ionicons name="return-down-forward-outline" size={13} color={T.textMuted} />
+                          <TouchableOpacity onPress={() => setReplyTarget(c)} style={{ marginLeft: 'auto', padding: 2 }}>
+                            <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
                           </TouchableOpacity>
                         </View>
 
-                        {/* Message text */}
-                        <Text style={[styles.discordMessage, { color: T.text }]}>{c.content}</Text>
+                        <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 14, lineHeight: 18 }}>{c.content}</Text>
                       </View>
                     </TouchableOpacity>
                   </SwipeableRow>
@@ -608,36 +771,42 @@ export function ForumScreen({ navigation }: any) {
             )}
           </ScrollView>
 
-          {/* Reply Target Indicator Bar */}
+          {/* Reply Target Indicator */}
           {replyTarget && (
-            <View style={[styles.replyTargetBar, { backgroundColor: T.cardAlt, borderTopColor: T.border }]}>
-              <View style={[styles.discordReplyAccent, { backgroundColor: ACCENT, marginRight: 10 }]} />
-              <Ionicons name="return-down-forward-outline" size={14} color={ACCENT} style={{ marginRight: 6 }} />
-              <Text style={{ color: T.text, fontSize: 12, flex: 1 }} numberOfLines={1}>
-                Replying to <Text style={{ fontWeight: '700', color: ACCENT }}>@{replyTarget.citizen_name}</Text>
-                {'  '}<Text style={{ color: T.textMuted }}>{replyTarget.content}</Text>
+            <View style={{
+              flexDirection: 'row',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              alignItems: 'center',
+              borderTopWidth: 1,
+              borderColor: T.border,
+              backgroundColor: T.cardAlt,
+            }}>
+              <View style={{ width: 2, height: 16, backgroundColor: T.accent, marginRight: 8 }} />
+              <Text style={{ color: T.text, fontSize: 12, fontFamily: 'Inter-Medium', flex: 1 }} numberOfLines={1}>
+                Replying to <Text style={{ fontFamily: 'Octarine-Bold', color: T.accent }}>@{replyTarget.citizen_name}</Text>
               </Text>
               <TouchableOpacity onPress={() => setReplyTarget(null)}>
-                <Ionicons name="close-circle" size={18} color={T.textMuted} />
+                <CloseSquare size={16} color={T.textMuted} variant="Bold" />
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Preset Photo Selector Panel inside thread discussion */}
+          {/* Chat presets selector */}
           {showPresetsInChat && (
-            <View style={[styles.chatPresetsPanel, { backgroundColor: T.card, borderTopColor: T.border }]}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: T.textMuted, marginBottom: 8, paddingHorizontal: 16 }}>
+            <View style={{ paddingTop: 10, paddingBottom: 14, borderTopWidth: 1, borderColor: T.border, backgroundColor: T.card }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6, paddingHorizontal: 16 }}>
                 SELECT IMAGE PRESET TO SEND
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
                 {PRESET_IMAGES.map((img, idx) => (
                   <TouchableOpacity 
                     key={idx} 
-                    onPress={() => handleCreateComment(`Sent a preset image: ${img.name} ${img.url}`)}
-                    style={styles.chatPresetThumbCard}
+                    onPress={() => handleCreateComment(`Sent preset: ${img.name} ${img.url}`)}
+                    style={{ width: 70, alignItems: 'center' }}
                   >
-                    <Image source={{ uri: img.url }} style={styles.chatPresetThumb} />
-                    <Text style={{ fontSize: 10, color: T.text, textAlign: 'center', marginTop: 2 }} numberOfLines={1}>
+                    <Image source={{ uri: img.url }} style={{ width: 60, height: 44, borderRadius: 6 }} />
+                    <Text style={{ fontSize: 9, fontFamily: 'Inter-Medium', color: T.text, textAlign: 'center', marginTop: 2 }} numberOfLines={1}>
                       {img.name}
                     </Text>
                   </TouchableOpacity>
@@ -646,18 +815,50 @@ export function ForumScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* Clean bottom chat input bar */}
-          <View style={[styles.chatInputBar, { backgroundColor: T.card, borderColor: T.border }]}>
+          {/* Chat input bar */}
+          <View style={{
+            flexDirection: 'row',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            alignItems: 'center',
+            borderTopWidth: 1,
+            borderColor: T.border,
+            backgroundColor: T.card,
+          }}>
             <TouchableOpacity 
               onPress={() => setShowPresetsInChat(!showPresetsInChat)}
-              style={[styles.chatAttachBtn, { backgroundColor: T.cardAlt }]}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: T.cardAlt,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 10,
+              }}
             >
-              <Ionicons name="add" size={20} color={T.text} />
+              <Add size={18} color={T.text} variant="Bold" />
             </TouchableOpacity>
             
-            <View style={[styles.chatInputContainer, { backgroundColor: T.cardAlt }]}>
+            <View style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderRadius: 999, // Pill layout
+              backgroundColor: T.cardAlt,
+              paddingHorizontal: 14,
+              height: 40,
+              marginRight: 6,
+            }}>
               <TextInput
-                style={[styles.chatInput, { color: T.text }]}
+                style={{
+                  flex: 1,
+                  height: '100%',
+                  fontSize: 14,
+                  fontFamily: 'Inter-Medium',
+                  color: T.text,
+                  paddingVertical: 0,
+                }}
                 value={newComment}
                 onChangeText={setNewComment}
                 placeholder={`Message "${selectedPost.title}"…`}
@@ -665,16 +866,24 @@ export function ForumScreen({ navigation }: any) {
                 onSubmitEditing={() => handleCreateComment()}
               />
               <TouchableOpacity onPress={() => setNewComment(prev => prev + ' 😊')}>
-                <Ionicons name="happy-outline" size={20} color={T.textMuted} />
+                <EmojiHappy size={18} color={T.textMuted} variant="Linear" />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity 
-              style={[styles.chatSend, { backgroundColor: ACCENT }]} 
-              onPress={() => handleCreateComment()} 
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: T.accentSoft,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: 6,
+              }}
+              onPress={() => handleCreateComment()}
               disabled={!newComment.trim()}
             >
-              <Ionicons name="send" size={14} color="#1A1A1A" />
+              <Send2 size={16} color="#292929" variant="Bold" />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -682,23 +891,83 @@ export function ForumScreen({ navigation }: any) {
     );
   }
 
+  // Helper tags icons map
+  const TAG_ICONS: Record<string, any> = {
+    'All': SearchNormal1,
+    'General': MessageText1,
+    'Questions': MessageQuestion,
+    'Alerts': Danger,
+    'Suggestions': Edit2,
+    'Events': Calendar,
+  };
+
+  // Extract top trending threads sorted by replies/comments count
+  const trendingThreads = [...posts]
+    .sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0))
+    .slice(0, 3);
+
   // 4. Default: THREAD LIST (viewState === 'list')
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: T.cardAlt }} edges={['top']}>
-      <View style={[globalStyles.screen, { backgroundColor: T.cardAlt }]}>
-        <View style={{ padding: 20, paddingBottom: 10 }}>
-          <Text style={[globalStyles.serif, { color: T.text, fontSize: 28 }]}>Forum.</Text>
-          <Text style={[globalStyles.muted, { color: T.textMuted, marginTop: 4, marginBottom: 12 }]}>
-            Discuss municipal concerns and build ideas with Liliw citizens.
-          </Text>
+    <ScreenBackground>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
+        {/* Centered navigation tabs (For you / Bookmarks) */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 36,
+          paddingTop: 20,
+          marginBottom: 16,
+        }}>
+          <TouchableOpacity onPress={() => setActiveTab('foryou')} activeOpacity={0.8}>
+            <Text style={{
+              fontFamily: 'Octarine-Bold',
+              fontSize: 18,
+              color: activeTab === 'foryou' ? T.text : T.textMuted,
+            }}>
+              For you
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('bookmarks')} activeOpacity={0.8}>
+            <Text style={{
+              fontFamily: 'Octarine-Bold',
+              fontSize: 18,
+              color: activeTab === 'bookmarks' ? T.text : T.textMuted,
+            }}>
+              Bookmarks
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Search Bar + New Post Button */}
-        <View style={styles.searchRow}>
-          <View style={[styles.searchContainer, { backgroundColor: T.card, borderColor: T.border }]}>
-            <Ionicons name="search" size={18} color={T.textMuted} style={{ marginRight: 8 }} />
+        {/* Search Bar Row */}
+        <View style={{
+          flexDirection: 'row',
+          paddingHorizontal: 20,
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 6,
+        }}>
+          <View style={{
+            flex: 1,
+            flexDirection: 'row',
+            height: 44,
+            borderRadius: 999, // Pill layout
+            borderWidth: 1,
+            borderColor: T.border,
+            backgroundColor: T.card,
+            alignItems: 'center',
+            paddingHorizontal: 16,
+          }}>
+            <SearchNormal1 size={18} color={T.textMuted} variant="Outline" style={{ marginRight: 8 }} />
             <TextInput
-              style={[styles.searchInput, { color: T.text }]}
+              style={{
+                flex: 1,
+                height: '100%',
+                fontSize: 14,
+                fontFamily: 'Inter-Medium',
+                color: T.text,
+              }}
               placeholder="Search threads..."
               placeholderTextColor={T.textMuted}
               value={searchQuery}
@@ -706,45 +975,46 @@ export function ForumScreen({ navigation }: any) {
             />
             {searchQuery !== '' && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={16} color={T.textMuted} />
+                <CloseSquare size={16} color={T.textMuted} variant="Bold" />
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={[styles.newPostBtn, { backgroundColor: ACCENT }]} onPress={() => {
-            if (!verified) {
-              showToast('Please verify your identity before creating forum threads.', 'error');
-              return;
-            }
-            setViewState('create');
-          }}>
-            <Ionicons name="add" size={20} color="#1A1A1A" style={{ marginRight: 4 }} />
-            <Text style={styles.newPostBtnText}>New Post</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Horizontal tag filter bar */}
+        {/* Horizontal tag filter bar with icons */}
         <View>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.filterBarContainer}
+            contentContainerStyle={{
+              flexDirection: 'row',
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              gap: 8,
+            }}
           >
             {['All', ...AVAILABLE_TAGS].map(tag => {
               const isSelected = selectedFilter === tag;
+              const TagIcon = TAG_ICONS[tag] || SearchNormal1;
               return (
                 <TouchableOpacity
                   key={tag}
                   onPress={() => setSelectedFilter(tag)}
-                  style={[
-                    styles.filterPill,
-                    { 
-                      backgroundColor: isSelected ? T.text : T.card,
-                      borderColor: isSelected ? T.text : T.border 
-                    }
-                  ]}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 999, // Pill layout
+                    borderWidth: isSelected ? 0 : 1,
+                    borderColor: T.border,
+                    backgroundColor: isSelected ? T.text : T.card,
+                    gap: 6,
+                  }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? T.bg : T.text }}>
-                    {tag}
+                  <TagIcon size={14} color={isSelected ? T.bg : T.textMuted} variant="Bold" />
+                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: isSelected ? T.bg : T.text }}>
+                    #{tag}
                   </Text>
                 </TouchableOpacity>
               );
@@ -752,511 +1022,312 @@ export function ForumScreen({ navigation }: any) {
           </ScrollView>
         </View>
 
-        {/* Threads Grid/List */}
+        {/* Threads ScrollView Container */}
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          {filteredPosts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={48} color={T.textMuted} style={{ marginBottom: 16 }} />
-              <Text style={{ color: T.textMuted, textAlign: 'center', fontSize: 16 }}>
+          {/* 1. Trending Threads (Horizontal small cards - only in "For you", empty search, and "All" tag filter) */}
+          {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginBottom: 12 }}>Trending Threads</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 20 }}>
+                {trendingThreads.map((thread, idx) => {
+                  const ranking = idx + 1;
+                  const tag = thread.tags?.[0] || 'General';
+                  const tagColors = TAG_COLORS[tag] || { bg: T.cardAlt, text: T.textMuted };
+                  const avatarBg = getAvatarBg(thread.citizen_name);
+                  return (
+                    <TouchableOpacity
+                      key={thread.id}
+                      style={{
+                        width: 220,
+                        minHeight: 270,
+                        padding: 20,
+                        borderRadius: 24,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.card,
+                      }}
+                      onPress={() => {
+                        setSelectedPost(thread);
+                        setViewState('detail');
+                      }}
+                    >
+                      {/* Top Header Row: Ranking + dots option */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted }}>
+                          #{ranking} on Trending
+                        </Text>
+                        <TouchableOpacity onPress={(e) => { e.stopPropagation(); toggleBookmark(thread.id); }}>
+                          {bookmarkedIds.includes(thread.id) ? (
+                            <Bookmark size={18} color={T.accent} variant="Bold" />
+                          ) : (
+                            <More size={20} color={T.textMuted} variant="Bold" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Main Title */}
+                      <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, lineHeight: 22, marginBottom: 12 }} numberOfLines={4}>
+                        {thread.title || 'General Discussion'}
+                      </Text>
+
+                      {/* Category Tag Badge */}
+                      <View style={{
+                        alignSelf: 'flex-start',
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        borderRadius: 12,
+                        backgroundColor: tagColors.bg,
+                        borderWidth: 1,
+                        borderColor: tagColors.text,
+                        marginBottom: 12,
+                      }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: tagColors.text }}>
+                          #{tag}
+                        </Text>
+                      </View>
+
+                      {/* Simulating overlapping avatars stack */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.sage, borderWidth: 1.5, borderColor: T.card }} />
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.blue, borderWidth: 1.5, borderColor: T.card, marginLeft: -8 }} />
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.pink, borderWidth: 1.5, borderColor: T.card, marginLeft: -8 }} />
+                        <View style={{
+                          paddingHorizontal: 8,
+                          height: 20,
+                          borderRadius: 10,
+                          backgroundColor: T.cardAlt,
+                          borderWidth: 1,
+                          borderColor: T.border,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginLeft: 6,
+                        }}>
+                          <Text style={{ fontSize: 9, fontFamily: 'Octarine-Bold', color: T.textMuted }}>
+                            +{((thread.commentsCount || 0) * 3) + 2}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Author row at the bottom (solid colored avatar + name) */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 'auto' }}>
+                        <View style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: avatarBg,
+                          borderWidth: 1.5,
+                          borderColor: T.text,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 8,
+                        }}>
+                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 11 }}>
+                            {thread.citizen_name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: T.text, marginRight: 4 }} numberOfLines={1}>
+                          {thread.citizen_name}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 2. Featured Threads / Main Stream Feed */}
+          {activeTab === 'bookmarks' && bookmarkedIds.length === 0 ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 60 }}>
+              <Bookmark size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 16 }} />
+              <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', textAlign: 'center', fontSize: 15 }}>
+                You haven't bookmarked any threads yet.
+              </Text>
+            </View>
+          ) : filteredPosts.length === 0 ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 60 }}>
+              <MessageText1 size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 16 }} />
+              <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', textAlign: 'center', fontSize: 15 }}>
                 No threads found. Be the first to start the discussion!
               </Text>
             </View>
           ) : (
-            filteredPosts.map(post => {
-              const avatarBg = getAvatarBg(post.citizen_name);
-              return (
-                <TouchableOpacity 
-                  key={post.id} 
-                  style={[styles.threadCard, { backgroundColor: T.card, borderColor: T.border }]}
-                  onPress={() => {
-                    setSelectedPost(post);
-                    setViewState('detail');
-                  }}
-                >
-                  {/* Author row */}
-                  <View style={styles.postHeader}>
-                    <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
-                      <Text style={{ color: '#1A1A1A', fontWeight: '700', fontSize: 13 }}>
-                        {post.citizen_name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.authorName, { color: T.text }]}>
-                        {post.citizen_name}
-                        <Text style={{ color: T.textMuted, fontWeight: '400', fontSize: 12 }}> · {getRelativeTime(post.created_at)}</Text>
-                      </Text>
-                    </View>
-                    {!post.is_approved && (
-                      <View style={styles.pendingBadge}>
-                        <Text style={styles.pendingText}>PENDING</Text>
+            <>
+              {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && (
+                <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginBottom: 12 }}>Featured Threads</Text>
+              )}
+              {filteredPosts.map(post => {
+                const avatarBg = getAvatarBg(post.citizen_name);
+                return (
+                  <TouchableOpacity 
+                    key={post.id} 
+                    style={{
+                      padding: 20,
+                      borderRadius: 24, // Rounded mockup card corners
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      backgroundColor: T.card,
+                      marginBottom: 16,
+                    }}
+                    onPress={() => {
+                      setSelectedPost(post);
+                      setViewState('detail');
+                    }}
+                  >
+                    {/* Author row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+                        <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                          {post.citizen_name.charAt(0).toUpperCase()}
+                        </Text>
                       </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>
+                          {post.citizen_name}
+                        </Text>
+                      </View>
+                      <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12 }}>
+                        {getRelativeTime(post.created_at)}
+                      </Text>
+                    </View>
+
+                    {/* Title */}
+                    <Text style={{ fontSize: 20, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 24, marginBottom: 8 }} numberOfLines={2}>
+                      {post.title || 'General Discussion'}
+                    </Text>
+
+                    {/* Snippet */}
+                    <Text style={{ fontSize: 14, fontFamily: 'Inter-Medium', color: T.textMuted, lineHeight: 20, marginBottom: 12 }} numberOfLines={3}>
+                      {post.content}
+                    </Text>
+
+                    {/* Thread Thumbnail Photo Preview */}
+                    {post.photo_url && (
+                      <Image source={{ uri: post.photo_url }} style={{ width: '100%', height: 160, borderRadius: 16, marginBottom: 12 }} />
                     )}
-                  </View>
 
-                  {/* Title */}
-                  <Text style={[styles.threadTitle, { color: T.text }]} numberOfLines={2}>
-                    {post.title || 'General Discussion'}
-                  </Text>
-
-                  {/* Snippet */}
-                  <Text style={[styles.threadSnippet, { color: T.textMuted }]} numberOfLines={2}>
-                    {post.content}
-                  </Text>
-
-                  {/* Thread Thumbnail Photo Preview */}
-                  {post.photo_url && (
-                    <Image source={{ uri: post.photo_url }} style={styles.threadThumbImage} />
-                  )}
-
-                  {/* Footer (Tags + Replies Count) */}
-                  <View style={styles.threadCardFooter}>
-                    <View style={styles.tagsRow}>
+                    {/* Category Tags (Placed under description as shown in mockup) */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                       {post.tags && post.tags.slice(0, 2).map((t: string) => {
                         const tagColors = TAG_COLORS[t] || { bg: T.cardAlt, text: T.textMuted };
                         return (
-                          <View key={t} style={[styles.tagBadge, { backgroundColor: tagColors.bg }]}>
-                            <Text style={[styles.tagBadgeText, { color: tagColors.text }]}>#{t}</Text>
+                          <View
+                            key={t}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 4,
+                              borderRadius: 12,
+                              backgroundColor: tagColors.bg,
+                              borderWidth: 1,
+                              borderColor: tagColors.text,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: tagColors.text }}>#{t}</Text>
                           </View>
                         );
                       })}
                     </View>
-                    <View style={[styles.commentsCountBubble, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,26,0.04)' }]}>
-                      <Ionicons name="chatbubble-ellipses-outline" size={14} color={T.text} style={{ marginRight: 4 }} />
-                      <Text style={{ color: T.text, fontSize: 12, fontWeight: '600' }}>
-                        {post.commentsCount || 0}
-                      </Text>
+
+                    {/* Divider line before reactions */}
+                    <View style={{ height: 1, backgroundColor: T.border, opacity: 0.15, marginVertical: 8 }} />
+
+                    {/* Footer Reaction buttons (likes count, comments count, bookmark option) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 16 }}>
+                      {/* Heart reaction trigger */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleLike(post.id);
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 12,
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,26,0.04)',
+                        }}
+                      >
+                        <Heart
+                          size={16}
+                          color={likedPostIds.includes(post.id) ? '#EF4444' : T.text}
+                          variant="Bold"
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={{ color: T.text, fontSize: 12, fontFamily: 'Octarine-Bold' }}>
+                          {getLikeCount(post)}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Comment Count preview */}
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 12,
+                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,26,0.04)',
+                      }}>
+                        <MessageText1 size={16} color={T.text} variant="Linear" style={{ marginRight: 4 }} />
+                        <Text style={{ color: T.text, fontSize: 12, fontFamily: 'Octarine-Bold' }}>
+                          {post.commentsCount || 0}
+                        </Text>
+                      </View>
+
+                      {/* Bookmark toggle icon pushed to the right */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleBookmark(post.id);
+                        }}
+                        style={{ marginLeft: 'auto', padding: 4 }}
+                      >
+                        {bookmarkedIds.includes(post.id) ? (
+                          <Bookmark size={18} color={T.accent} variant="Bold" />
+                        ) : (
+                          <Bookmark2 size={18} color={T.textMuted} variant="Bold" />
+                        )}
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
+                  </TouchableOpacity>
+                );
+              })}
+            </>
           )}
         </ScrollView>
+
+        {/* Floating Action Button (FAB) for New Post */}
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            right: 24,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: T.text, // high contrast solid ink black or white
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 5,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+          }}
+          onPress={() => {
+            if (!verified) {
+              showToast('Please verify your identity before creating forum threads.', 'error');
+              return;
+            }
+            setViewState('create');
+          }}
+          activeOpacity={0.9}
+        >
+          <Edit2 size={24} color={T.bg} variant="Bold" />
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
+    </ScreenBackground>
   );
 }
-
-const styles = StyleSheet.create({
-  verificationBanner: { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
-  verifyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    marginRight: 12,
-    padding: 4,
-  },
-  headerBarTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  titleInput: {
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 16,
-  },
-  contentInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    minHeight: 120,
-  },
-  tagGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  tagSelectorPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  presetsRow: {
-    gap: 12,
-    paddingVertical: 4,
-  },
-  presetCard: {
-    width: 90,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    alignItems: 'center',
-    paddingBottom: 6,
-  },
-  presetThumb: {
-    width: '100%',
-    height: 60,
-    marginBottom: 4,
-  },
-  presetText: {
-    fontSize: 11,
-    fontWeight: '600',
-    paddingHorizontal: 4,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 14,
-  },
-  newPostBtn: {
-    flexDirection: 'row',
-    height: 42,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  newPostBtnText: {
-    color: '#1A1A1A',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  filterBarContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  threadCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  authorName: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  relativeTime: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  pendingBadge: {
-    backgroundColor: '#FEF08A',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  pendingText: {
-    color: '#854D0E',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  threadTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  threadSnippet: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  threadThumbImage: {
-    width: '100%',
-    height: 140,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  threadCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  tagBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tagBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  commentsCountBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 60,
-  },
-  threadOPCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  detailThreadTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 24,
-    marginVertical: 8,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  detailThreadContent: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  threadOPImage: {
-    width: '100%',
-    height: 180,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    opacity: 0.12,
-  },
-  dividerText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  statusMsg: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  // Discord-style flat message rows
-  discordRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  discordAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-    marginTop: 2,
-  },
-  discordMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 3,
-  },
-  discordAuthor: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  discordTimestamp: {
-    fontSize: 11,
-    fontWeight: '400',
-  },
-  discordMessage: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  discordReplyBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    paddingLeft: 4,
-    gap: 8,
-  },
-  discordReplyAccent: {
-    width: 2,
-    height: '100%',
-    minHeight: 16,
-    borderRadius: 2,
-    flexShrink: 0,
-  },
-  discordReplyText: {
-    fontSize: 12,
-    flex: 1,
-  },
-  discordReplyBtn: {
-    marginLeft: 'auto' as any,
-    padding: 4,
-  },
-  // Legacy kept for other parts
-  commentBubble: {
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  commentAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  commentAuthor: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  commentTime: {
-    fontSize: 11,
-  },
-  commentContent: {
-    fontSize: 14,
-    lineHeight: 20,
-    paddingLeft: 32,
-  },
-  replyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 'auto' as any,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  parentReplyReference: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 8,
-    borderLeftWidth: 2,
-    marginBottom: 8,
-    marginLeft: 12,
-  },
-  parentReplyReferenceText: {
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  replyTargetBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderTopWidth: 1,
-  },
-  chatPresetsPanel: {
-    paddingTop: 12,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-  },
-  chatPresetThumbCard: {
-    width: 70,
-    alignItems: 'center',
-  },
-  chatPresetThumb: {
-    width: 60,
-    height: 45,
-    borderRadius: 6,
-  },
-  chatInputBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderTopWidth: 1,
-  },
-  chatAttachBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  chatInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    height: 40,
-    marginRight: 6,
-  },
-  chatInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 14,
-    paddingVertical: 0,
-  },
-  chatSend: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-  },
-});

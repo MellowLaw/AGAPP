@@ -9,30 +9,49 @@ export const PASTELS = {
   butter:  '#EFE6BD',
 };
 
-export const ACCENT = '#F497A2';
+// Deprecated static fallback — screens should stop importing this directly.
+// Dynamic per-municipality accent now lives on the theme (T.accent via ThemeContext).
+export const ACCENT = '#F2E863';
+
+// Blends any hex color toward white by `amount` (0-1). Used to derive a soft,
+// pastel version of a per-LGU accent for large fills (tab bar pill, toggle
+// tracks) — a raw full-saturation accent reads as "neon" at that size,
+// regardless of which municipality's color it is.
+export function softenColor(hex: string, amount = 0.45): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const mix = (channel: number) => Math.round(channel + (255 - channel) * amount);
+  return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
 
 export const TOKENS = {
   light: {
-    bg:        '#E8E7E5',
-    bgAlt:     '#DEDCD8',
-    card:      '#FFFFFF',
-    cardAlt:   '#F4F2EE',
-    text:      '#1A1A1A',
-    textMuted: '#6B7280',
-    border:    'rgba(26,26,26,0.08)',
-    chip:      '#F4F2EE',
+    bg:        '#FFFCF5',
+    bgAlt:     '#F7F3EA',
+    card:      '#FFFDF7',
+    cardAlt:   '#FBF8F0',
+    text:      '#292929',
+    textMuted: '#8A8781',
+    border:    '#E9E4DA',
+    chip:      '#F1ECE1',
   },
   dark: {
-    bg:        '#1A1A1A',
-    bgAlt:     '#0F0F0F',
-    card:      '#242322',
-    cardAlt:   '#2E2D2C',
-    text:      '#E8E7E5',
-    textMuted: '#9CA3AF',
-    border:    'rgba(232,231,229,0.08)',
-    chip:      '#2E2D2C',
+    bg:        '#292929',
+    bgAlt:     '#1F1F1F',
+    card:      '#333333',
+    cardAlt:   '#2D2D2D',
+    text:      '#FFFCF5',
+    textMuted: '#A19E97',
+    border:    '#3D3D3D',
+    chip:      '#3A3A3A',
   },
 };
+
+export const RADII = { pill: 999, card: 24, tile: 16, input: 14 };
+export const SPACING = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
+export const FONTS = { heading: 'Octarine-Bold', body: 'Inter-Medium' };
 
 export const globalStyles = StyleSheet.create({
   screen:              { flex: 1 },
@@ -40,14 +59,14 @@ export const globalStyles = StyleSheet.create({
   muted:               { fontSize: 14, lineHeight: 20 },
   card:                { padding: 20, borderRadius: 24, borderWidth: 1, marginBottom: 16 },
   label:               { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 8 },
-  input:               { height: 52, borderRadius: 12, paddingHorizontal: 16, fontSize: 16, borderWidth: 1, marginBottom: 20 },
-  primaryButton:       { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  primaryButtonText:   { fontSize: 16, fontWeight: '600' },
+  input:               { height: 52, borderRadius: 12, paddingHorizontal: 16, fontSize: 16, borderWidth: 1, marginBottom: 20, fontFamily: 'Inter-Medium' },
+  primaryButton:       { height: 56, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
+  primaryButtonText:   { fontSize: 16, fontWeight: '600', fontFamily: 'Inter-Medium' },
   sectionHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16, marginTop: 12 },
-  sectionTitle:        { fontSize: 20, fontWeight: '700', letterSpacing: -0.5 },
-  sectionAction:       { fontSize: 14, fontWeight: '600' },
-  h2:                  { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  h3:                  { fontSize: 20, fontWeight: '600', letterSpacing: -0.5 },
+  sectionTitle:        { fontSize: 20, fontWeight: '700', letterSpacing: -0.5, fontFamily: 'Octarine-Bold' },
+  sectionAction:       { fontSize: 14, fontWeight: '600', fontFamily: 'Inter-Medium' },
+  h2:                  { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, fontFamily: 'Octarine-Bold' },
+  h3:                  { fontSize: 20, fontWeight: '600', letterSpacing: -0.5, fontFamily: 'Octarine-Bold' },
   secondaryButton:     { height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  secondaryButtonText: { fontSize: 15, fontWeight: '600' },
+  secondaryButtonText: { fontSize: 15, fontWeight: '600', fontFamily: 'Inter-Medium' },
 });

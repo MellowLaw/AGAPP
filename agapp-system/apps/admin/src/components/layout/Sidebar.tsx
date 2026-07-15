@@ -5,19 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import {
-  House,
-  FileText,
-  Warning,
-  Newspaper,
-  ChatCircle,
-  Gear,
-  Building,
-  SignOut,
-  IdentificationBadge,
-  MapPin,
-  ListChecks,
-} from '@phosphor-icons/react';
+import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll } from 'iconsax-react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
@@ -37,7 +25,7 @@ function initials(name: string) {
 interface NavItem {
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<any>;
   /** "New since last visit" badge section, if this tab shows one. */
   section?: NavSection;
 }
@@ -48,27 +36,27 @@ interface SidebarProps {
 }
 
 const LGU_ADMIN_NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/lgu/dashboard', icon: House },
-  { label: 'Service Requests', href: '/lgu/services', icon: FileText, section: 'services' },
-  { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: ListChecks },
-  { label: 'Issue Reports', href: '/lgu/reports', icon: Warning, section: 'reports' },
-  { label: 'News', href: '/lgu/news', icon: Newspaper },
-  { label: 'Forum', href: '/lgu/forum', icon: ChatCircle, section: 'forum' },
-  { label: 'Facilities', href: '/lgu/facilities', icon: MapPin },
-  { label: 'Verifications', href: '/lgu/verifications', icon: IdentificationBadge, section: 'verifications' },
-  { label: 'Settings', href: '/lgu/settings', icon: Gear },
+  { label: 'Dashboard', href: '/lgu/dashboard', icon: Home },
+  { label: 'Service Requests', href: '/lgu/services', icon: DocumentText, section: 'services' },
+  { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: Scroll },
+  { label: 'Issue Reports', href: '/lgu/reports', icon: Danger, section: 'reports' },
+  { label: 'News', href: '/lgu/news', icon: Book },
+  { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum' },
+  { label: 'Facilities', href: '/lgu/facilities', icon: Location },
+  { label: 'Verifications', href: '/lgu/verifications', icon: Personalcard, section: 'verifications' },
+  { label: 'Settings', href: '/lgu/settings', icon: Setting2 },
 ];
 
 const SUPER_ADMIN_NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/super', icon: House },
+  { label: 'Dashboard', href: '/super', icon: Home },
   { label: 'LGU Directory', href: '/super/lgus', icon: Building },
-  { label: 'Settings', href: '/super/settings', icon: Gear },
+  { label: 'Settings', href: '/super/settings', icon: Setting2 },
 ];
 
 const LGU_PERSONNEL_NAV: NavItem[] = [
-  { label: 'My Queue', href: '/personnel/dashboard', icon: FileText, section: 'services' },
-  { label: 'Issue Reports', href: '/personnel/reports', icon: Warning, section: 'reports' },
-  { label: 'Settings', href: '/personnel/settings', icon: Gear },
+  { label: 'My Queue', href: '/personnel/dashboard', icon: DocumentText, section: 'services' },
+  { label: 'Issue Reports', href: '/personnel/reports', icon: Danger, section: 'reports' },
+  { label: 'Settings', href: '/personnel/settings', icon: Setting2 },
 ];
 
 // Active: soft accent-tinted backdrop (no hard fill), bolded rose text, +2%
@@ -90,8 +78,9 @@ function NavLink({ item, active, href, count }: { item: NavItem; active: boolean
         <span className="relative inline-flex shrink-0">
           <Icon
             className={`relative w-6 h-6 transition-colors duration-200 ${
-              active ? 'text-accent' : hovering ? 'text-text-primary' : 'text-text-muted'
+              active ? 'text-accent-icon' : hovering ? 'text-text-primary' : 'text-text-muted'
             }`}
+            variant="Bold"
           />
           {!!count && (
             <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-[3px] flex items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white leading-none">
@@ -205,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
           whileTap={{ scale: 0.98 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
         >
-          <SignOut className="w-6 h-6 shrink-0" />
+          <Logout className="w-6 h-6 shrink-0" />
           <span className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">Sign Out</span>
         </motion.button>
       </div>

@@ -23,7 +23,7 @@ VALUES
     'Municipality of Liliw',
     'https://placehold.co/100x100/A2B59F/1A1A1A?text=LILIW',
     'https://placehold.co/800x200/A2B59F/1A1A1A?text=Welcome+to+Liliw',
-    '#A2B59F',
+    '#F2E863',
     '#D9CDB8',
     14.1310,
     121.4365,

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon } from '@phosphor-icons/react';
+import { Sun1, Moon } from 'iconsax-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { NotificationBell } from './NotificationBell';
 
@@ -59,7 +59,7 @@ export function StatusRow() {
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             className="flex"
           >
-            {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            {isDark ? <Moon variant="Bold" className="w-4 h-4" /> : <Sun1 className="w-4 h-4" />}
           </motion.span>
         </AnimatePresence>
       </motion.button>
