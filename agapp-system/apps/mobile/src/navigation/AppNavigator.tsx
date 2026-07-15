@@ -357,7 +357,7 @@ function MainTabNavigator() {
         {({ navigation }) => <ServicesScreen navigation={navigation} />}
       </Tab.Screen>
       <Tab.Screen name="ReportsTab" options={{ title: 'Report' }}>
-        {({ navigation }) => <ReportsScreen navigation={navigation} />}
+        {({ navigation, route }: any) => <ReportsScreen navigation={navigation} route={route} />}
       </Tab.Screen>
       <Tab.Screen name="Forum" options={{ title: 'Forum' }}>
         {({ navigation }) => <ForumScreen navigation={navigation} />}

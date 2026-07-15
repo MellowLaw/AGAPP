@@ -191,7 +191,7 @@ export function ForumScreen({ navigation }: any) {
     try {
       let query = supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved)')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved), forum_post_likes(user_id)')
         .eq('lgu_id', lgu.id);
 
       if (profile) {
@@ -209,12 +209,19 @@ export function ForumScreen({ navigation }: any) {
       if (data) {
         const mapped = data.map((p: any) => {
           const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
+          const postLikes = p.forum_post_likes || [];
           return {
             ...p,
-            commentsCount: approvedComments.length
+            commentsCount: approvedComments.length,
+            likesCount: postLikes.length,
+            isLiked: postLikes.some((like: any) => like.user_id === profile?.id),
           };
         });
         setPosts(mapped);
+
+        // Sync liked ids
+        const likedIds = mapped.filter((p: any) => p.isLiked).map((p: any) => p.id);
+        setLikedPostIds(likedIds);
       }
     } catch (err: any) {
       console.error('Failed to fetch posts:', err.message);
@@ -300,7 +307,7 @@ export function ForumScreen({ navigation }: any) {
     const textToSend = customText ?? newComment;
     if (!textToSend.trim() || !profile || !selectedPost) return;
     if (!verified) {
-      showToast('Please verify your identity before replying in the forum.', 'error');
+      navigation.navigate('VerifyIdentity');
       return;
     }
     const contentText = textToSend.trim();
@@ -397,26 +404,35 @@ export function ForumScreen({ navigation }: any) {
   };
 
   const toggleLike = async (postId: string) => {
+    if (!session || !profile) {
+      navigation.navigate('Login', { initialMode: 'register' });
+      return;
+    }
+
     try {
-      let updated: string[];
       if (likedPostIds.includes(postId)) {
-        updated = likedPostIds.filter(id => id !== postId);
+        const { error } = await supabase
+          .from('forum_post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', profile.id);
+        if (error) throw error;
         showToast('Removed like', 'success');
       } else {
-        updated = [...likedPostIds, postId];
+        const { error } = await supabase
+          .from('forum_post_likes')
+          .insert({ post_id: postId, user_id: profile.id });
+        if (error) throw error;
         showToast('Liked post', 'success');
       }
-      setLikedPostIds(updated);
-      await AsyncStorage.setItem('liked_posts', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Failed to save like', err);
+      fetchPosts();
+    } catch (err: any) {
+      console.warn('Failed to toggle like in database:', err.message);
     }
   };
 
   const getLikeCount = (post: any) => {
-    const sum = post.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-    const base = (sum % 15) + 3;
-    return likedPostIds.includes(post.id) ? base + 1 : base;
+    return post.likesCount || 0;
   };
 
   const filteredPosts = posts.filter(post => {
@@ -1142,24 +1158,18 @@ export function ForumScreen({ navigation }: any) {
                         </Text>
                       </View>
 
-                      {/* Simulating overlapping avatars stack */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.sage, borderWidth: 1.5, borderColor: T.card }} />
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.blue, borderWidth: 1.5, borderColor: T.card, marginLeft: -8 }} />
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PASTELS.pink, borderWidth: 1.5, borderColor: T.card, marginLeft: -8 }} />
-                        <View style={{
-                          paddingHorizontal: 8,
-                          height: 20,
-                          borderRadius: 10,
-                          backgroundColor: T.cardAlt,
-                          borderWidth: 1,
-                          borderColor: T.border,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginLeft: 6,
-                        }}>
-                          <Text style={{ fontSize: 9, fontFamily: 'Octarine-Bold', color: T.textMuted }}>
-                            +{((thread.commentsCount || 0) * 3) + 2}
+                      {/* Real metrics display */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Heart size={14} color={likedPostIds.includes(thread.id) ? '#EF4444' : T.textMuted} variant="Bold" />
+                          <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                            {thread.likesCount || 0}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MessageText1 size={14} color={T.textMuted} variant="Linear" />
+                          <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                            {thread.commentsCount || 0}
                           </Text>
                         </View>
                       </View>
@@ -1385,7 +1395,7 @@ export function ForumScreen({ navigation }: any) {
               return;
             }
             if (!verified) {
-              showToast('Please verify your identity before creating forum threads.', 'error');
+              navigation.navigate('VerifyIdentity');
               return;
             }
             setViewState('create');

@@ -20,11 +20,11 @@ export function OnboardingScreen({ navigation, onComplete }: any) {
     try {
       await AsyncStorage.setItem('hasSeenOnboarding', 'true');
       if (onComplete) onComplete();
-      navigation.replace('Login');
+      navigation.replace('GuestLguDetect');
     } catch (err) {
       console.warn('Failed to save onboarding progress:', err);
       if (onComplete) onComplete();
-      navigation.replace('Login');
+      navigation.replace('GuestLguDetect');
     }
   };
 

@@ -36,12 +36,21 @@ const REPORT_CATEGORIES = [
   { id: 'damaged_pole',     label: 'Damaged Pole', icon: Flash },
 ];
 
-export function ReportsScreen({ navigation }: any) {
+export function ReportsScreen({ navigation, route }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { selectedLgu, profile, session } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [category, setCategory] = useState('pothole');
+
+  useEffect(() => {
+    if (route?.params?.initialCategory) {
+      setCategory(route.params.initialCategory);
+      setShowForm(true);
+      // clean params so it doesn't reopen next time
+      navigation.setParams({ initialCategory: undefined });
+    }
+  }, [route?.params?.initialCategory]);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<any>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -733,7 +742,7 @@ export function ReportsScreen({ navigation }: any) {
                       alignItems: 'center',
                       marginBottom: 12,
                     }}>
-                      <IconComp size={18} color="#292929" variant="Bold" />
+                      <IconComp size={18} color={T.onAccent} variant="Bold" />
                     </View>
                     <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 18 }}>{cat.label}</Text>
                   </TouchableOpacity>

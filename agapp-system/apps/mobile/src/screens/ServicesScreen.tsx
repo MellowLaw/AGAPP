@@ -512,7 +512,7 @@ export function ServicesScreen({ navigation }: any) {
                         alignItems: 'center',
                         marginBottom: 12,
                       }}>
-                        <IconComp size={18} color="#292929" variant="Bold" />
+                        <IconComp size={18} color={T.onAccentSoft} variant="Bold" />
                       </View>
                       <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 18 }}>{s.name}</Text>
                     </TouchableOpacity>
