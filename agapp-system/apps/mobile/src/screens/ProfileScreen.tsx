@@ -208,8 +208,8 @@ export function ProfileScreen({ navigation }: any) {
 
   return (
     <ScreenBackground>
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>Profile.</Text>
         <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 4, marginBottom: 22 }}>
           Account · settings · privacy

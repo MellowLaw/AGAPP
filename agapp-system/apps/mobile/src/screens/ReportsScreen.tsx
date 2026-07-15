@@ -384,7 +384,7 @@ export function ReportsScreen({ navigation }: any) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <TouchableOpacity
               style={{ marginBottom: 16 }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -650,7 +650,7 @@ export function ReportsScreen({ navigation }: any) {
   // ── Catalog list view ───────────────────────────────────────────────────────
   return (
     <ScreenBackground>
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <View style={{ flex: 1 }}>
         <View style={{ padding: 20, paddingBottom: 10 }}>
           <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>Report.</Text>
@@ -695,7 +695,7 @@ export function ReportsScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           {activeTab === 'reports' ? (
             /* Flat category selection card grid */
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>

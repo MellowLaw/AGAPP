@@ -172,7 +172,7 @@ export function HomeScreen({ navigation }: any) {
 
   return (
     <ScreenBackground>
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       {/* Tabs navigation at the top */}
       <View style={{
         flexDirection: 'row',
@@ -279,7 +279,7 @@ export function HomeScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         
         {/* TAB 1: FOR YOU */}
         {activeTab === 'for_you' && (

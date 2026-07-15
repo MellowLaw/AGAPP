@@ -36,12 +36,12 @@ type ViewState = 'list' | 'detail' | 'create';
 
 const AVAILABLE_TAGS = ['General', 'Questions', 'Alerts', 'Suggestions', 'Events'];
 
-const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  'General': { bg: 'rgba(199,213,193,0.25)', text: '#4B633F' },     // Pastel Sage
-  'Questions': { bg: 'rgba(196,208,215,0.25)', text: '#2B4D5F' },   // Pastel Blue
-  'Alerts': { bg: 'rgba(242,196,203,0.25)', text: '#8F3845' },      // Pastel Pink
-  'Suggestions': { bg: 'rgba(232,222,201,0.25)', text: '#7A622A' }, // Pastel Cream
-  'Events': { bg: 'rgba(212,204,224,0.25)', text: '#5D447A' },      // Pastel Lilac
+const TAG_COLORS: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
+  'General': { bg: '#E2EBE0', text: '#3E5434', darkBg: '#3E5434', darkText: '#E2EBE0' },     // Sage
+  'Questions': { bg: '#DEE7EC', text: '#213E4F', darkBg: '#213E4F', darkText: '#DEE7EC' },   // Blue
+  'Alerts': { bg: '#FADEE1', text: '#7E2532', darkBg: '#7E2532', darkText: '#FADEE1' },      // Pink
+  'Suggestions': { bg: '#F5EBD6', text: '#644F1D', darkBg: '#644F1D', darkText: '#F5EBD6' }, // Cream
+  'Events': { bg: '#EADFEA', text: '#4D3666', darkBg: '#4D3666', darkText: '#EADFEA' },      // Lilac
 };
 
 const PRESET_IMAGES = [
@@ -189,7 +189,7 @@ export function ForumScreen({ navigation }: any) {
     try {
       const { data, error } = await supabase
         .from('forum_posts')
-        .select('*, forum_comments(id, is_approved)')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved)')
         .eq('lgu_id', selectedLgu.id)
         .or(`is_approved.eq.true,citizen_id.eq.${profile.id}`)
         .order('created_at', { ascending: false })
@@ -217,7 +217,7 @@ export function ForumScreen({ navigation }: any) {
     try {
       const { data, error } = await supabase
         .from('forum_comments')
-        .select('*')
+        .select('*, citizen:users!citizen_id(avatar_url)')
         .eq('post_id', postId)
         .or(`is_approved.eq.true,citizen_id.eq.${profile?.id}`)
         .order('created_at', { ascending: true });
@@ -359,6 +359,17 @@ export function ForumScreen({ navigation }: any) {
     return colors[sum % colors.length];
   };
 
+  const getTagColors = (tag: string) => {
+    const rawColors = TAG_COLORS[tag];
+    if (!rawColors) {
+      return { bg: T.cardAlt, text: T.textMuted };
+    }
+    return {
+      bg: isDarkMode ? rawColors.darkBg : rawColors.bg,
+      text: isDarkMode ? rawColors.darkText : rawColors.text,
+    };
+  };
+
   const toggleBookmark = async (postId: string) => {
     try {
       let updated: string[];
@@ -449,7 +460,7 @@ export function ForumScreen({ navigation }: any) {
               <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>New Forum Thread</Text>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
               {!verified && (
                 <View style={{
                   flexDirection: 'row',
@@ -656,10 +667,14 @@ export function ForumScreen({ navigation }: any) {
           >
             {/* Original Post */}
             <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, alignItems: 'flex-start', gap: 12 }}>
-              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: avatarOPBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
-                <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 16 }}>
-                  {selectedPost.citizen_name.charAt(0).toUpperCase()}
-                </Text>
+              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: avatarOPBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                {selectedPost.citizen?.avatar_url ? (
+                  <Image source={{ uri: selectedPost.citizen.avatar_url }} style={{ width: 42, height: 42 }} />
+                ) : (
+                  <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 16 }}>
+                    {selectedPost.citizen_name.charAt(0).toUpperCase()}
+                  </Text>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -680,7 +695,7 @@ export function ForumScreen({ navigation }: any) {
                 {selectedPost.tags && selectedPost.tags.length > 0 && (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {selectedPost.tags.map((t: string) => {
-                      const tagColor = TAG_COLORS[t] || { bg: T.cardAlt, text: T.textMuted };
+                      const tagColor = getTagColors(t);
                       return (
                         <View key={t} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: tagColor.bg }}>
                           <Text style={{ fontSize: 10, fontFamily: 'Inter-Medium', color: tagColor.text }}>#{t}</Text>
@@ -729,10 +744,14 @@ export function ForumScreen({ navigation }: any) {
                         gap: 12,
                       }}
                     >
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
-                        <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                          {c.citizen_name.charAt(0).toUpperCase()}
-                        </Text>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                        {c.citizen?.avatar_url ? (
+                          <Image source={{ uri: c.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
+                        ) : (
+                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                            {c.citizen_name.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
                       </View>
 
                       <View style={{ flex: 1 }}>
@@ -909,7 +928,7 @@ export function ForumScreen({ navigation }: any) {
   // 4. Default: THREAD LIST (viewState === 'list')
   return (
     <ScreenBackground>
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <View style={{ flex: 1 }}>
         {/* Centered navigation tabs (For you / Bookmarks) */}
         <View style={{
@@ -1023,7 +1042,7 @@ export function ForumScreen({ navigation }: any) {
         </View>
 
         {/* Threads ScrollView Container */}
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           {/* 1. Trending Threads (Horizontal small cards - only in "For you", empty search, and "All" tag filter) */}
           {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
             <View style={{ marginBottom: 24 }}>
@@ -1032,7 +1051,7 @@ export function ForumScreen({ navigation }: any) {
                 {trendingThreads.map((thread, idx) => {
                   const ranking = idx + 1;
                   const tag = thread.tags?.[0] || 'General';
-                  const tagColors = TAG_COLORS[tag] || { bg: T.cardAlt, text: T.textMuted };
+                  const tagColors = getTagColors(tag);
                   const avatarBg = getAvatarBg(thread.citizen_name);
                   return (
                     <TouchableOpacity
@@ -1120,10 +1139,15 @@ export function ForumScreen({ navigation }: any) {
                           justifyContent: 'center',
                           alignItems: 'center',
                           marginRight: 8,
+                          overflow: 'hidden',
                         }}>
-                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 11 }}>
-                            {thread.citizen_name.charAt(0).toUpperCase()}
-                          </Text>
+                          {thread.citizen?.avatar_url ? (
+                            <Image source={{ uri: thread.citizen.avatar_url }} style={{ width: 28, height: 28 }} />
+                          ) : (
+                            <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 11 }}>
+                              {thread.citizen_name.charAt(0).toUpperCase()}
+                            </Text>
+                          )}
                         </View>
                         <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: T.text, marginRight: 4 }} numberOfLines={1}>
                           {thread.citizen_name}
@@ -1176,10 +1200,14 @@ export function ForumScreen({ navigation }: any) {
                   >
                     {/* Author row */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-                        <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                          {post.citizen_name.charAt(0).toUpperCase()}
-                        </Text>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center', marginRight: 10, overflow: 'hidden' }}>
+                        {post.citizen?.avatar_url ? (
+                          <Image source={{ uri: post.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
+                        ) : (
+                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                            {post.citizen_name.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>
@@ -1209,7 +1237,7 @@ export function ForumScreen({ navigation }: any) {
                     {/* Category Tags (Placed under description as shown in mockup) */}
                     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                       {post.tags && post.tags.slice(0, 2).map((t: string) => {
-                        const tagColors = TAG_COLORS[t] || { bg: T.cardAlt, text: T.textMuted };
+                        const tagColors = getTagColors(t);
                         return (
                           <View
                             key={t}

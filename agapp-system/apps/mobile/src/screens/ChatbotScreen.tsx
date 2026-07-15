@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PASTELS } from '../theme';
-import { AgappLogo } from '../components/AgappLogo';
 import { useNavigation } from '@react-navigation/native';
 import {
   ArrowLeft2,
@@ -33,13 +32,11 @@ const ThinkingIndicator = ({ T }: { T: any }) => {
     ).start();
   }, []);
   return (
-    <View style={styles.botMessageRow}>
-      <View style={[styles.botAvatar, { backgroundColor: '#292929' }]}>
-        <Animated.View style={{ opacity: pulseAnim }}>
-          <AgappLogo size={12} bgColor="#292929" textColor="#FFFFFF" showText={false} />
-        </Animated.View>
-      </View>
-      <View style={[styles.botMessageContent, { flexDirection: 'row', alignItems: 'center' }]}>
+    <View style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%', marginBottom: 24 }}>
+      <Animated.View style={{ opacity: pulseAnim, marginBottom: -20 }}>
+        <Image source={require('../../assets/brand/mascot.png')} style={{ width: 120, height: 120 }} resizeMode="contain" />
+      </Animated.View>
+      <View style={{ width: '100%', paddingLeft: 4, flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ color: T.textMuted, fontSize: 13, fontFamily: 'Inter-Medium', fontStyle: 'italic' }}>Thinking...</Text>
       </View>
     </View>
@@ -191,13 +188,7 @@ export function ChatbotScreen() {
               <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4, marginRight: 8 }}>
                 <ArrowLeft2 size={30} color={T.text} variant="Outline" />
               </TouchableOpacity>
-              <AgappLogo size={24} bgColor="#292929" textColor="#FFFFFF" showText={false} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: T.text }}>Assistant</Text>
-                <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }} numberOfLines={1}>
-                  Online · {selectedLgu?.name.replace('Municipality of ', '')}
-                </Text>
-              </View>
+              <View style={{ flex: 1 }} />
               {messages.length > 1 && (
                 <TouchableOpacity onPress={handleReset} style={{
                   flexDirection: 'row',
@@ -289,12 +280,14 @@ export function ChatbotScreen() {
                 } else {
                   const RedirectIcon = m.redirect ? getRedirectIcon(m.redirect.screen) : null;
                   return (
-                    <View key={idx} style={styles.botMessageRow}>
-                      <View style={[styles.botAvatar, { backgroundColor: '#292929' }]}>
-                        <AgappLogo size={12} bgColor="#292929" textColor="#FFFFFF" showText={false} />
-                      </View>
+                    <View key={idx} style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%', marginBottom: 24 }}>
+                      <Image
+                        source={require('../../assets/brand/mascot.png')}
+                        style={{ width: 120, height: 120, marginBottom: -20 }}
+                        resizeMode="contain"
+                      />
                       
-                      <View style={styles.botMessageContent}>
+                      <View style={{ width: '100%', paddingLeft: 4 }}>
                         {idx === 0 ? (
                           <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium', lineHeight: 22 }}>
                             {m.text}
@@ -310,7 +303,7 @@ export function ChatbotScreen() {
                               alignItems: 'center',
                               paddingHorizontal: 16,
                               paddingVertical: 12,
-                              borderRadius: 20, // radii 20
+                              borderRadius: 20,
                               borderWidth: 1,
                               borderColor: T.border,
                               backgroundColor: T.card,

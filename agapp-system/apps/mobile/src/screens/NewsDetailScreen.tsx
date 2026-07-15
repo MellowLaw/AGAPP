@@ -26,7 +26,7 @@ export function NewsDetailScreen({ route, navigation }: any) {
   if (!news) {
     return (
       <ScreenBackground>
-        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
@@ -59,7 +59,7 @@ export function NewsDetailScreen({ route, navigation }: any) {
 
   return (
     <ScreenBackground>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
         <View style={{ flex: 1 }}>
           {/* Header row */}
           <View style={{

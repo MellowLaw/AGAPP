@@ -201,7 +201,7 @@ export function ServicesScreen({ navigation }: any) {
           resizeMode="cover"
         />
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           <TouchableOpacity
             style={{ marginBottom: 16 }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -361,7 +361,7 @@ export function ServicesScreen({ navigation }: any) {
           resizeMode="cover"
         />
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           <TouchableOpacity
             style={{ marginBottom: 16 }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -434,7 +434,7 @@ export function ServicesScreen({ navigation }: any) {
   // ── Catalog list ─────────────────────────────────────────────────────────
   return (
     <ScreenBackground>
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <View style={{ flex: 1 }}>
         <View style={{ padding: 20, paddingBottom: 10 }}>
           <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>Services.</Text>
@@ -479,7 +479,7 @@ export function ServicesScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           {activeTab === 'services' ? (
             /* Catalog grid */
             catalog.length === 0 ? (

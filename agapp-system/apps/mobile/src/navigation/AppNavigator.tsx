@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -108,6 +108,26 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
       }}
       onLayout={(e) => setInnerWidth(e.nativeEvent.layout.width)}
     >
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Assistant')}
+        activeOpacity={0.85}
+        style={{
+          position: 'absolute',
+          left: 8,
+          top: -92,
+          width: 110,
+          height: 110,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Image
+          source={require('../../assets/brand/mascot.png')}
+          style={{ width: 110, height: 110 }}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
+
       {innerWidth > 0 && (
         <Animated.View
           pointerEvents="none"

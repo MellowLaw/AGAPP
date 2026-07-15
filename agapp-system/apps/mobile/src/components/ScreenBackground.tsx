@@ -124,7 +124,7 @@ export function ScreenBackground({ children }: { children: React.ReactNode }) {
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       {/* Decorative wash + sparkles — no touch events */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_HEIGHT }}>
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         <LinearGradient
           colors={[topColor, midColor, lowColor, bottomColor]}
           locations={[0, 0.4, 0.75, 1]}
