@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -22,7 +22,7 @@ interface StaffMember {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'general' | 'staff' | 'notifications'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'customization' | 'staff' | 'notifications'>('general');
   const { showToast, ToastContainer } = useToast();
   const params = useSearchParams();
 
@@ -48,6 +48,40 @@ export default function SettingsPage() {
   const [twitterUrl, setTwitterUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [featureFlags, setFeatureFlags] = useState<any>({ chatbot: true, potholeDetection: true, forum: true });
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Logo image must be under 2MB.', 'error');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('lguId', lguId);
+
+      const res = await fetch('/api/upload-logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to upload logo');
+
+      setLogoUrl(result.publicUrl);
+      showToast('Logo uploaded successfully. Click Save Changes at the top to apply.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to upload logo', 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // Staff States
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -65,6 +99,19 @@ export default function SettingsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
+
+  // Confirmation Modal States
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+
+  const triggerConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
 
   // Fetch LGU General Config, Staff, and current user notification preferences
   useEffect(() => {
@@ -296,123 +343,176 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Tabs */}
-        <div className="lg:col-span-1">
-          <Card noBorder padding="none">
-            <nav className="p-2">
-              <button
-                onClick={() => setActiveTab('general')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
-                  activeTab === 'general' 
-                    ? 'bg-surface-alt text-text-primary font-medium' 
-                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
-                }`}
-              >
-                <Building variant="Bold" className="w-4 h-4" />
-                General
-              </button>
-              <button
-                onClick={() => setActiveTab('staff')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
-                  activeTab === 'staff' 
-                    ? 'bg-surface-alt text-text-primary font-medium' 
-                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
-                }`}
-              >
-                <User variant="Bold" className="w-4 h-4" />
-                Staff Management
-              </button>
-              <button
-                onClick={() => setActiveTab('notifications')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors text-left ${
-                  activeTab === 'notifications' 
-                    ? 'bg-surface-alt text-text-primary font-medium' 
-                    : 'text-text-muted hover:bg-surface-alt hover:text-text-primary'
-                }`}
-              >
-                <Notification className="w-4 h-4" />
-                Notifications
-              </button>
-            </nav>
-          </Card>
-        </div>
+      {/* Horizontal Tabs selector */}
+      <div className="flex border-b border-theme mb-6">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2 border-b-2 font-semibold text-sm transition-all -mb-px flex items-center gap-2 ${
+            activeTab === 'general'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Building className="w-4.5 h-4.5" />
+          General Info
+        </button>
+        <button
+          onClick={() => setActiveTab('customization')}
+          className={`px-4 py-2 border-b-2 font-semibold text-sm transition-all -mb-px flex items-center gap-2 ${
+            activeTab === 'customization'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Setting2 className="w-4.5 h-4.5" />
+          Customization
+        </button>
+        <button
+          onClick={() => setActiveTab('staff')}
+          className={`px-4 py-2 border-b-2 font-semibold text-sm transition-all -mb-px flex items-center gap-2 ${
+            activeTab === 'staff'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <User className="w-4.5 h-4.5" />
+          Staff Management
+        </button>
+        <button
+          onClick={() => setActiveTab('notifications')}
+          className={`px-4 py-2 border-b-2 font-semibold text-sm transition-all -mb-px flex items-center gap-2 ${
+            activeTab === 'notifications'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Notification className="w-4.5 h-4.5" />
+          Notifications
+        </button>
+      </div>
 
-        {/* Content */}
-        <div className="lg:col-span-3">
-          {activeTab === 'general' && (
-            <Card noBorder>
-              <h2 className="text-lg font-semibold text-text-primary mb-6">Municipality Information</h2>
-              
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Municipality Name"
-                    value={lguName}
-                    onChange={(e: any) => setLguName(e.target.value)}
-                  />
-                  <Input
-                    label="Province"
-                    value={lguProvince}
-                    onChange={(e: any) => setLguProvince(e.target.value)}
-                  />
-                </div>
-                
-                <div>
-                  <Input
-                    label="LGU Seal / Logo URL"
-                    value={logoUrl}
-                    onChange={(e: any) => setLogoUrl(e.target.value)}
-                    placeholder="https://example.com/logo.png"
-                  />
-                </div>
+      {/* Content panel */}
+      <div>
+        {activeTab === 'general' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-theme pb-4 mb-4">
+              <h2 className="text-lg font-semibold text-text-primary">Municipality Information</h2>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={() => window.location.reload()}>Cancel</Button>
+                <Button onClick={() => triggerConfirm('Confirm Settings Update', 'Are you sure you want to save these municipality settings?', handleSaveGeneral)}>Save Changes</Button>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Contact Email"
-                    value={contactEmail}
-                    onChange={(e: any) => setContactEmail(e.target.value)}
-                  />
-                  <Input
-                    label="Contact Call"
-                    value={contactPhone}
-                    onChange={(e: any) => setContactPhone(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-text-muted mb-1.5">Office Address</label>
-                  <textarea
-                    rows={3}
-                    value={officeAddress}
-                    onChange={(e) => setOfficeAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Latitude</label>
-                    <input
-                      type="text"
-                      value={latitude}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
-                      readOnly
+            <Card>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Column 1: Profile & Feature Flags */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-text-primary mb-2 border-b border-theme pb-1">Profile Details</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Municipality Name"
+                      value={lguName}
+                      onChange={(e: any) => setLguName(e.target.value)}
+                    />
+                    <Input
+                      label="Province"
+                      value={lguProvince}
+                      onChange={(e: any) => setLguProvince(e.target.value)}
                     />
                   </div>
+                  
                   <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Longitude</label>
-                    <input
-                      type="text"
-                      value={longitude}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
-                      readOnly
+                    <Input
+                      label="LGU Seal / Logo URL"
+                      value={logoUrl}
+                      onChange={(e: any) => setLogoUrl(e.target.value)}
+                      placeholder="https://example.com/logo.png"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Contact Email"
+                      value={contactEmail}
+                      onChange={(e: any) => setContactEmail(e.target.value)}
+                    />
+                    <Input
+                      label="Contact Call"
+                      value={contactPhone}
+                      onChange={(e: any) => setContactPhone(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Office Address</label>
+                    <textarea
+                      rows={1}
+                      value={officeAddress}
+                      onChange={(e) => setOfficeAddress(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Latitude</label>
+                      <input
+                        type="text"
+                        value={latitude}
+                        className="w-full px-3 py-1.5 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
+                        readOnly
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Longitude</label>
+                      <input
+                        type="text"
+                        value={longitude}
+                        className="w-full px-3 py-1.5 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Feature Flags */}
+                  <div className="pt-2 border-t border-theme">
+                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">Feature Flags</h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex items-center gap-2 p-2 border border-theme rounded-md bg-surface cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={featureFlags.chatbot}
+                          onChange={(e) => setFeatureFlags((prev: any) => ({ ...prev, chatbot: e.target.checked }))}
+                          className="w-4 h-4 accent-accent rounded"
+                        />
+                        <span className="text-xs text-text-primary font-semibold">Chatbot</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2 border border-theme rounded-md bg-surface cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={featureFlags.potholeDetection}
+                          onChange={(e) => setFeatureFlags((prev: any) => ({ ...prev, potholeDetection: e.target.checked }))}
+                          className="w-4 h-4 accent-accent rounded"
+                        />
+                        <span className="text-xs text-text-primary font-semibold">Potholes</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2 border border-theme rounded-md bg-surface cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={featureFlags.forum}
+                          onChange={(e) => setFeatureFlags((prev: any) => ({ ...prev, forum: e.target.checked }))}
+                          className="w-4 h-4 accent-accent rounded"
+                        />
+                        <span className="text-xs text-text-primary font-semibold">Forum</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
-                <div className="border-t border-theme pt-4">
-                  <h3 className="text-sm font-semibold text-text-primary mb-4">Official Channels & Social Links</h3>
+                {/* Column 2: Social Links */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-text-primary mb-2 border-b border-theme pb-1">Official Channels &amp; Social Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
                       label="Facebook URL"
@@ -421,7 +521,7 @@ export default function SettingsPage() {
                       placeholder="https://facebook.com/your-lgu"
                     />
                     <Input
-                      label="YouTube Channel URL"
+                      label="YouTube URL"
                       value={youtubeUrl}
                       onChange={(e: any) => setYoutubeUrl(e.target.value)}
                       placeholder="https://youtube.com/@your-lgu"
@@ -433,90 +533,145 @@ export default function SettingsPage() {
                       placeholder="https://x.com/your-lgu"
                     />
                     <Input
-                      label="Official Website URL"
+                      label="Website URL"
                       value={websiteUrl}
                       onChange={(e: any) => setWebsiteUrl(e.target.value)}
                       placeholder="https://your-lgu.gov.ph"
                     />
                   </div>
                 </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
-                {/* Colors and Palette Selector */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Primary Color</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                      />
-                      <input
-                        type="text"
-                        value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Secondary Color</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={secondaryColor}
-                        onChange={(e) => setSecondaryColor(e.target.value)}
-                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                      />
-                      <input
-                        type="text"
-                        value={secondaryColor}
-                        onChange={(e) => setSecondaryColor(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  </div>
-                </div>
+        {activeTab === 'customization' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-theme pb-4 mb-4">
+              <h2 className="text-lg font-semibold text-text-primary">Customization &amp; Branding</h2>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={() => window.location.reload()}>Cancel</Button>
+                <Button onClick={() => triggerConfirm('Confirm Settings Update', 'Are you sure you want to save these customization settings?', handleSaveGeneral)}>Save Changes</Button>
+              </div>
+            </div>
 
-                {/* Overrides */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Icon Override Color</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={iconColor}
-                        onChange={(e) => setIconColor(e.target.value)}
-                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                      />
-                      <input
-                        type="text"
-                        value={iconColor}
-                        onChange={(e) => setIconColor(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-text-muted mb-1.5">Dark BG Override</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={darkBgColor}
-                        onChange={(e) => setDarkBgColor(e.target.value)}
-                        className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                      />
-                      <input
-                        type="text"
-                        value={darkBgColor}
-                        onChange={(e) => setDarkBgColor(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
+              {/* Left Column: Theme Override Colors (xl:col-span-5) */}
+              <div className="xl:col-span-5 flex">
+                <Card className="w-full">
+                  <CardHeader title="Theme Override Colors" subtitle="Set custom palette override hex colors for your LGU" />
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={primaryColor}
+                            onChange={(e) => setPrimaryColor(e.target.value)}
+                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={primaryColor}
+                            onChange={(e) => setPrimaryColor(e.target.value)}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
 
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={secondaryColor}
+                            onChange={(e) => setSecondaryColor(e.target.value)}
+                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={secondaryColor}
+                            onChange={(e) => setSecondaryColor(e.target.value)}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Icon Color</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={iconColor}
+                            onChange={(e) => setIconColor(e.target.value)}
+                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={iconColor}
+                            onChange={(e) => setIconColor(e.target.value)}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={darkBgColor}
+                            onChange={(e) => setDarkBgColor(e.target.value)}
+                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={darkBgColor}
+                            onChange={(e) => setDarkBgColor(e.target.value)}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Logo Upload Section */}
+                    <div className="pt-5 border-t border-theme">
+                      <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-2">Municipality Logo / Seal</label>
+                      <div className="flex items-center gap-4">
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="LGU Logo" className="w-16 h-16 rounded-full border border-theme bg-surface-alt object-contain p-1" />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full border border-theme bg-surface-alt flex items-center justify-center text-text-faint text-[10px] font-semibold">No Logo</div>
+                        )}
+                        <div className="flex-1 space-y-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            disabled={uploadingLogo}
+                            className="hidden"
+                            id="logo-file-input"
+                          />
+                          <label
+                            htmlFor="logo-file-input"
+                            className="inline-flex items-center justify-center px-4 py-1.5 border border-theme rounded-full text-xs font-semibold text-text-primary bg-surface hover:bg-surface-alt cursor-pointer transition-colors"
+                          >
+                            {uploadingLogo ? 'Uploading...' : 'Browse Image'}
+                          </label>
+                          <p className="text-[10px] text-text-muted">Accepts JPEG, PNG, SVG under 2MB</p>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </Card>
+              </div>
+
+              {/* Right Column: Predefined Palettes & Preview (xl:col-span-7) */}
+              <Card className="xl:col-span-7 flex flex-col justify-between">
                 <ColorPaletteSelector
                   primaryColor={primaryColor}
                   secondaryColor={secondaryColor}
@@ -529,16 +684,14 @@ export default function SettingsPage() {
                     setDarkBgColor(d);
                   }}
                   lguName={lguNameParam}
+                  sideBySide={true}
                 />
+              </Card>
+            </div>
+          </div>
+        )}
 
-                <div className="pt-4 border-t border-theme">
-                  <Button onClick={handleSaveGeneral}>Save Changes</Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {activeTab === 'staff' && (
+        {activeTab === 'staff' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-text-primary">Staff Members</h2>
@@ -634,11 +787,10 @@ export default function SettingsPage() {
               </div>
 
               <div className="pt-4 border-t border-theme mt-6">
-                <Button onClick={handleSaveNotifications}>Save Preferences</Button>
+                <Button onClick={() => triggerConfirm('Confirm Preferences Update', 'Are you sure you want to save these notification preferences?', handleSaveNotifications)}>Save Preferences</Button>
               </div>
             </Card>
           )}
-        </div>
       </div>
 
       {/* Add/Edit Staff Modal */}
@@ -696,6 +848,20 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-2 mt-6 border-t border-theme pt-4">
               <Button variant="ghost" onClick={() => setShowStaffModal(false)}>Cancel</Button>
               <Button onClick={handleSaveStaff}>Save Staff Member</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-text-primary mb-2">{confirmTitle}</h3>
+            <p className="text-sm text-text-muted mb-6">{confirmMessage}</p>
+            <div className="flex justify-end gap-2 border-t border-theme pt-4">
+              <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={() => { confirmAction?.(); setConfirmOpen(false); }}>Yes, Save Changes</Button>
             </div>
           </div>
         </div>

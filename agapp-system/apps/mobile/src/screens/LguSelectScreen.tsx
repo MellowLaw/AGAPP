@@ -72,19 +72,26 @@ export function LguSelectScreen() {
               onPress={() => setSelectedLgu(lgu)}
               activeOpacity={0.8}
             >
-              <View style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: lgu.primary_color || T.accent,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 16,
-              }}>
-                <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: '#292929' }}>
-                  {lgu.name[0]}
-                </Text>
-              </View>
+              {(() => {
+                const logoSource = lgu.logo && lgu.logo.startsWith('http')
+                  ? { uri: lgu.logo }
+                  : require('../../assets/brand/liliw-seal.jpg');
+                return (
+                  <Image
+                    source={logoSource}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      marginRight: 16,
+                      backgroundColor: '#FFFFFF',
+                    }}
+                    resizeMode="contain"
+                  />
+                );
+              })()}
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: T.text }}>
                   {lgu.name}

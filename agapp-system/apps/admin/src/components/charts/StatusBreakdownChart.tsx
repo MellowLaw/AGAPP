@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { STATUS_COLORS } from '@/components/map/markers';
+import { STATUS_COLORS } from '@/components/map/colors';
 import { buildTooltipContent } from './ChartTooltip';
 import { ChartLegend } from './ChartLegend';
 

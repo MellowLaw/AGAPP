@@ -29,6 +29,7 @@ const config: Config = {
         // exactly `border-theme`, matching this project's design spec.
         theme: 'var(--border-theme)',
         accent: 'var(--accent)',
+        'accent-contrast': 'var(--accent-contrast)',
         'accent-soft': 'var(--accent-soft)',
         'accent-icon': 'var(--accent-icon)',
       },

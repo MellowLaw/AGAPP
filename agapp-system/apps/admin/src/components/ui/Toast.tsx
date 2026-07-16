@@ -28,30 +28,30 @@ export const Toast: React.FC<ToastProps> = ({
   }, [duration, onClose]);
 
   const icons = {
-    success: <TickCircle className="w-5 h-5 text-[#16a34a]" />,
-    error: <Danger className="w-5 h-5 text-[#dc2626]" />,
-    info: <InfoCircle className="w-5 h-5 text-[#2563eb]" />,
+    success: <TickCircle className="w-5 h-5 text-[#22c55e]" variant="Bold" />,
+    error: <Danger className="w-5 h-5 text-[#ef4444]" variant="Bold" />,
+    info: <InfoCircle className="w-5 h-5 text-[#3b82f6]" variant="Bold" />,
   };
 
-  const bgColors = {
-    success: 'bg-[#dcfce7] border-[#16a34a]',
-    error: 'bg-[#fee2e2] border-[#dc2626]',
-    info: 'bg-[#dbeafe] border-[#2563eb]',
+  const borderColors = {
+    success: 'border-[#22c55e]/30 dark:border-[#22c55e]/25',
+    error: 'border-[#ef4444]/30 dark:border-[#ef4444]/25',
+    info: 'border-[#3b82f6]/30 dark:border-[#3b82f6]/25',
   };
 
   return (
     <div
       className={`
-        fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg
-        transition-all duration-300
-        ${bgColors[type]}
-        ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+        fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-xl
+        bg-surface-alt/90 backdrop-blur-md transition-all duration-300
+        ${borderColors[type]}
+        ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95'}
       `}
     >
       {icons[type]}
-      <span className="text-sm font-medium text-text-primary">{message}</span>
-      <button onClick={() => setIsVisible(false)} className="ml-2">
-        <CloseCircle className="w-4 h-4 text-text-muted hover:text-text-primary" />
+      <span className="text-xs font-semibold text-text-primary">{message}</span>
+      <button onClick={() => setIsVisible(false)} className="ml-3 hover:opacity-80 transition-opacity">
+        <CloseCircle className="w-4.5 h-4.5 text-text-muted hover:text-text-primary" />
       </button>
     </div>
   );

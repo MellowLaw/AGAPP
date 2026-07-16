@@ -54,6 +54,7 @@ interface WizardState {
   province: string;
   city: string;
   // Step 2 — branding
+  logo: string;
   primaryColor: string;
   secondaryColor: string;
   iconColor: string;
@@ -71,6 +72,7 @@ const EMPTY_WIZARD: WizardState = {
   region: '',
   province: '',
   city: '',
+  logo: '',
   primaryColor: DEFAULT_PRIMARY,
   secondaryColor: DEFAULT_SECONDARY,
   iconColor: DEFAULT_PRIMARY,
@@ -108,6 +110,86 @@ export default function SuperLgusPage() {
   const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Confirmation Modal States
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+
+  const triggerConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
+
+  const uploadLogoFile = async (file: File, lguId: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('lguId', lguId);
+
+    const res = await fetch('/api/upload-logo', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to upload logo');
+    return result.publicUrl;
+  };
+
+  const handleSuperAdminLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedLguForEdit) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Logo image must be under 2MB.', 'error');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const publicUrl = await uploadLogoFile(file, selectedLguForEdit.id);
+      setSelectedLguForEdit({
+        ...selectedLguForEdit,
+        logo: publicUrl
+      });
+      showToast('Logo uploaded successfully. Click Save Changes at the top to apply.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to upload logo', 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleWizardLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Logo image must be under 2MB.', 'error');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const wizardId = lguIdFromName(`Municipality of ${wizard.city || 'temp'}`);
+      const publicUrl = await uploadLogoFile(file, wizardId);
+      setWizard(prev => ({
+        ...prev,
+        logo: publicUrl
+      }));
+      showToast('Logo uploaded successfully!', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to upload logo', 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   useEffect(() => {
     const fetchLgus = async () => {
@@ -233,7 +315,7 @@ export default function SuperLgusPage() {
       reports: 0,
       requests: 0,
       responseTime: 'N/A',
-      logo: '',
+      logo: wizard.logo || '',
       banner_url: null,
       primary_color: wizard.primaryColor,
       secondary_color: wizard.secondaryColor,
@@ -255,7 +337,7 @@ export default function SuperLgusPage() {
       .insert({
         id,
         name,
-        logo: '',
+        logo: wizard.logo || '',
         banner_url: null,
         primary_color: wizard.primaryColor,
         secondary_color: wizard.secondaryColor,
@@ -369,286 +451,328 @@ export default function SuperLgusPage() {
 
 
   return (
-    <DashboardLayout role="super-admin" title="LGU Directory">
+    <DashboardLayout role="super-admin" title={selectedLguForEdit ? `Configure LGU: ${selectedLguForEdit.name}` : "LGU Directory"}>
       <ToastContainer />
-      {loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl">
-          Loading LGUs…
-        </div>
-      )}
-      {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
-          Failed to load LGUs: {loadError}
-        </div>
-      )}
-      <Card>
-        <CardHeader
-          title="Municipalities"
-          action={
-            <Button onClick={openWizard}>
-              <Add className="w-4 h-4 mr-1" />
-              Add LGU
+
+      {selectedLguForEdit ? (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4 border-b border-theme pb-4">
+            <Button variant="secondary" size="sm" onClick={() => setSelectedLguForEdit(null)}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Directory
             </Button>
-          }
-        />
-
-        <div className="flex items-center justify-between mb-4">
-          <Search value={search} onChange={setSearch} className="max-w-md" placeholder="Search municipality..." />
-          <Button
-            variant="secondary"
-            onClick={handleExportCsv}
-          >
-            <DocumentDownload className="w-4 h-4 mr-1" /> Export CSV
-          </Button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-            <thead>
-              <tr>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Users</th>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Avg Response</th>
-                <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Status</th>
-                <th className="text-right pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((lgu) => (
-                <tr key={lgu.id} className="bg-surface-alt hover:bg-surface transition-colors">
-                  <td className="py-3 px-4 rounded-l-md font-medium text-text-primary">{lgu.name}</td>
-                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.reports}</td>
-                  <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.requests}</td>
-                  <td className="py-3 px-4 text-sm text-text-muted">{lgu.responseTime}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
-                      {lgu.status === 'active' ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 rounded-r-md">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
-                        <Eye variant="Bold" className="w-4 h-4 mr-1" /> Configure
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={() => toggleActive(lgu.id)}>
-                        <CloseCircle className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* LGU Settings Modal */}
-      {selectedLguForEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg bg-surface rounded-2xl border border-theme p-6 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-start border-b border-theme pb-3 mb-4">
-              <h3 className="text-lg font-bold text-text-primary">Configure LGU: {selectedLguForEdit.name}</h3>
-              <button onClick={() => setSelectedLguForEdit(null)} className="text-text-faint hover:text-accent font-bold">✕</button>
-            </div>
-
-            <div className="space-y-5">
-              {/* Latitude and Longitude */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Latitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={selectedLguForEdit.latitude || 0}
-                    onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, latitude: parseFloat(e.target.value || '0') })}
-                    className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Longitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={selectedLguForEdit.longitude || 0}
-                    onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, longitude: parseFloat(e.target.value || '0') })}
-                    className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
-                  />
-                </div>
-              </div>
-
-              {/* Colors */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Primary Color</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={selectedLguForEdit.primary_color || '#ffffff'}
-                      onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={selectedLguForEdit.primary_color || ''}
-                      onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Secondary Color</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={selectedLguForEdit.secondary_color || '#ffffff'}
-                      onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={selectedLguForEdit.secondary_color || ''}
-                      onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Custom Icon Color and Dark BG Color overrides */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Icon Override Color</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        icon_color: e.target.value
-                      })}
-                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={selectedLguForEdit.icon_color || ''}
-                      placeholder={selectedLguForEdit.primary_color}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        icon_color: e.target.value
-                      })}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Dark BG Override</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={selectedLguForEdit.dark_bg_color || '#292929'}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        dark_bg_color: e.target.value
-                      })}
-                      className="w-10 h-10 border border-theme rounded-lg p-1 cursor-pointer bg-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={selectedLguForEdit.dark_bg_color || ''}
-                      placeholder="#292929"
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        dark_bg_color: e.target.value
-                      })}
-                      className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <ColorPaletteSelector
-                primaryColor={selectedLguForEdit.primary_color || '#ffffff'}
-                secondaryColor={selectedLguForEdit.secondary_color || '#ffffff'}
-                iconColor={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
-                darkBgColor={selectedLguForEdit.dark_bg_color || '#292929'}
-                onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
-                  setSelectedLguForEdit({
-                    ...selectedLguForEdit,
-                    primary_color: primaryColor,
-                    secondary_color: secondaryColor,
-                    icon_color: iconColor,
-                    dark_bg_color: darkBgColor,
-                  })
-                }
-                lguName={selectedLguForEdit.name}
-              />
-
-              {/* Onboarding payment status */}
-              <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedLguForEdit.onboarding_fee_paid || false}
-                  onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, onboarding_fee_paid: e.target.checked })}
-                  className="rounded text-accent focus:ring-accent w-4 h-4"
-                />
-                <span className="text-sm font-semibold text-text-primary">Onboarding Fee Paid (Active License)</span>
-              </label>
-
-              {/* Feature Flags */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-text-faint uppercase tracking-wider">Feature Flags</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedLguForEdit.feature_flags?.chatbot || false}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags!, chatbot: e.target.checked }
-                      })}
-                      className="rounded text-accent focus:ring-accent w-4 h-4"
-                    />
-                    <span className="text-sm font-semibold text-text-primary">Chatbot</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedLguForEdit.feature_flags?.potholeDetection || false}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags!, potholeDetection: e.target.checked }
-                      })}
-                      className="rounded text-accent focus:ring-accent w-4 h-4"
-                    />
-                    <span className="text-sm font-semibold text-text-primary">AI Pothole</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedLguForEdit.feature_flags?.forum || false}
-                      onChange={(e) => setSelectedLguForEdit({
-                        ...selectedLguForEdit,
-                        feature_flags: { ...selectedLguForEdit.feature_flags!, forum: e.target.checked }
-                      })}
-                      className="rounded text-accent focus:ring-accent w-4 h-4"
-                    />
-                    <span className="text-sm font-semibold text-text-primary">Forum</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6 border-t border-theme pt-4 justify-end">
-              <Button variant="secondary" onClick={() => setSelectedLguForEdit(null)}>Cancel</Button>
-              <Button onClick={handleSaveLgu}>Save Changes</Button>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => setSelectedLguForEdit(null)}>Cancel</Button>
+              <Button onClick={() => triggerConfirm('Confirm Settings Update', `Are you sure you want to save the configurations for ${selectedLguForEdit.name}?`, handleSaveLgu)}>Save Changes</Button>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
+            
+            {/* Left Column: All Settings Inputs (xl:col-span-5) */}
+            <div className="xl:col-span-5 flex">
+              <Card className="w-full flex flex-col justify-between">
+                <CardHeader title="LGU Configuration" subtitle="Geographic defaults, active feature flags, and custom branding color values" />
+                <div className="space-y-6 flex-1 flex flex-col justify-between">
+                  {/* Coordinates & Location info */}
+                  <div className="space-y-4">
+                    <p className="text-xs font-bold text-text-faint uppercase tracking-wider">Geographic Location</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Latitude</label>
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={selectedLguForEdit.latitude || 0}
+                          onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, latitude: parseFloat(e.target.value || '0') })}
+                          className="w-full px-3 py-2 bg-surface border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Longitude</label>
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={selectedLguForEdit.longitude || 0}
+                          onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, longitude: parseFloat(e.target.value || '0') })}
+                          className="w-full px-3 py-2 bg-surface border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active License status */}
+                  <div className="pt-4 border-t border-theme">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedLguForEdit.onboarding_fee_paid || false}
+                        onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, onboarding_fee_paid: e.target.checked })}
+                        className="rounded text-accent focus:ring-accent w-4 h-4"
+                      />
+                      <div>
+                        <span className="text-xs font-semibold text-text-primary">Onboarding Fee Paid (Active License)</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Feature flags flags */}
+                  <div className="pt-4 border-t border-theme">
+                    <p className="text-xs font-bold text-text-faint uppercase tracking-wider mb-2">Feature Flags</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer p-1.5 border border-theme rounded-md bg-surface-alt">
+                        <input
+                          type="checkbox"
+                          checked={selectedLguForEdit.feature_flags?.chatbot || false}
+                          onChange={(e) => setSelectedLguForEdit({
+                            ...selectedLguForEdit,
+                            feature_flags: { ...selectedLguForEdit.feature_flags!, chatbot: e.target.checked }
+                          })}
+                          className="rounded text-accent focus:ring-accent w-3.5 h-3.5"
+                        />
+                        <span className="text-[11px] font-semibold text-text-primary">Chatbot</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer p-1.5 border border-theme rounded-md bg-surface-alt">
+                        <input
+                          type="checkbox"
+                          checked={selectedLguForEdit.feature_flags?.potholeDetection || false}
+                          onChange={(e) => setSelectedLguForEdit({
+                            ...selectedLguForEdit,
+                            feature_flags: { ...selectedLguForEdit.feature_flags!, potholeDetection: e.target.checked }
+                          })}
+                          className="rounded text-accent focus:ring-accent w-3.5 h-3.5"
+                        />
+                        <span className="text-[11px] font-semibold text-text-primary">Pothole</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer p-1.5 border border-theme rounded-md bg-surface-alt">
+                        <input
+                          type="checkbox"
+                          checked={selectedLguForEdit.feature_flags?.forum || false}
+                          onChange={(e) => setSelectedLguForEdit({
+                            ...selectedLguForEdit,
+                            feature_flags: { ...selectedLguForEdit.feature_flags!, forum: e.target.checked }
+                          })}
+                          className="rounded text-accent focus:ring-accent w-3.5 h-3.5"
+                        />
+                        <span className="text-[11px] font-semibold text-text-primary">Forum</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Brand color input pickers */}
+                  <div className="pt-4 border-t border-theme">
+                    <p className="text-xs font-bold text-text-faint uppercase tracking-wider mb-2.5">Branding Override Colors</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={selectedLguForEdit.primary_color || '#ffffff'}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={selectedLguForEdit.primary_color || ''}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={selectedLguForEdit.secondary_color || '#ffffff'}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={selectedLguForEdit.secondary_color || ''}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Icon Override</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
+                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={selectedLguForEdit.icon_color || ''}
+                            placeholder={selectedLguForEdit.primary_color}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="color"
+                            value={selectedLguForEdit.dark_bg_color || '#292929'}
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
+                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={selectedLguForEdit.dark_bg_color || ''}
+                            placeholder="#292929"
+                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
+                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Right Column: Predefined Palettes & Preview (xl:col-span-7) */}
+            <Card className="xl:col-span-7 flex flex-col justify-between">
+              <div className="flex-1 flex flex-col justify-between">
+                <ColorPaletteSelector
+                  primaryColor={selectedLguForEdit.primary_color || '#ffffff'}
+                  secondaryColor={selectedLguForEdit.secondary_color || '#ffffff'}
+                  iconColor={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
+                  darkBgColor={selectedLguForEdit.dark_bg_color || '#292929'}
+                  onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
+                    setSelectedLguForEdit({
+                      ...selectedLguForEdit,
+                      primary_color: primaryColor,
+                      secondary_color: secondaryColor,
+                      icon_color: iconColor,
+                      dark_bg_color: darkBgColor,
+                    })
+                  }
+                  lguName={selectedLguForEdit.name}
+                  sideBySide={true}
+                />
+
+                {/* Logo Upload Section */}
+                <div className="p-5 border-t border-theme">
+                  <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-2">Municipality Logo / Seal</label>
+                  <div className="flex items-center gap-4">
+                    {selectedLguForEdit.logo ? (
+                      <img src={selectedLguForEdit.logo} alt="LGU Logo" className="w-14 h-14 rounded-full border border-theme bg-surface-alt object-contain p-1" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full border border-theme bg-surface-alt flex items-center justify-center text-text-faint text-[10px] font-semibold">No Logo</div>
+                    )}
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSuperAdminLogoUpload}
+                        disabled={uploadingLogo}
+                        className="hidden"
+                        id="super-logo-file-input"
+                      />
+                      <label
+                        htmlFor="super-logo-file-input"
+                        className="inline-flex items-center justify-center px-4 py-1.5 border border-theme rounded-full text-xs font-semibold text-text-primary bg-surface hover:bg-surface-alt cursor-pointer transition-colors"
+                      >
+                        {uploadingLogo ? 'Uploading...' : 'Browse Image'}
+                      </label>
+                      <span className="text-[10px] text-text-muted ml-3">Accepts JPEG, PNG, SVG under 2MB</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+          </div>
         </div>
+      ) : (
+        <>
+          {loading && (
+            <div className="mb-3 px-4 py-2 text-sm text-text-muted bg-surface-alt rounded-xl">
+              Loading LGUs…
+            </div>
+          )}
+          {loadError && !loading && (
+            <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
+              Failed to load LGUs: {loadError}
+            </div>
+          )}
+          <Card>
+            <CardHeader
+              title="Municipalities"
+              action={
+                <Button onClick={openWizard}>
+                  <Add className="w-4 h-4 mr-1" />
+                  Add LGU
+                </Button>
+              }
+            />
+
+            <div className="flex items-center justify-between mb-4">
+              <Search value={search} onChange={setSearch} className="max-w-md" placeholder="Search municipality..." />
+              <Button
+                variant="secondary"
+                onClick={handleExportCsv}
+              >
+                <DocumentDownload className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
+                <thead>
+                  <tr>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Users</th>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Avg Response</th>
+                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Status</th>
+                    <th className="text-right pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((lgu) => (
+                    <tr key={lgu.id} className="bg-surface-alt hover:bg-surface transition-colors">
+                      <td className="py-3 px-4 rounded-l-md font-medium text-text-primary">{lgu.name}</td>
+                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.reports}</td>
+                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.requests}</td>
+                      <td className="py-3 px-4 text-sm text-text-muted">{lgu.responseTime}</td>
+                      <td className="py-3 px-4">
+                        <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
+                          {lgu.status === 'active' ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 rounded-r-md">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
+                            <Eye variant="Bold" className="w-4 h-4 mr-1" /> Configure
+                          </Button>
+                          <Button variant="secondary" size="sm" onClick={() => triggerConfirm('Confirm LGU Status Update', `Are you sure you want to ${lgu.status === 'active' ? 'deactivate' : 'activate'} LGU ${lgu.name}?`, () => toggleActive(lgu.id))}>
+                            <CloseCircle className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
       )}
 
       {/* Add-LGU Onboarding Wizard */}
@@ -698,15 +822,15 @@ export default function SuperLgusPage() {
                         <div
                           className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-colors ${
                             done
-                              ? 'bg-accent border-accent text-white'
+                              ? 'bg-accent border-accent text-accent-contrast'
                               : active
                               ? 'border-accent text-accent bg-accent-soft'
-                              : 'border-theme text-text-faint bg-surface-alt'
+                              : 'border-theme text-text-muted bg-surface-alt'
                           }`}
                         >
                           {done ? <TickCircle className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
                         </div>
-                        <span className={`text-[11px] font-semibold ${active || done ? 'text-text-primary' : 'text-text-faint'}`}>
+                        <span className={`text-[11px] font-semibold ${active || done ? 'text-text-primary' : 'text-text-muted'}`}>
                           {s.label}
                         </span>
                       </div>
@@ -884,6 +1008,35 @@ export default function SuperLgusPage() {
                       lguName={wizard.city || 'Municipality'}
                     />
 
+                    {/* Onboarding Wizard Logo Upload Section */}
+                    <div className="p-4 border border-theme rounded-xl bg-surface-alt mt-2">
+                      <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-2">Municipality Logo / Seal</label>
+                      <div className="flex items-center gap-4">
+                        {wizard.logo ? (
+                          <img src={wizard.logo} alt="LGU Logo" className="w-14 h-14 rounded-full border border-theme bg-surface object-contain p-1" />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full border border-theme bg-surface flex items-center justify-center text-text-faint text-[10px] font-semibold">No Logo</div>
+                        )}
+                        <div className="flex-1 space-y-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleWizardLogoUpload}
+                            disabled={uploadingLogo}
+                            className="hidden"
+                            id="wizard-logo-file-input"
+                          />
+                          <label
+                            htmlFor="wizard-logo-file-input"
+                            className="inline-flex items-center justify-center px-4 py-1.5 border border-theme rounded-full text-xs font-semibold text-text-primary bg-surface hover:bg-surface-alt cursor-pointer transition-colors"
+                          >
+                            {uploadingLogo ? 'Uploading...' : 'Browse Image'}
+                          </label>
+                          <span className="text-[10px] text-text-muted ml-3">Accepts JPEG, PNG, SVG under 2MB</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <label className="flex items-center gap-2.5 py-2 border-b border-theme cursor-pointer">
                       <input
                         type="checkbox"
@@ -986,6 +1139,14 @@ export default function SuperLgusPage() {
                       <ReviewRow label="LGU Name" value={wizardName} />
                       <ReviewRow label="LGU ID" value={wizardId} mono />
                       <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-xs font-semibold text-text-muted uppercase">Logo / Seal</span>
+                        {wizard.logo ? (
+                          <img src={wizard.logo} alt="Wizard Logo" className="w-8 h-8 rounded-full border border-theme bg-surface-alt object-contain p-0.5" />
+                        ) : (
+                          <span className="text-sm text-text-muted">None</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5">
                         <span className="text-xs font-semibold text-text-muted uppercase">Branding</span>
                         <div className="flex items-center gap-3">
                           <span className="flex items-center gap-1.5 text-sm text-text-primary">
@@ -1053,6 +1214,20 @@ export default function SuperLgusPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-text-primary mb-2">{confirmTitle}</h3>
+            <p className="text-sm text-text-muted mb-6">{confirmMessage}</p>
+            <div className="flex justify-end gap-2 border-t border-theme pt-4">
+              <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={() => { confirmAction?.(); setConfirmOpen(false); }}>Yes, Save Changes</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 

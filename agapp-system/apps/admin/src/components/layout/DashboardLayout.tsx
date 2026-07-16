@@ -139,7 +139,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         ? adjustColorContrast(customIconColor, isDark)
         : adjustedColor;
       
+      // Calculate luminance of adjusted color to decide contrasting text color
+      const cleanColor = adjustedColor.replace('#', '');
+      let contrastVal = '#ffffff';
+      if (cleanColor.length === 6) {
+        const rc = parseInt(cleanColor.slice(0, 2), 16);
+        const gc = parseInt(cleanColor.slice(2, 4), 16);
+        const bc = parseInt(cleanColor.slice(4, 6), 16);
+        const lum = (0.299 * rc + 0.587 * gc + 0.114 * bc) / 255;
+        if (lum > 0.65) contrastVal = '#1f1f1f'; // dark text for very light accent
+      }
+      
       document.documentElement.style.setProperty('--accent', adjustedColor);
+      document.documentElement.style.setProperty('--accent-contrast', contrastVal);
       document.documentElement.style.setProperty('--accent-secondary', adjustedSecColor);
       document.documentElement.style.setProperty('--accent-icon', adjustedIconColor);
 

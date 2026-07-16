@@ -26,6 +26,19 @@ export default function SuperSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // Confirmation Modal States
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+
+  const triggerConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
+
   // ── Load all config from Supabase ─────────────────────────────────────────
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -165,7 +178,7 @@ export default function SuperSettingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
 
         {/* ── Global Configuration ── */}
         <Card>
@@ -190,12 +203,12 @@ export default function SuperSettingsPage() {
                 value={banner}
                 onChange={(e: any) => setBanner(e.target.value)}
                 placeholder="e.g. System will be under maintenance on Sunday 12–2 AM"
-                rows={3}
+                rows={2}
               />
             </div>
 
             <div className="pt-2 border-t border-theme">
-              <Button onClick={handleSaveGlobal} disabled={saving === 'global'}>
+              <Button onClick={() => triggerConfirm('Confirm Settings Update', 'Are you sure you want to save these global configuration changes?', handleSaveGlobal)} disabled={saving === 'global'}>
                 {saving === 'global' ? 'Saving…' : 'Save Settings'}
               </Button>
             </div>
@@ -220,7 +233,7 @@ export default function SuperSettingsPage() {
               />
             </div>
             <div className="pt-2 border-t border-theme">
-              <Button onClick={handleSaveSla} disabled={saving === 'sla'}>
+              <Button onClick={() => triggerConfirm('Confirm SLA Target Update', 'Are you sure you want to save the new SLA response target settings?', handleSaveSla)} disabled={saving === 'sla'}>
                 {saving === 'sla' ? 'Saving…' : 'Save SLA'}
               </Button>
             </div>
@@ -230,9 +243,9 @@ export default function SuperSettingsPage() {
         {/* ── Report Categories ── */}
         <Card>
           <CardHeader title="Report Categories" subtitle="Labels visible to LGU admins when filtering reports" />
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
             {categories.map((c, i) => (
-              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-theme rounded-md">
+              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-1.5 border border-theme rounded-md bg-surface">
                 <span className="text-sm text-text-primary">{c}</span>
                 <button
                   onClick={() => removeCategory(i)}
@@ -265,9 +278,9 @@ export default function SuperSettingsPage() {
         {/* ── Service Types ── */}
         <Card>
           <CardHeader title="Service Types" subtitle="Document/service types available for citizen e-service requests" />
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
             {serviceTypes.map((c, i) => (
-              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-2 border border-theme rounded-md">
+              <div key={`${c}-${i}`} className="flex items-center justify-between px-3 py-1.5 border border-theme rounded-md bg-surface">
                 <span className="text-sm text-text-primary">{c}</span>
                 <button
                   onClick={() => removeServiceType(i)}
@@ -298,6 +311,20 @@ export default function SuperSettingsPage() {
         </Card>
 
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-text-primary mb-2">{confirmTitle}</h3>
+            <p className="text-sm text-text-muted mb-6">{confirmMessage}</p>
+            <div className="flex justify-end gap-2 border-t border-theme pt-4">
+              <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={() => { confirmAction?.(); setConfirmOpen(false); }}>Yes, Save Changes</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

@@ -506,11 +506,9 @@ export function HomeScreen({ navigation }: any) {
 
               {(() => {
                 const activeLgu = session ? selectedLgu : guestLgu;
-                const lguLogoSource = activeLgu?.id === 'liliw-laguna'
-                  ? require('../../assets/brand/liliw-seal.jpg')
-                  : activeLgu?.logo && activeLgu.logo.startsWith('http')
-                    ? { uri: activeLgu.logo }
-                    : require('../../assets/brand/liliw-seal.jpg');
+                const lguLogoSource = activeLgu?.logo && activeLgu.logo.startsWith('http')
+                  ? { uri: activeLgu.logo }
+                  : require('../../assets/brand/liliw-seal.jpg');
 
                 return (
                   <Image

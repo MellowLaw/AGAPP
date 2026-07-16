@@ -15,6 +15,7 @@ interface ColorPaletteSelectorProps {
   darkBgColor: string;
   onChange: (colors: { primaryColor: string; secondaryColor: string; iconColor: string; darkBgColor: string }) => void;
   lguName?: string;
+  sideBySide?: boolean;
 }
 
 // Reimplementation of packages/shared/src/theme.ts's softenColor/contrastColor —
@@ -133,6 +134,7 @@ export function ColorPaletteSelector({
   darkBgColor,
   onChange,
   lguName = 'Municipality',
+  sideBySide = false,
 }: ColorPaletteSelectorProps) {
   const [activeTab, setActiveTab] = useState('Red');
   const [savedPalettes, setSavedPalettes] = useState<any[]>([]);
@@ -198,300 +200,284 @@ export function ColorPaletteSelector({
   const washLowAlpha = isPreviewDark ? '12' : '14';
   const previewWash = `linear-gradient(to bottom left, ${previewPrimary}${washTopAlpha} 0%, ${previewPrimary}${washMidAlpha} 40%, ${previewPrimary}${washLowAlpha} 75%, ${previewBg} 100%)`;
 
-  return (
-    <div className="space-y-4 border border-theme rounded-xl p-4 bg-surface-alt/30">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
-          Predefined Brand Palettes (Coolors & Custom)
-        </label>
-        <span className="text-[11px] text-text-faint">
-          Select a category to apply matching primary, secondary, active icon, and dark mode background colors.
-        </span>
-      </div>
-
-      {/* Palette Tabs */}
-      <div className="flex flex-wrap gap-1.5 border-b border-theme pb-2.5">
-        {PALETTE_CATEGORIES.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === tab
-                ? 'bg-text-primary text-bg'
-                : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Palette Items Grid */}
-      {filteredPalettes.length === 0 ? (
-        <div className="text-center py-6 text-xs text-text-faint bg-surface rounded-xl border border-dashed border-theme">
-          No custom palettes saved yet. Enter a name below to save your current configuration!
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {filteredPalettes.map((palette) => {
-            const isSelected =
-              primaryColor.toLowerCase() === palette.primary.toLowerCase() &&
-              secondaryColor.toLowerCase() === palette.secondary.toLowerCase() &&
-              iconColor.toLowerCase() === palette.icon.toLowerCase() &&
-              darkBgColor.toLowerCase() === palette.darkBg.toLowerCase();
-            return (
-              <button
-                key={palette.name}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    primaryColor: palette.primary,
-                    secondaryColor: palette.secondary,
-                    iconColor: palette.icon,
-                    darkBgColor: palette.darkBg,
-                  })
-                }
-                className={`p-2.5 rounded-xl border text-left flex flex-col gap-2 relative transition-all ${
-                  isSelected
-                    ? 'border-accent bg-accent-soft shadow-sm ring-1 ring-accent'
-                    : 'border-theme bg-surface hover:border-text-muted'
-                }`}
-              >
-                <span className="text-[11px] font-bold text-text-primary truncate pr-4">{palette.name}</span>
-                <div className="flex gap-1.5 items-center">
-                  <div
-                    className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: palette.primary }}
-                    title={`Primary: ${palette.primary}`}
-                  />
-                  <div
-                    className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: palette.secondary }}
-                    title={`Secondary: ${palette.secondary}`}
-                  />
-                  <div
-                    className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: palette.icon }}
-                    title={`Icon Override: ${palette.icon}`}
-                  />
-                  <div
-                    className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: palette.darkBg }}
-                    title={`Dark BG Override: ${palette.darkBg}`}
-                  />
-                </div>
-                {palette.category === 'Custom' && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeletePalette(palette.name, e)}
-                    className="absolute top-1.5 right-1.5 text-text-faint hover:text-red-500 font-bold text-xs"
-                    title="Delete custom palette"
-                  >
-                    ✕
-                  </button>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Save Custom Palette Form */}
-      <div className="flex flex-col sm:flex-row gap-2 pt-2 pb-1">
-        <input
-          type="text"
-          value={newPaletteName}
-          onChange={(e) => setNewPaletteName(e.target.value)}
-          placeholder="New Palette Name…"
-          className="flex-1 px-3 py-1.5 bg-surface border border-theme rounded-lg text-xs text-text-primary focus:outline-none focus:border-accent"
-        />
-        <button
-          type="button"
-          onClick={handleSavePalette}
-          disabled={!newPaletteName.trim()}
-          className="px-4 py-1.5 rounded-lg bg-text-primary text-bg hover:opacity-90 disabled:opacity-40 transition-opacity text-xs font-bold shrink-0"
-        >
-          Save Current Config
-        </button>
-      </div>
-
-      {/* Preview header with Light/Dark mode switcher */}
-      <div className="flex justify-between items-center mt-6 pt-4 border-t border-theme">
-        <div className="flex flex-col gap-0.5">
+  const innerContent = (
+    <>
+      {/* Left/Main portion: Palettes Selection */}
+      <div className={sideBySide ? "lg:col-span-7 space-y-4" : "space-y-4"}>
+        <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
-            Mobile App Live Preview Mockup
+            Predefined Brand Palettes (Coolors & Custom)
           </label>
-          <span className="text-[10px] text-text-faint">
-            View active icons in custom colors and dark backgrounds simulated on iOS/Android.
+          <span className="text-[11px] text-text-faint">
+            Select a category to apply matching primary, secondary, active icon, and dark mode background colors.
           </span>
         </div>
-        <div className="flex gap-1 bg-surface border border-theme rounded-lg p-0.5">
+
+        {/* Palette Tabs */}
+        <div className="flex flex-wrap gap-1.5 border-b border-theme pb-2.5">
+          {PALETTE_CATEGORIES.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === tab
+                  ? 'bg-text-primary text-bg'
+                  : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Palette Items Grid */}
+        {filteredPalettes.length === 0 ? (
+          <div className="text-center py-6 text-xs text-text-faint bg-surface rounded-xl border border-dashed border-theme">
+            No custom palettes saved yet. Enter a name below to save your current configuration!
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {filteredPalettes.map((palette) => {
+              const isSelected =
+                primaryColor.toLowerCase() === palette.primary.toLowerCase() &&
+                secondaryColor.toLowerCase() === palette.secondary.toLowerCase() &&
+                iconColor.toLowerCase() === palette.icon.toLowerCase() &&
+                darkBgColor.toLowerCase() === palette.darkBg.toLowerCase();
+              return (
+                <button
+                  key={palette.name}
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      primaryColor: palette.primary,
+                      secondaryColor: palette.secondary,
+                      iconColor: palette.icon,
+                      darkBgColor: palette.darkBg,
+                    })
+                  }
+                  className={`p-2.5 rounded-xl border text-left flex flex-col gap-2 relative transition-all ${
+                    isSelected
+                      ? 'border-accent bg-accent-soft shadow-sm ring-1 ring-accent'
+                      : 'border-theme bg-surface hover:border-text-muted'
+                  }`}
+                >
+                  <span className="text-[11px] font-bold text-text-primary truncate pr-4">{palette.name}</span>
+                  <div className="flex gap-1.5 items-center">
+                    <div
+                      className="w-4 h-4 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: palette.primary }}
+                      title={`Primary: ${palette.primary}`}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: palette.secondary }}
+                      title={`Secondary: ${palette.secondary}`}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: palette.icon }}
+                      title={`Icon Override: ${palette.icon}`}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: palette.darkBg }}
+                      title={`Dark BG Override: ${palette.darkBg}`}
+                    />
+                  </div>
+                  {palette.category === 'Custom' && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeletePalette(palette.name, e)}
+                      className="absolute top-1.5 right-1.5 text-text-faint hover:text-red-500 font-bold text-xs"
+                      title="Delete custom palette"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Save Custom Palette Form */}
+        <div className="flex flex-col sm:flex-row gap-2 pt-2 pb-1">
+          <input
+            type="text"
+            value={newPaletteName}
+            onChange={(e) => setNewPaletteName(e.target.value)}
+            placeholder="New Palette Name…"
+            className="flex-1 px-3 py-1.5 bg-surface border border-theme rounded-lg text-xs text-text-primary focus:outline-none focus:border-accent"
+          />
           <button
             type="button"
-            onClick={() => setIsPreviewDark(false)}
-            className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${
-              !isPreviewDark ? 'bg-text-primary text-bg' : 'text-text-muted hover:text-text-primary'
-            }`}
+            onClick={handleSavePalette}
+            disabled={!newPaletteName.trim()}
+            className="px-4 py-1.5 rounded-lg bg-text-primary text-bg hover:opacity-90 disabled:opacity-40 transition-opacity text-xs font-bold shrink-0"
           >
-            Light
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsPreviewDark(true)}
-            className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${
-              isPreviewDark ? 'bg-text-primary text-bg' : 'text-text-muted hover:text-text-primary'
-            }`}
-          >
-            Dark
+            Save Current Config
           </button>
         </div>
       </div>
 
-      {/* Phone Frame Wrap Container */}
-      <div className="flex justify-center py-4 bg-surface-alt/20 rounded-2xl border border-theme">
-        {/* Bezel frame of simulated Phone */}
-        <div className="w-[260px] h-[450px] bg-black rounded-[42px] p-2.5 shadow-2xl relative border-4 border-[#333333]">
-          
-          {/* Dynamic screen area — structural mirror of the real mobile Home
-              screen's top portion (HomeScreen.tsx) plus the floating nav bar
-              (AppNavigator.tsx's FloatingTabBar). Static/non-interactive —
-              this is a color preview, not a functional mockup. */}
-          <div
-            className="w-full h-full rounded-[32px] overflow-hidden relative transition-all duration-300 select-none"
-            style={{
-              // NOT the `background` shorthand — that resets background-color
-              // to transparent, so the gradient's translucent alpha stops
-              // (30%/16%/8%) would composite against the black phone bezel
-              // behind this div instead of against previewBg, rendering as a
-              // dark/muddy smear instead of a light accent tint. Setting
-              // backgroundColor separately gives the gradient a solid cream
-              // (or dark) base to blend against, same as how ScreenBackground.tsx
-              // paints its LinearGradient over an already-opaque T.bg View.
-              backgroundImage: previewWash,
-              backgroundColor: previewBg,
-              color: isPreviewDark ? '#FFFCF5' : '#292929',
-            }}
-          >
-            {/* Sparkle shapes — same static/animated decor
-                ScreenBackground.tsx scatters through the top ~60% of every
-                tab screen (star/diamond/ring/dot, tinted with the accent),
-                not confined to a thin sliver under the status bar. Fixed
-                opacity here since this preview has no animation. */}
-            <div className="absolute inset-x-0 top-0 h-[60%] pointer-events-none overflow-hidden">
-              <div className="absolute rounded-full" style={{ top: 10, left: '18%', width: 5, height: 5, backgroundColor: previewPrimary, opacity: 0.55 }} />
-              <div className="absolute rotate-45" style={{ top: 22, left: '68%', width: 6, height: 6, backgroundColor: previewPrimary, opacity: 0.5 }} />
-              <div className="absolute rounded-full border" style={{ top: 34, left: '42%', width: 7, height: 7, borderColor: previewPrimary, opacity: 0.5 }} />
-              <div className="absolute rounded-full" style={{ top: 16, left: '86%', width: 4, height: 4, backgroundColor: previewPrimary, opacity: 0.55 }} />
-              <div className="absolute rotate-45" style={{ top: 92, left: '80%', width: 6, height: 6, backgroundColor: previewPrimary, opacity: 0.45 }} />
-              <div className="absolute rounded-full" style={{ top: 118, left: '14%', width: 5, height: 5, backgroundColor: previewPrimary, opacity: 0.45 }} />
-              <div className="absolute rounded-full border" style={{ top: 150, left: '55%', width: 7, height: 7, borderColor: previewPrimary, opacity: 0.4 }} />
-            </div>
+      {/* Right portion: Live Phone Preview Mockup */}
+      <div className={sideBySide ? "lg:col-span-5 flex flex-col justify-between space-y-4 lg:space-y-0" : "space-y-4"}>
+        {/* Preview header with Light/Dark mode switcher */}
+        <div className="flex justify-between items-center pt-2">
+          <div className="flex flex-col gap-0.5">
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
+              Mobile App Live Preview
+            </label>
+            <span className="text-[10px] text-text-faint">
+              Simulated iOS/Android display
+            </span>
+          </div>
+          <div className="flex gap-1 bg-surface border border-theme rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setIsPreviewDark(false)}
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
+                !isPreviewDark ? 'bg-text-primary text-bg' : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Light
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPreviewDark(true)}
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
+                isPreviewDark ? 'bg-text-primary text-bg' : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Dark
+            </button>
+          </div>
+        </div>
 
-            {/* Simulated Phone Status Bar */}
-            <div className="h-6 w-full flex justify-between items-center px-5 text-[9px] font-bold tracking-tight z-20 opacity-75">
-              <span>9:41</span>
-              {/* Dynamic status indicators */}
-              <div className="flex items-center gap-1">
-                <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c3.9 3.89 10.21 3.89 14.1 0l1.38-1.79C21.26 16.07 22 14.12 22 12c0-4.97-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-10h2v4h-2zm0 6h2v2h-2z" />
-                </svg>
-                <div className="w-4 h-2 border border-current rounded-sm p-0.5 flex items-center">
-                  <div className="w-full h-full bg-current rounded-xs" />
+        {/* Phone Frame Wrap Container */}
+        <div className="flex justify-center py-2.5 bg-surface-alt/20 rounded-2xl border border-theme">
+          {/* Bezel frame of simulated Phone */}
+          <div className="w-[230px] h-[390px] bg-black rounded-[36px] p-2 shadow-2xl relative border-[3px] border-[#333333]">
+            
+            {/* Dynamic screen area */}
+            <div
+              className="w-full h-full rounded-[28px] overflow-hidden relative transition-all duration-300 select-none"
+              style={{
+                backgroundImage: previewWash,
+                backgroundColor: previewBg,
+                color: isPreviewDark ? '#FFFCF5' : '#292929',
+              }}
+            >
+              {/* Sparkle shapes */}
+              <div className="absolute inset-x-0 top-0 h-[60%] pointer-events-none overflow-hidden">
+                <div className="absolute rounded-full" style={{ top: 10, left: '18%', width: 4, height: 4, backgroundColor: previewPrimary, opacity: 0.55 }} />
+                <div className="absolute rotate-45" style={{ top: 20, left: '68%', width: 5, height: 5, backgroundColor: previewPrimary, opacity: 0.5 }} />
+                <div className="absolute rounded-full border" style={{ top: 30, left: '42%', width: 6, height: 6, borderColor: previewPrimary, opacity: 0.5 }} />
+              </div>
+
+              {/* Simulated Phone Status Bar */}
+              <div className="h-5 w-full flex justify-between items-center px-4 text-[8px] font-bold tracking-tight z-20 opacity-75">
+                <span>9:41</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-3.5 h-1.5 border border-current rounded-sm p-0.5 flex items-center">
+                    <div className="w-full h-full bg-current rounded-xs" />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Home screen top portion — greeting header + quick-action grid,
-                mirroring HomeScreen.tsx's "For You" tab structure. */}
-            <div className="px-3.5 pt-1 overflow-hidden" style={{ height: 'calc(100% - 24px - 62px)' }}>
-              <span className="block text-[8px] font-medium opacity-70 mb-0.5">
-                Brgy. Poblacion | {lguName}
-              </span>
-              <h4 className="text-[16px] font-bold leading-tight mb-3">
-                Magandang Araw!
-              </h4>
+              {/* Home screen top portion */}
+              <div className="px-3 pt-0.5 overflow-hidden" style={{ height: 'calc(100% - 20px - 54px)' }}>
+                <span className="block text-[7px] font-medium opacity-70 mb-0.5">
+                  Brgy. Poblacion | {lguName}
+                </span>
+                <h4 className="text-[13px] font-bold leading-tight mb-2">
+                  Magandang Araw!
+                </h4>
 
-              {/* Quick Actions Grid Card — 2x4, matching the real 8 quick
-                  actions. Tile background is T.card equivalent; the glyph
-                  color is T.iconAccent (iconColor || primaryColor), the
-                  ACTUAL fallback logic HomeScreen.tsx uses. */}
+                {/* Quick Actions Grid Card */}
+                <div
+                  className="rounded-xl border p-2"
+                  style={{
+                    backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
+                    borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
+                  }}
+                >
+                  <span className="block text-[7px] font-bold mb-1.5 opacity-80">
+                    What would you like to do?
+                  </span>
+                  <div className="grid grid-cols-4 gap-x-1 gap-y-1.5">
+                    {PREVIEW_QUICK_ACTIONS.map((qa) => (
+                      <div key={qa.label} className="flex flex-col items-center gap-0.5">
+                        <div
+                          className="w-6.5 h-6.5 rounded-lg border flex items-center justify-center"
+                          style={{
+                            backgroundColor: isPreviewDark ? '#3A3A33' : '#FFFFFF',
+                            borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
+                          }}
+                        >
+                          {qa.Icon ? (
+                            <qa.Icon size={12} color={previewIconAccent} variant="Bold" />
+                          ) : (
+                            <ChatboxGlyph size={12} color={previewIconAccent} />
+                          )}
+                        </div>
+                        <span className="text-[5px] font-medium text-center leading-tight opacity-85 scale-90 truncate w-full">
+                          {qa.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating pill nav bar */}
               <div
-                className="rounded-2xl border p-2.5"
+                className="absolute left-2 right-2 bottom-2 h-10 rounded-full flex items-center px-1 shadow-sm border"
                 style={{
                   backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
                   borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
                 }}
               >
-                <span className="block text-[8px] font-bold mb-2 opacity-80">
-                  What would you like to do?
-                </span>
-                <div className="grid grid-cols-4 gap-x-1.5 gap-y-2.5">
-                  {PREVIEW_QUICK_ACTIONS.map((qa) => (
-                    <div key={qa.label} className="flex flex-col items-center gap-1">
-                      <div
-                        className="w-8 h-8 rounded-xl border flex items-center justify-center"
-                        style={{
-                          backgroundColor: isPreviewDark ? '#3A3A33' : '#FFFFFF',
-                          borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
-                        }}
-                      >
-                        {qa.Icon ? (
-                          <qa.Icon size={16} color={previewIconAccent} variant="Bold" />
-                        ) : (
-                          <ChatboxGlyph size={16} color={previewIconAccent} />
-                        )}
+                {PREVIEW_NAV_TABS.map((tab, idx) => {
+                  const active = idx === 0;
+                  const tabColor = active ? previewPillIconColor : (isPreviewDark ? '#A19E97' : '#8A8781');
+                  return (
+                    <div key={tab.label} className="flex-1 h-full flex items-center justify-center relative">
+                      {active && (
+                        <div
+                          className="absolute inset-y-1 inset-x-0.5 rounded-full"
+                          style={{ backgroundColor: previewPillColor }}
+                        />
+                      )}
+                      <div className="relative flex flex-col items-center gap-0.5">
+                        {tab.Icon && <tab.Icon size={11} color={tabColor} variant="Bold" />}
+                        <span style={{ fontSize: 5.5, fontWeight: 500, color: tabColor, lineHeight: '6px' }}>
+                          {tab.label}
+                        </span>
                       </div>
-                      <span className="text-[5.5px] font-medium text-center leading-tight opacity-80">
-                        {qa.label}
-                      </span>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            </div>
-
-            {/* Floating pill nav bar — structural mirror of AppNavigator.tsx's
-                FloatingTabBar: every tab shows icon + label; the active
-                tab's whole slot (icon AND label together) sits on an oval
-                T.accentSoft pill, not just a small circle around the icon.
-                Pill background is softenColor(primaryColor, isPreviewDark
-                ? 0.3 : 0.45) i.e. T.accentSoft, and its icon/label color is
-                contrastColor(that pill color) i.e. T.onAccentSoft — the
-                exact mobile formula, so an admin's primary color going
-                murky when softened for dark mode honestly shows the icon
-                flipping to cream here too. */}
-            <div
-              className="absolute left-2.5 right-2.5 bottom-2.5 h-12 rounded-full flex items-center px-1 shadow-sm border"
-              style={{
-                backgroundColor: isPreviewDark ? '#333333' : '#FFFDF7',
-                borderColor: isPreviewDark ? '#3D3D3D' : '#E9E4DA',
-              }}
-            >
-              {PREVIEW_NAV_TABS.map((tab, idx) => {
-                const active = idx === 0;
-                const tabColor = active ? previewPillIconColor : (isPreviewDark ? '#A19E97' : '#8A8781');
-                return (
-                  <div key={tab.label} className="flex-1 h-full flex items-center justify-center relative">
-                    {active && (
-                      <div
-                        className="absolute inset-y-1 inset-x-0.5 rounded-full"
-                        style={{ backgroundColor: previewPillColor }}
-                      />
-                    )}
-                    <div className="relative flex flex-col items-center gap-0.5">
-                      {tab.Icon && <tab.Icon size={14} color={tabColor} variant="Bold" />}
-                      <span style={{ fontSize: 6, fontWeight: 500, color: tabColor, lineHeight: '7px' }}>
-                        {tab.label}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <div className={sideBySide ? "" : "border border-theme rounded-xl p-4 bg-surface-alt/30 space-y-4"}>
+      {sideBySide ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {innerContent}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {innerContent}
+        </div>
+      )}
     </div>
   );
 }

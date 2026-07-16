@@ -18,6 +18,7 @@
   --text-faint: #a3a097;
   --border-theme: #e5e2d9;
   --accent: #d62a53;
+  --accent-contrast: #ffffff;
   --accent-soft: rgba(214, 42, 83, 0.08);
   --accent-icon: var(--accent);
 }
@@ -31,6 +32,7 @@
   --text-faint: #5e5c56;
   --border-theme: #3d3d3d;
   --accent: #ff758f;
+  --accent-contrast: #ffffff;
   --accent-soft: rgba(255, 117, 143, 0.08);
   --accent-icon: var(--accent);
 }

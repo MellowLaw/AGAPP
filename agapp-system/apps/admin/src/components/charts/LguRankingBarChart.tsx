@@ -64,7 +64,7 @@ export const LguRankingBarChart: React.FC<LguRankingBarChartProps> = ({ data }) 
             onClick={() => setMetric(m.key)}
             className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
               metric === m.key
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-accent-contrast'
                 : 'bg-transparent border border-theme text-text-muted hover:border-text-muted hover:text-text-primary'
             }`}
           >

@@ -15,12 +15,23 @@ import {
   STALE_REQUEST_DAYS,
   UNCOLLECTED_REQUEST_DAYS,
 } from '@/lib/importantNotices';
+import dynamic from 'next/dynamic';
 import { ReportsMap, type ReportPin } from '@/components/map';
-import { STATUS_COLORS } from '@/components/map/markers';
-import { LguRankingBarChart, type LguRankingDatum } from '@/components/charts/LguRankingBarChart';
-import { StatusBreakdownChart, type StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
+import { STATUS_COLORS } from '@/components/map/colors';
+import type { LguRankingDatum } from '@/components/charts/LguRankingBarChart';
+import type { StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
 import { NeedsAttentionPanel, type NeedsAttentionData } from '@/components/charts/NeedsAttentionPanel';
 import { Building, People, Danger, DocumentText, Add } from 'iconsax-react';
+
+const LguRankingBarChart = dynamic(
+  () => import('@/components/charts/LguRankingBarChart').then((m) => m.LguRankingBarChart),
+  { ssr: false }
+);
+
+const StatusBreakdownChart = dynamic(
+  () => import('@/components/charts/StatusBreakdownChart').then((m) => m.StatusBreakdownChart),
+  { ssr: false }
+);
 
 // LGUs with zero reports AND zero requests created in this window are
 // flagged as inactive on the cross-LGU "Needs attention" panel.
@@ -374,7 +385,7 @@ export default function SuperAdminDashboard() {
                 : 'Interactive Reports Map across all LGUs'}
             </p>
           </div>
-          <Badge variant="default" className="!bg-accent !text-white font-semibold px-2.5 py-1 border-0">
+          <Badge variant="default" className="!bg-accent !text-accent-contrast font-semibold px-2.5 py-1 border-0">
             View only
           </Badge>
         </div>
@@ -395,7 +406,7 @@ export default function SuperAdminDashboard() {
             <p className="text-sm font-serif italic text-accent mt-1">Summary of reporting workloads per active tenant</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" className="!bg-accent !text-white !border-0 hover:opacity-90" onClick={() => {
+            <Button variant="secondary" size="sm" className="!bg-accent !text-accent-contrast !border-0 hover:opacity-90" onClick={() => {
               const rows = (selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map(l => [l.name, l.users, l.reports, l.requests, l.responseTime, 'Active'].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
               const csv = ['LGU,People,Reports,Requests,Avg Response,Status', ...rows].join('\n');
               const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
