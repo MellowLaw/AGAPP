@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PASTELS } from '../theme';
 import { useNavigation } from '@react-navigation/native';
+import LottieView from 'lottie-react-native';
 import {
   ArrowLeft2,
   ArrowRight2,
@@ -34,7 +35,16 @@ const ThinkingIndicator = ({ T }: { T: any }) => {
   return (
     <View style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%', marginBottom: 24 }}>
       <Animated.View style={{ opacity: pulseAnim, marginBottom: -20 }}>
-        <Image source={require('../../assets/brand/mascot.png')} style={{ width: 120, height: 120 }} resizeMode="contain" />
+        <LottieView
+          source={require('../../assets/brand/chatbot-message.json')}
+          style={{ width: 120, height: 120 }}
+          autoPlay
+          loop
+          colorFilters={[
+            { keypath: 'head', color: T.accent },
+            { keypath: 'ear', color: T.accent }
+          ]}
+        />
       </Animated.View>
       <View style={{ width: '100%', paddingLeft: 4, flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ color: T.textMuted, fontSize: 13, fontFamily: 'Inter-Medium', fontStyle: 'italic' }}>Thinking...</Text>
@@ -281,10 +291,15 @@ export function ChatbotScreen() {
                   const RedirectIcon = m.redirect ? getRedirectIcon(m.redirect.screen) : null;
                   return (
                     <View key={idx} style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%', marginBottom: 24 }}>
-                      <Image
-                        source={require('../../assets/brand/mascot.png')}
+                      <LottieView
+                        source={require('../../assets/brand/chatbot-message.json')}
                         style={{ width: 120, height: 120, marginBottom: -20 }}
-                        resizeMode="contain"
+                        autoPlay
+                        loop
+                        colorFilters={[
+                          { keypath: 'head', color: T.accent },
+                          { keypath: 'ear', color: T.accent }
+                        ]}
                       />
                       
                       <View style={{ width: '100%', paddingLeft: 4 }}>

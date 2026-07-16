@@ -39,12 +39,48 @@ function ChatboxIcon({ size, color }: { size: number; color: string; variant?: s
 export function HomeScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { session, profile, selectedLgu, guestLgu } = useAuth();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return 'Magandang Umaga,';
+    if (hour >= 11 && hour < 13) return 'Magandang Tanghali,';
+    if (hour >= 13 && hour < 18) return 'Magandang Hapon,';
+    return 'Magandang Gabi,';
+  };
+
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatDateTime = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const dayName = days[currentDateTime.getDay()];
+    const monthName = months[currentDateTime.getMonth()];
+    const date = currentDateTime.getDate();
+    
+    let hours = currentDateTime.getHours();
+    const minutes = currentDateTime.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+    
+    return `${dayName}, ${monthName} ${date} · ${hours}:${strMinutes} ${ampm}`;
+  };
   const [activeTab, setActiveTab] = useState<'for_you' | 'community'>('for_you');
   const [news, setNews] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [trendingThread, setTrendingThread] = useState<any | null>(null);
 
   // Search Overlay State
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -158,6 +194,56 @@ export function HomeScreen({ navigation }: any) {
         .limit(5);
 
       if (newsData) setNews(newsData);
+
+      // Fetch trending threads
+      const { data: forumData } = await supabase
+        .from('forum_posts')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, citizen:users!citizen_id(avatar_url, name))')
+        .eq('lgu_id', activeLgu.id)
+        .eq('is_approved', true)
+        .limit(10);
+
+      if (forumData) {
+        const mapped = forumData.map((p: any) => {
+          const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
+          
+          // Get unique replier avatars
+          const replierAvatars: string[] = [];
+          approvedComments.forEach((c: any) => {
+            const avatar = c.citizen?.avatar_url;
+            if (avatar && !replierAvatars.includes(avatar)) {
+              replierAvatars.push(avatar);
+            }
+          });
+
+          // Fallbacks for avatar stack
+          if (approvedComments.length > 0) {
+            const presets = [
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80',
+              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop&q=80',
+            ];
+            while (replierAvatars.length < Math.min(3, approvedComments.length)) {
+              const fallback = presets[replierAvatars.length % presets.length];
+              replierAvatars.push(fallback);
+            }
+          }
+
+          return {
+            ...p,
+            commentsCount: approvedComments.length,
+            replierAvatars,
+          };
+        });
+
+        // Sort by comments count to find top trending
+        const sorted = mapped.sort((a, b) => b.commentsCount - a.commentsCount);
+        if (sorted.length > 0) {
+          setTrendingThread(sorted[0]);
+        } else {
+          setTrendingThread(null);
+        }
+      }
     };
 
     const fetchPrivateData = async () => {
@@ -260,13 +346,7 @@ export function HomeScreen({ navigation }: any) {
     { icon: Messages, label: 'Forum', onPress: () => navigation.navigate('Forum') },
     { icon: ChatboxIcon, label: 'Chatbot', onPress: () => navigation.navigate('Assistant') },
     { icon: Map, label: 'Explore', onPress: () => navigation.navigate('Explore') },
-    { icon: Call, label: 'Emergency', onPress: () => {
-        Alert.alert('Emergency Hotlines', 'Call the municipal emergency rescue center?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Call 911', onPress: () => Linking.openURL('tel:911') },
-        ]);
-      }
-    },
+    { icon: Call, label: 'Emergency', onPress: () => navigation.navigate('Emergency') },
   ];
 
   return (
@@ -396,28 +476,59 @@ export function HomeScreen({ navigation }: any) {
                   ? lguName
                   : `${lguName}, ${province}`;
 
-                if (!session) {
-                  return (
-                    <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: T.text }}>
-                      {cleanLocation}
-                    </Text>
-                  );
-                }
-
-                const rawBarangay = profile?.barangay || 'Poblacion';
+                const rawBarangay = session && profile?.barangay ? profile.barangay : 'Poblacion';
                 const barangay = rawBarangay.toLowerCase().startsWith('brgy') 
                   ? rawBarangay 
                   : `Brgy. ${rawBarangay}`;
-                
+
                 return (
-                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: T.text }}>
-                    {barangay} | {cleanLocation}
+                  <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                    {barangay} · {cleanLocation} · {formatDateTime()}
                   </Text>
                 );
               })()}
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, marginTop: 6, lineHeight: 36 }}>
-                Magandang Araw,{'\n'}{firstName}!
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 36 }}>
+                  {getGreeting()}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 }}>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 34 }}>
+                    {firstName}!
+                  </Text>
+                  <Image
+                    source={require('../../assets/brand/mascot.png')}
+                    style={{ width: 56, height: 28, marginLeft: 8, marginBottom: 3 }}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+
+              {(() => {
+                const activeLgu = session ? selectedLgu : guestLgu;
+                const lguLogoSource = activeLgu?.id === 'liliw-laguna'
+                  ? require('../../assets/brand/liliw-seal.jpg')
+                  : activeLgu?.logo && activeLgu.logo.startsWith('http')
+                    ? { uri: activeLgu.logo }
+                    : require('../../assets/brand/liliw-seal.jpg');
+
+                return (
+                  <Image
+                    source={lguLogoSource}
+                    style={{
+                      width: 68,
+                      height: 68,
+                      borderRadius: 34,
+                      borderWidth: 1.5,
+                      borderColor: T.border,
+                      marginLeft: 16,
+                      backgroundColor: '#FFFFFF',
+                    }}
+                    resizeMode="contain"
+                  />
+                );
+              })()}
+            </View>
             </View>
 
             {/* Quick Actions Grid Card */}
@@ -476,6 +587,77 @@ export function HomeScreen({ navigation }: any) {
                 ))}
               </View>
             </View>
+
+            {/* Guest Sign-In CTA Card */}
+            {!session && (
+              <View style={{
+                backgroundColor: '#3F3D56',
+                borderRadius: 24,
+                padding: 24,
+                marginBottom: 20,
+                overflow: 'hidden',
+                position: 'relative',
+              }}>
+                {/* Decorative background shapes */}
+                <View style={{
+                  position: 'absolute',
+                  right: -30,
+                  top: -30,
+                  width: 140,
+                  height: 140,
+                  borderRadius: 70,
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                }} />
+                <View style={{
+                  position: 'absolute',
+                  right: -10,
+                  bottom: -40,
+                  width: 120,
+                  height: 120,
+                  borderRadius: 60,
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                }} />
+
+                <Text style={{
+                  fontFamily: 'Octarine-Bold',
+                  fontSize: 20,
+                  color: '#FFFFFF',
+                  marginBottom: 8,
+                }}>
+                  Help us improve our city
+                </Text>
+                
+                <Text style={{
+                  fontFamily: 'Inter-Medium',
+                  fontSize: 14,
+                  color: 'rgba(255,255,255,0.85)',
+                  lineHeight: 20,
+                  marginBottom: 20,
+                }}>
+                  Create an account to report local issues directly to the city.
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    height: 48,
+                    borderRadius: 24,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+                  activeOpacity={0.9}
+                >
+                  <Text style={{
+                    fontFamily: 'Octarine-Bold',
+                    fontSize: 15,
+                    color: '#292929',
+                  }}>
+                    Sign in
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Featured Section Header */}
             <Text style={{
@@ -624,51 +806,93 @@ export function HomeScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-
-            {/* Emergency Hotline Strip */}
-            <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginBottom: 10 }}>Emergency Hotlines</Text>
-            <View style={{ backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 24, padding: 4 }}>
-              {[
-                { name: 'Police (PNP)', number: '117' },
-                { name: 'Fire Bureau (BFP)', number: '160' },
-                { name: 'Medical / Rescue', number: '911' },
-              ].map((h, i) => (
-                <TouchableOpacity
-                  key={h.name}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 16,
-                    borderBottomWidth: i < 2 ? 1 : 0,
-                    borderBottomColor: T.border,
-                  }}
-                  onPress={() => Linking.openURL(`tel:${h.number}`)}
-                >
-                  <View style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: T.cardAlt,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: 12,
-                  }}>
-                    <Call size={18} color={T.text} variant="Bold" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 14 }}>{h.name}</Text>
-                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 2 }}>Tap to call · {h.number}</Text>
-                  </View>
-                  <Text style={{ color: T.accent, fontFamily: 'Octarine-Bold', fontSize: 14 }}>›</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
         )}
 
         {/* TAB 2: COMMUNITY / ANNOUNCEMENTS */}
         {activeTab === 'community' && (
           <View style={{ paddingHorizontal: 20 }}>
+            {/* Trending Discussion Section */}
+            {trendingThread && (
+              <>
+                <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
+                  Trending Discussion
+                </Text>
+                
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => navigation.navigate('Forum', { initialPostId: trendingThread.id })}
+                  style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 24,
+                    padding: 20,
+                    marginBottom: 20,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    {/* Badge */}
+                    <View style={{
+                      backgroundColor: '#FADEE1',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 12,
+                    }}>
+                      <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: '#7E2532' }}>
+                        #{trendingThread.category || 'General'}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                      {trendingThread.created_at ? new Date(trendingThread.created_at).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+                    </Text>
+                  </View>
+
+                  <Text style={{ fontSize: 18, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 22, marginBottom: 8 }}>
+                    {trendingThread.title}
+                  </Text>
+
+                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: T.textMuted, lineHeight: 18, marginBottom: 16 }} numberOfLines={3}>
+                    {trendingThread.content}
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: T.border, paddingTop: 12 }}>
+                    {/* Replier Avatars Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', marginRight: 8 }}>
+                        {trendingThread.replierAvatars?.slice(0, 3).map((url: string, index: number) => (
+                          <View
+                            key={index}
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              borderWidth: 1.5,
+                              borderColor: T.card,
+                              marginLeft: index === 0 ? 0 : -8,
+                              backgroundColor: T.border,
+                              overflow: 'hidden',
+                              zIndex: 3 - index,
+                            }}
+                          >
+                            <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+                          </View>
+                        ))}
+                      </View>
+                      <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.text }}>
+                        +{trendingThread.commentsCount || 0} replies
+                      </Text>
+                    </View>
+
+                    {/* Action text */}
+                    <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.accent }}>
+                      Join Discussion &rarr;
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
+
             {/* Announcements Section */}
             <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
               Announcements

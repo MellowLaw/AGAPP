@@ -67,6 +67,10 @@ export function ReportsScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<'reports' | 'my_reports'>('reports');
 
   useEffect(() => {
+    navigation.setParams({ isSubScreen: showForm });
+  }, [showForm, navigation]);
+
+  useEffect(() => {
     if (!profile) return;
     fetchReports();
   }, [profile]);

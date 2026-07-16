@@ -116,9 +116,9 @@ export function ScreenBackground({ children }: { children: React.ReactNode }) {
   // base bg right near the bottom edge — a small corner glow that flattens
   // out by ~60% down (the previous formula) reads as much weaker/plainer
   // than the reference.
-  const topColor    = isDarkMode ? `${T.accent}33` : `${T.accent}4D`; // ~20% / ~30%
-  const midColor    = isDarkMode ? `${T.accent}21` : `${T.accent}29`; // ~13% / ~16%
-  const lowColor    = isDarkMode ? `${T.accent}12` : `${T.accent}14`; // ~7% / ~8%
+  const topColor = isDarkMode ? `${T.accent}33` : `${T.accent}4D`; // ~20% / ~30%
+  const midColor = isDarkMode ? `${T.accent}21` : `${T.accent}29`; // ~13% / ~16%
+  const lowColor = isDarkMode ? `${T.accent}12` : `${T.accent}14`; // ~7% / ~8%
   const bottomColor = T.bg;
 
   return (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,6 +23,9 @@ import { TrackingDetailScreen } from '../screens/TrackingDetailScreen';
 import { NewsDetailScreen } from '../screens/NewsDetailScreen';
 import { MapExplorerScreen } from '../screens/MapExplorerScreen';
 import { VerifyIdentityScreen } from '../screens/VerifyIdentityScreen';
+import { EmergencyScreen } from '../screens/EmergencyScreen';
+import { LogoutConfirmScreen } from '../screens/LogoutConfirmScreen';
+import LottieView from 'lottie-react-native';
 import { GuestLguDetectScreen } from '../screens/GuestLguDetectScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SplashGreetingScreen } from '../screens/SplashGreetingScreen';
@@ -107,73 +110,72 @@ function AuthGate({ label, navigation }: { label: string; navigation: any }) {
   const S = (SCREEN_WIDTH - 48) / 3;
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 }}>
-      <View style={{ width: S * 3, height: S * 3, flexDirection: 'row', flexWrap: 'wrap', marginBottom: 40 }}>
-        <ShapeCell col={0} row={0} S={S} />
-        <ShapeCell col={1} row={0} S={S} />
-        <ShapeCell col={2} row={0} S={S} />
-        
-        <ShapeCell col={0} row={1} S={S} />
-        <ShapeCell col={1} row={1} S={S} />
-        <ShapeCell col={2} row={1} S={S} />
-        
-        <ShapeCell col={0} row={2} S={S} />
-        <EaselCell S={S} />
-        <ShapeCell col={2} row={2} S={S} />
-      </View>
-
-      <Text style={{
-        color: T.text,
-        fontSize: 26,
-        fontFamily: 'Octarine-Bold',
-        textAlign: 'center',
-        marginBottom: 8,
-      }}>
-        Get the Full Experience!
-      </Text>
-      
-      <Text style={{
-        color: T.textMuted,
-        fontSize: 14,
-        fontFamily: 'Inter-Medium',
-        textAlign: 'center',
-        paddingHorizontal: 12,
-        marginBottom: 36,
-        lineHeight: 20,
-      }}>
-        Sign in to access full features and services.
-      </Text>
-
-      <TouchableOpacity
+    <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 }}>
+      <LottieView
+        source={require('../../assets/brand/sign-up-animation.json')}
+        autoPlay
+        loop
         style={{
-          width: '100%',
-          height: 52,
-          borderRadius: 26,
-          backgroundColor: '#292929',
-          justifyContent: 'center',
-          alignItems: 'center',
+          width: SCREEN_WIDTH * 0.95,
+          height: SCREEN_WIDTH * 0.95,
           marginBottom: 16,
         }}
-        onPress={() => navigation.navigate('Login', { initialMode: 'register' })}
-        activeOpacity={0.85}
-      >
-        <Text style={{ color: '#FFFFFF', fontFamily: 'Inter-Bold', fontSize: 16 }}>Sign up</Text>
-      </TouchableOpacity>
+      />
 
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
-        activeOpacity={0.7}
-        style={{ paddingVertical: 8 }}
-      >
+      <View style={{ width: '100%', paddingHorizontal: 24, alignItems: 'center' }}>
         <Text style={{
           color: T.text,
+          fontSize: 26,
           fontFamily: 'Octarine-Bold',
-          fontSize: 16,
           textAlign: 'center',
+          marginBottom: 8,
         }}>
-          Login
+          Get the Full Experience!
         </Text>
-      </TouchableOpacity>
+        
+        <Text style={{
+          color: T.textMuted,
+          fontSize: 14,
+          fontFamily: 'Inter-Medium',
+          textAlign: 'center',
+          paddingHorizontal: 12,
+          marginBottom: 36,
+          lineHeight: 20,
+        }}>
+          Sign in to access full features and services.
+        </Text>
+
+        <TouchableOpacity
+          style={{
+            width: '100%',
+            height: 52,
+            borderRadius: 26,
+            backgroundColor: '#292929',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+          onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+          activeOpacity={0.85}
+        >
+          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter-Bold', fontSize: 16 }}>Login</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Login', { initialMode: 'register' })}
+          activeOpacity={0.7}
+          style={{ paddingVertical: 8 }}
+        >
+          <Text style={{
+            color: T.text,
+            fontFamily: 'Octarine-Bold',
+            fontSize: 16,
+            textAlign: 'center',
+          }}>
+            Sign up
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -190,6 +192,12 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { T } = useTheme();
   const insets = useSafeAreaInsets();
   const routeCount = state.routes.length;
+
+  const currentRoute = state.routes[state.index];
+  const isSubScreenActive = 
+    (currentRoute.state && currentRoute.state.index !== undefined && currentRoute.state.index > 0) ||
+    currentRoute.params?.isSubScreen === true;
+  const showFloater = (state.index === 0 || state.index === 1 || state.index === 2) && !isSubScreenActive;
 
   const [innerWidth, setInnerWidth] = React.useState(0);
   const slotWidth = innerWidth / routeCount;
@@ -211,7 +219,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         position: 'absolute',
         left: 16,
         right: 16,
-        bottom: insets.bottom + 10,
+        bottom: Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 10) : 10,
         height: 68,
         borderRadius: 999,
         backgroundColor: T.card,
@@ -227,25 +235,28 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
       }}
       onLayout={(e) => setInnerWidth(e.nativeEvent.layout.width)}
     >
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Assistant')}
-        activeOpacity={0.85}
-        style={{
-          position: 'absolute',
-          left: 8,
-          top: -92,
-          width: 110,
-          height: 110,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Image
-          source={require('../../assets/brand/mascot.png')}
-          style={{ width: 110, height: 110 }}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+      {showFloater && (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Assistant')}
+          activeOpacity={0.85}
+          style={{
+            position: 'absolute',
+            left: 12,
+            top: -72,
+            width: 90,
+            height: 90,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10,
+          }}
+        >
+          <Image
+            source={require('../../assets/brand/sticker-15.png')}
+            style={{ width: 90, height: 90 }}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      )}
 
       {innerWidth > 0 && (
         <Animated.View
@@ -385,10 +396,7 @@ export function AppNavigator() {
         const val = await AsyncStorage.getItem('hasSeenOnboarding');
         if (val === 'true') {
           setHasSeenOnboarding(true);
-          // Show splash briefly for returning users
-          setTimeout(() => {
-            setShowSplash(false);
-          }, 1200);
+          // SplashGreetingScreen will control its own fade-out and trigger onFinish
         } else {
           setHasSeenOnboarding(false);
           setShowSplash(false);
@@ -404,7 +412,7 @@ export function AppNavigator() {
   }, []);
 
   if (isLoading || !onboardingLoaded || (showSplash && hasSeenOnboarding)) {
-    return <SplashGreetingScreen />;
+    return <SplashGreetingScreen onFinish={() => setShowSplash(false)} />;
   }
 
   return (
@@ -426,6 +434,7 @@ export function AppNavigator() {
             <Stack.Screen name="LguSelect" component={LguSelectScreen} />
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
+            <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="Assistant">
               {({ navigation }) => <AuthGate label="use the assistant" navigation={navigation} />}
             </Stack.Screen>
@@ -440,7 +449,9 @@ export function AppNavigator() {
             <Stack.Screen name="TrackingDetail" component={TrackingDetailScreen} />
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
+            <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="Assistant" component={ChatbotScreen} />
+            <Stack.Screen name="LogoutConfirm" component={LogoutConfirmScreen} />
           </>
         )}
       </Stack.Navigator>

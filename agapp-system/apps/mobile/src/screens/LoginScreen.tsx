@@ -158,44 +158,20 @@ export function LoginScreen({ navigation, route }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      {/* Top Swirl Decor — soft pastel ribbons that melt into the cream behind the form.
-          The gradient uses the theme bg at 0/70/100% alpha (`${T.bg}00` etc.) instead of
-          the keyword 'transparent', which fades through a faint dark halo on RN. */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 300, zIndex: 0 }}>
-        <Image
-          source={require('../../assets/brand/swirl.png')}
-          style={{
-            width: '100%',
-            height: '100%',
-            opacity: 0.6,
-            resizeMode: 'cover',
-          }}
-        />
-        <LinearGradient
-          colors={[`${T.bg}00`, `${T.bg}20`, `${T.bg}90`, `${T.bg}F5`, T.bg]}
-          locations={[0, 0.18, 0.38, 0.58, 1]}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-      </View>
-
-      {/* Bottom Swirl Decor — mirror of the top, fades upward into the cream. */}
-      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 300, zIndex: 0 }}>
-        <Image
-          source={require('../../assets/brand/swirl.png')}
-          style={{
-            width: '100%',
-            height: '100%',
-            opacity: 0.6,
-            resizeMode: 'cover',
-            transform: [{ rotate: '180deg' }],
-          }}
-        />
-        <LinearGradient
-          colors={[T.bg, `${T.bg}F5`, `${T.bg}90`, `${T.bg}20`, `${T.bg}00`]}
-          locations={[0, 0.42, 0.62, 0.82, 1]}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-      </View>
+      <Image
+        source={require('../../assets/brand/bg-mobile-2.png')}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+          resizeMode: 'cover',
+          opacity: isLoginMode ? 0.6 : 0.3,
+        }}
+      />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, zIndex: 1 }}>
         <ScrollView
@@ -407,7 +383,13 @@ export function LoginScreen({ navigation, route }: any) {
               </LinearGradient>
             </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, alignItems: 'center', paddingHorizontal: 4 }}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: isLoginMode ? 'space-between' : 'center',
+              marginTop: 24,
+              alignItems: 'center',
+              paddingHorizontal: 4,
+            }}>
               <TouchableOpacity onPress={switchMode}>
                 <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 13, fontWeight: '600' }}>
                   {isLoginMode ? 'Create new account' : 'Sign in instead'}

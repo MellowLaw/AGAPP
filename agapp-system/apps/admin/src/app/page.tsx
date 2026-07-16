@@ -249,11 +249,10 @@ export default function UnifiedLoginPage() {
 
           {(error || resetStatus) && (
             <div
-              className={`mb-5 px-4 py-3 border rounded-[10px] text-sm ${
-                error || resetStatus?.type === 'error'
+              className={`mb-5 px-4 py-3 border rounded-[10px] text-sm ${error || resetStatus?.type === 'error'
                   ? 'bg-[#FDF1F0] border-[#F6D6D3] text-[#B3261E]'
                   : 'bg-[#EEF7F0] border-[#CBE8D3] text-[#1E7A3C]'
-              }`}
+                }`}
               role="alert"
             >
               {error || resetStatus?.text}

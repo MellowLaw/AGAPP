@@ -39,9 +39,14 @@ export default function SettingsPage() {
   const [latitude, setLatitude] = useState(0);
   const [longitude, setLongitude] = useState(0);
   const [primaryColor, setPrimaryColor] = useState('#d62a53');
+  const [logoUrl, setLogoUrl] = useState('');
   const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [iconColor, setIconColor] = useState('#d62a53');
   const [darkBgColor, setDarkBgColor] = useState('#292929');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [twitterUrl, setTwitterUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [featureFlags, setFeatureFlags] = useState<any>({ chatbot: true, potholeDetection: true, forum: true });
 
   // Staff States
@@ -86,11 +91,16 @@ export default function SettingsPage() {
           setLatitude(lgu.latitude || 0);
           setLongitude(lgu.longitude || 0);
           setPrimaryColor(lgu.primary_color || '#d62a53');
+          setLogoUrl(lgu.logo || '');
           setSecondaryColor(lgu.secondary_color || '#ffffff');
           const flags = lgu.feature_flags || {};
           setFeatureFlags(flags);
-          setIconColor(lgu.icon_color || lgu.primary_color || '#d62a53');
+           setIconColor(lgu.icon_color || lgu.primary_color || '#d62a53');
           setDarkBgColor(lgu.dark_bg_color || '#292929');
+          setFacebookUrl(lgu.facebook_url || '');
+          setYoutubeUrl(lgu.youtube_url || '');
+          setTwitterUrl(lgu.twitter_url || '');
+          setWebsiteUrl(lgu.website_url || '');
         }
 
         // 2. Load Staff Members
@@ -145,6 +155,7 @@ export default function SettingsPage() {
         .from('lgus')
         .update({
           name: fullName,
+          logo: logoUrl,
           contact_email: contactEmail,
           contact_phone: contactPhone,
           office_address: officeAddress,
@@ -152,6 +163,10 @@ export default function SettingsPage() {
           secondary_color: secondaryColor,
           icon_color: iconColor,
           dark_bg_color: darkBgColor,
+          facebook_url: facebookUrl,
+          youtube_url: youtubeUrl,
+          twitter_url: twitterUrl,
+          website_url: websiteUrl,
           // Explicit allowlist (not a spread) so any stale iconColor/darkBgColor
           // keys left over from before these became top-level columns get
           // dropped on save instead of persisting forever.
@@ -342,6 +357,15 @@ export default function SettingsPage() {
                     onChange={(e: any) => setLguProvince(e.target.value)}
                   />
                 </div>
+                
+                <div>
+                  <Input
+                    label="LGU Seal / Logo URL"
+                    value={logoUrl}
+                    onChange={(e: any) => setLogoUrl(e.target.value)}
+                    placeholder="https://example.com/logo.png"
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
@@ -383,6 +407,36 @@ export default function SettingsPage() {
                       value={longitude}
                       className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-md text-sm cursor-not-allowed"
                       readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-theme pt-4">
+                  <h3 className="text-sm font-semibold text-text-primary mb-4">Official Channels & Social Links</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Facebook URL"
+                      value={facebookUrl}
+                      onChange={(e: any) => setFacebookUrl(e.target.value)}
+                      placeholder="https://facebook.com/your-lgu"
+                    />
+                    <Input
+                      label="YouTube Channel URL"
+                      value={youtubeUrl}
+                      onChange={(e: any) => setYoutubeUrl(e.target.value)}
+                      placeholder="https://youtube.com/@your-lgu"
+                    />
+                    <Input
+                      label="X (Twitter) URL"
+                      value={twitterUrl}
+                      onChange={(e: any) => setTwitterUrl(e.target.value)}
+                      placeholder="https://x.com/your-lgu"
+                    />
+                    <Input
+                      label="Official Website URL"
+                      value={websiteUrl}
+                      onChange={(e: any) => setWebsiteUrl(e.target.value)}
+                      placeholder="https://your-lgu.gov.ph"
                     />
                   </div>
                 </div>

@@ -12,11 +12,11 @@ export function GuestLguDetectScreen() {
   const { setGuestLgu } = useAuth();
   const { T, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   const [step, setStep] = useState<'welcome' | 'detecting' | 'detected' | 'not_supported' | 'manual'>('welcome');
   const [detectedLgu, setDetectedLgu] = useState<DetectedLgu | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   const [lgus, setLgus] = useState<any[]>([]);
   const [loadingManual, setLoadingManual] = useState(false);
 
@@ -102,7 +102,7 @@ export function GuestLguDetectScreen() {
             <Text style={{ fontFamily: 'Inter-Medium', color: T.text, textAlign: 'center', marginTop: 12, fontSize: 15, lineHeight: 22, paddingHorizontal: 12 }}>
               Enable location to automatically load news, announcements, and landmarks for your municipality.
             </Text>
-            
+
             <TouchableOpacity
               style={{
                 flexDirection: 'row',
@@ -142,7 +142,7 @@ export function GuestLguDetectScreen() {
             >
               <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.text }}>Select Manually</Text>
             </TouchableOpacity>
-            
+
             <View style={{ height: 120 }} />
           </ScrollView>
         )}
@@ -257,7 +257,7 @@ export function GuestLguDetectScreen() {
             <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>
               Select your LGU.
             </Text>
-            
+
             {errorMessage && (
               <View style={{
                 flexDirection: 'row',
@@ -285,18 +285,18 @@ export function GuestLguDetectScreen() {
             ) : (
               lgus.map((lgu) => (
                 <TouchableOpacity
-                   key={lgu.id}
-                   style={{
-                     backgroundColor: T.card,
-                     borderWidth: 1,
-                     borderColor: T.border,
-                     borderRadius: 20,
-                     flexDirection: 'row',
-                     alignItems: 'center',
-                     padding: 16,
-                     marginBottom: 12,
-                   }}
-                   onPress={() => handleSelectManual(lgu)}
+                  key={lgu.id}
+                  style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 16,
+                    marginBottom: 12,
+                  }}
+                  onPress={() => handleSelectManual(lgu)}
                 >
                   <View style={{
                     width: 44,

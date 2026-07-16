@@ -41,6 +41,10 @@ export function ServicesScreen({ navigation }: any) {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'requests'>('services');
 
+  useEffect(() => {
+    navigation.setParams({ isSubScreen: showForm });
+  }, [showForm, navigation]);
+
   // Form state
   const [fullName, setFullName] = useState(profile?.name || '');
   const [purpose, setPurpose] = useState('');

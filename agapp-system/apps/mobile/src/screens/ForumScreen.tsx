@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,10 +52,57 @@ const PRESET_IMAGES = [
   { name: 'Barangay Clean', url: 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=500&auto=format&fit=crop&q=60' }
 ];
 
-export function ForumScreen({ navigation }: any) {
+function LikeButton({ isLiked, likeCount, onPress, theme }: any) {
+  const scale = React.useRef(new Animated.Value(1)).current;
+
+  const handlePress = (e: any) => {
+    e.stopPropagation();
+
+    scale.setValue(0.85);
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 4,
+      tension: 400,
+      useNativeDriver: true,
+    }).start();
+
+    onPress();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        backgroundColor: theme.isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,26,0.04)',
+      }}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Heart
+          size={16}
+          color={isLiked ? '#EF4444' : theme.T.text}
+          variant="Bold"
+          style={{ marginRight: 4 }}
+        />
+      </Animated.View>
+      <Text style={{ color: theme.T.text, fontSize: 12, fontFamily: 'Octarine-Bold' }}>
+        {likeCount}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+export function ForumScreen({ navigation, route }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { profile, selectedLgu, guestLgu, session } = useAuth();
+  const insets = useSafeAreaInsets();
+  
+  const bottomPaddingForTabBar = Platform.OS === 'ios' ? insets.bottom + 78 : 88;
   
   // ── Swipeable Row component (swipe right → reply) ──────────────────────
   const SwipeableRow = useCallback(({ children, onSwipe }: { children: React.ReactNode; onSwipe: () => void }) => {
@@ -154,8 +202,9 @@ export function ForumScreen({ navigation }: any) {
       }, 1500);
     };
 
+    const channelName = `forum_posts_lgu_${lgu.id}_${Date.now()}`;
     const postsSubscription = supabase
-      .channel('public:forum_posts_global')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_posts', filter: `lgu_id=eq.${lgu.id}` }, () => {
         debouncedFetchPosts();
       })
@@ -167,14 +216,28 @@ export function ForumScreen({ navigation }: any) {
     };
   }, [selectedLgu, guestLgu, profile]);
 
+  // 1b. Check for route parameter to auto-open specific thread
+  useEffect(() => {
+    if (route?.params?.initialPostId && posts.length > 0) {
+      const found = posts.find((p: any) => p.id === route.params.initialPostId);
+      if (found) {
+        setSelectedPost(found);
+        setViewState('detail');
+        // Clear param so it doesn't open again
+        navigation.setParams({ initialPostId: undefined });
+      }
+    }
+  }, [posts, route?.params?.initialPostId]);
+
   // 2. Fetch Comments subscription (only active when inside detail view)
   useEffect(() => {
     if (viewState !== 'detail' || !selectedPost) return;
     
     fetchPostComments(selectedPost.id);
 
+    const channelName = `forum_comments_post_${selectedPost.id}_${Date.now()}`;
     const commentsSubscription = supabase
-      .channel(`public:forum_comments_post:${selectedPost.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_comments', filter: `post_id=eq.${selectedPost.id}` }, () => {
         fetchPostComments(selectedPost.id);
       })
@@ -191,7 +254,7 @@ export function ForumScreen({ navigation }: any) {
     try {
       let query = supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved), forum_post_likes(user_id)')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, citizen:users!citizen_id(avatar_url, name)), forum_post_likes(user_id)')
         .eq('lgu_id', lgu.id);
 
       if (profile) {
@@ -210,11 +273,35 @@ export function ForumScreen({ navigation }: any) {
         const mapped = data.map((p: any) => {
           const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
           const postLikes = p.forum_post_likes || [];
+
+          // Collect unique replier avatars
+          const replierAvatars: string[] = [];
+          approvedComments.forEach((c: any) => {
+            const avatar = c.citizen?.avatar_url;
+            if (avatar && !replierAvatars.includes(avatar)) {
+              replierAvatars.push(avatar);
+            }
+          });
+
+          // Pre-populate with beautiful curated avatars if comments exist
+          if (approvedComments.length > 0) {
+            const presets = [
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80',
+              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop&q=80',
+            ];
+            while (replierAvatars.length < Math.min(3, approvedComments.length)) {
+              const fallback = presets[replierAvatars.length % presets.length];
+              replierAvatars.push(fallback);
+            }
+          }
+
           return {
             ...p,
             commentsCount: approvedComments.length,
             likesCount: postLikes.length,
             isLiked: postLikes.some((like: any) => like.user_id === profile?.id),
+            replierAvatars,
           };
         });
         setPosts(mapped);
@@ -231,12 +318,18 @@ export function ForumScreen({ navigation }: any) {
   const fetchPostComments = async (postId: string) => {
     setCommentsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('forum_comments')
         .select('*, citizen:users!citizen_id(avatar_url)')
-        .eq('post_id', postId)
-        .or(`is_approved.eq.true,citizen_id.eq.${profile?.id}`)
-        .order('created_at', { ascending: true });
+        .eq('post_id', postId);
+
+      if (profile) {
+        query = query.or(`is_approved.eq.true,citizen_id.eq.${profile.id}`);
+      } else {
+        query = query.eq('is_approved', true);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) throw error;
       setComments(data || []);
@@ -387,6 +480,10 @@ export function ForumScreen({ navigation }: any) {
   };
 
   const toggleBookmark = async (postId: string) => {
+    if (!session || !profile) {
+      navigation.navigate('Login', { initialMode: 'register' });
+      return;
+    }
     try {
       let updated: string[];
       if (bookmarkedIds.includes(postId)) {
@@ -417,13 +514,11 @@ export function ForumScreen({ navigation }: any) {
           .eq('post_id', postId)
           .eq('user_id', profile.id);
         if (error) throw error;
-        showToast('Removed like', 'success');
       } else {
         const { error } = await supabase
           .from('forum_post_likes')
           .insert({ post_id: postId, user_id: profile.id });
         if (error) throw error;
-        showToast('Liked post', 'success');
       }
       fetchPosts();
     } catch (err: any) {
@@ -750,68 +845,118 @@ export function ForumScreen({ navigation }: any) {
             ) : comments.length === 0 ? (
               <Text style={{ textAlign: 'center', color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, marginTop: 12 }}>No replies yet. Be the first to start the discussion!</Text>
             ) : (
-              comments.map(c => {
-                const commentAvatarBg = getAvatarBg(c.citizen_name);
-                const parentComment = c.parent_comment_id 
-                  ? comments.find((p: any) => p.id === c.parent_comment_id)
-                  : null;
+              <>
+                {(session ? comments : comments.slice(0, 3)).map(c => {
+                  const commentAvatarBg = getAvatarBg(c.citizen_name);
+                  const parentComment = c.parent_comment_id 
+                    ? comments.find((p: any) => p.id === c.parent_comment_id)
+                    : null;
 
-                return (
-                  <SwipeableRow key={c.id} onSwipe={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}>
-                    <TouchableOpacity 
-                      activeOpacity={0.8}
-                      onLongPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}
-                      style={{
-                        flexDirection: 'row',
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        alignItems: 'flex-start',
-                        gap: 12,
-                      }}
-                    >
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                        {c.citizen?.avatar_url ? (
-                          <Image source={{ uri: c.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
-                        ) : (
-                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                            {c.citizen_name.charAt(0).toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        {parentComment && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-                            <View style={{ width: 2, height: 12, backgroundColor: T.accent }} />
-                            <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }} numberOfLines={1}>
-                              Replying to <Text style={{ fontFamily: 'Octarine-Bold', color: T.text }}>@{parentComment.citizen_name}</Text>
+                  return (
+                    <SwipeableRow key={c.id} onSwipe={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}>
+                      <TouchableOpacity 
+                        activeOpacity={0.8}
+                        onLongPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })}
+                        style={{
+                          flexDirection: 'row',
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          alignItems: 'flex-start',
+                          gap: 12,
+                        }}
+                      >
+                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                          {c.citizen?.avatar_url ? (
+                            <Image source={{ uri: c.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
+                          ) : (
+                            <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                              {c.citizen_name.charAt(0).toUpperCase()}
                             </Text>
-                          </View>
-                        )}
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>
-                            {c.citizen_name}
-                          </Text>
-                          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 10 }}>
-                            {getRelativeTime(c.createdAt || c.created_at)}
-                          </Text>
-                          {!c.is_approved && (
-                            <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                              <Text style={{ color: '#854D0E', fontSize: 8, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
-                            </View>
                           )}
-                          <TouchableOpacity onPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })} style={{ marginLeft: 'auto', padding: 2 }}>
-                            <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
-                          </TouchableOpacity>
                         </View>
 
-                        <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 14, lineHeight: 18 }}>{c.content}</Text>
-                      </View>
+                        <View style={{ flex: 1 }}>
+                          {parentComment && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 }}>
+                              <View style={{ width: 2, height: 12, backgroundColor: T.accent }} />
+                              <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }} numberOfLines={1}>
+                                Replying to <Text style={{ fontFamily: 'Octarine-Bold', color: T.text }}>@{parentComment.citizen_name}</Text>
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>
+                              {c.citizen_name}
+                            </Text>
+                            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 10 }}>
+                              {getRelativeTime(c.createdAt || c.created_at)}
+                            </Text>
+                            {!c.is_approved && (
+                              <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                                <Text style={{ color: '#854D0E', fontSize: 8, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
+                              </View>
+                            )}
+                            <TouchableOpacity onPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })} style={{ marginLeft: 'auto', padding: 2 }}>
+                              <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 14, lineHeight: 18 }}>{c.content}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </SwipeableRow>
+                  );
+                })}
+                {!session && (
+                  <View style={{
+                    marginTop: -70,
+                    paddingTop: 80,
+                    paddingBottom: 40,
+                    paddingHorizontal: 24,
+                    alignItems: 'center',
+                    backgroundColor: 'transparent',
+                    zIndex: 20,
+                  }}>
+                    {/* The Gradient overlay background */}
+                    <LinearGradient
+                      colors={[`${T.card}00`, `${T.card}D0`, T.card]}
+                      locations={[0, 0.4, 0.95]}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                      }}
+                    />
+
+                    {/* The CTA content */}
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Login', { initialMode: 'login' })}
+                      activeOpacity={0.9}
+                      style={{
+                        backgroundColor: '#292929',
+                        paddingVertical: 14,
+                        paddingHorizontal: 28,
+                        borderRadius: 999, // Pill button
+                        alignItems: 'center',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 8,
+                        elevation: 4,
+                      }}
+                    >
+                      <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: '#FFFCF5', textAlign: 'center' }}>
+                        {comments.length > 3
+                          ? `Sign in to view all ${comments.length} replies`
+                          : 'Sign in to join the conversation'}
+                      </Text>
                     </TouchableOpacity>
-                  </SwipeableRow>
-                );
-              })
+                  </View>
+                )}
+              </>
             )}
           </ScrollView>
 
@@ -863,7 +1008,8 @@ export function ForumScreen({ navigation }: any) {
           {!session ? (
             <View style={{
               paddingHorizontal: 16,
-              paddingVertical: 16,
+              paddingTop: 16,
+              paddingBottom: bottomPaddingForTabBar,
               borderTopWidth: 1,
               borderColor: T.border,
               backgroundColor: T.card,
@@ -890,7 +1036,8 @@ export function ForumScreen({ navigation }: any) {
             <View style={{
               flexDirection: 'row',
               paddingHorizontal: 16,
-              paddingVertical: 12,
+              paddingTop: 12,
+              paddingBottom: bottomPaddingForTabBar,
               alignItems: 'center',
               borderTopWidth: 1,
               borderColor: T.border,
@@ -1158,21 +1305,44 @@ export function ForumScreen({ navigation }: any) {
                         </Text>
                       </View>
 
-                      {/* Real metrics display */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Heart size={14} color={likedPostIds.includes(thread.id) ? '#EF4444' : T.textMuted} variant="Bold" />
-                          <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
-                            {thread.likesCount || 0}
-                          </Text>
+                      {/* Replier Avatars Row */}
+                      {thread.commentsCount > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                          <View style={{ flexDirection: 'row', marginRight: 8 }}>
+                            {thread.replierAvatars?.slice(0, 3).map((url: string, index: number) => (
+                              <View
+                                key={index}
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: 12,
+                                  borderWidth: 1.5,
+                                  borderColor: T.card,
+                                  marginLeft: index === 0 ? 0 : -8,
+                                  backgroundColor: T.border,
+                                  overflow: 'hidden',
+                                  zIndex: 3 - index,
+                                }}
+                              >
+                                <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+                              </View>
+                            ))}
+                          </View>
+                          
+                          <View style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: T.border,
+                            backgroundColor: T.bg,
+                          }}>
+                            <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.text }}>
+                              +{thread.commentsCount}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <MessageText1 size={14} color={T.textMuted} variant="Linear" />
-                          <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
-                            {thread.commentsCount || 0}
-                          </Text>
-                        </View>
-                      </View>
+                      )}
 
                       {/* Author row at the bottom (solid colored avatar + name) */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 'auto' }}>
@@ -1309,30 +1479,12 @@ export function ForumScreen({ navigation }: any) {
                     {/* Footer Reaction buttons (likes count, comments count, bookmark option) */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 16 }}>
                       {/* Heart reaction trigger */}
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          toggleLike(post.id);
-                        }}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 12,
-                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,26,0.04)',
-                        }}
-                      >
-                        <Heart
-                          size={16}
-                          color={likedPostIds.includes(post.id) ? '#EF4444' : T.text}
-                          variant="Bold"
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text style={{ color: T.text, fontSize: 12, fontFamily: 'Octarine-Bold' }}>
-                          {getLikeCount(post)}
-                        </Text>
-                      </TouchableOpacity>
+                      <LikeButton
+                        isLiked={likedPostIds.includes(post.id)}
+                        likeCount={getLikeCount(post)}
+                        onPress={() => toggleLike(post.id)}
+                        theme={{ T, isDarkMode }}
+                      />
 
                       {/* Comment Count preview */}
                       <View style={{
@@ -1375,7 +1527,7 @@ export function ForumScreen({ navigation }: any) {
         <TouchableOpacity
           style={{
             position: 'absolute',
-            bottom: 24,
+            bottom: bottomPaddingForTabBar + 12,
             right: 24,
             width: 56,
             height: 56,

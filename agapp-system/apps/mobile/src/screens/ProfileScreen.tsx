@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { globalStyles, PASTELS } from '../theme';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
 import { getVerificationStatus, statusLabel, VerificationStatus } from '../utils/verification';
 import {
@@ -39,7 +40,7 @@ const BADGE_STYLE: Record<VerificationStatus, { bg: string; icon: any; iconColor
 
 export function ProfileScreen({ navigation }: any) {
   const { T, isDarkMode, setIsDarkMode } = useTheme();
-  const { profile, selectedLgu, signOut, refreshProfile } = useAuth();
+  const { profile, selectedLgu, guestLgu, signOut, refreshProfile } = useAuth();
   const { showToast } = useToast();
   const [infoModal, setInfoModal] = useState<null | 'terms' | 'security' | 'history'>(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
@@ -202,7 +203,54 @@ export function ProfileScreen({ navigation }: any) {
     : status === 'rejected' ? 'Re-submit verification'
     : 'Verify your identity';
 
+  const getSocialLinks = () => {
+    const activeLgu = selectedLgu || guestLgu;
+    const lguId = activeLgu?.id || 'liliw-laguna';
+    const lguName = activeLgu?.name || 'Liliw';
+    const cleanName = lguName.replace(/^Municipality of\s*/i, '');
+
+    const facebook = activeLgu?.facebook_url || '';
+    const youtube = activeLgu?.youtube_url || '';
+    const twitter = activeLgu?.twitter_url || '';
+    const website = activeLgu?.website_url || '';
+
+    const resolvedFacebook = facebook.trim() ? facebook : (
+      lguId === 'liliw-laguna' ? 'https://www.facebook.com/LiliwLocalGov' :
+      lguId.includes('naga') ? 'https://www.facebook.com/NagaCityGovernment' :
+      lguId === 'nagcarlan-laguna' ? 'https://www.facebook.com/nagcarlanlocalgov' :
+      'https://www.facebook.com'
+    );
+
+    const resolvedYoutube = youtube.trim() ? youtube : (
+      lguId === 'liliw-laguna' ? 'https://www.youtube.com/results?search_query=liliw+laguna' :
+      lguId.includes('naga') ? 'https://www.youtube.com/@NagaCityGovernment' :
+      lguId === 'nagcarlan-laguna' ? 'https://www.youtube.com/results?search_query=nagcarlan+laguna' :
+      'https://www.youtube.com'
+    );
+
+    const resolvedTwitter = twitter.trim() ? twitter : 'https://x.com';
+
+    const resolvedWebsite = website.trim() ? website : (
+      lguId === 'liliw-laguna' ? 'http://www.liliwlaguna.gov.ph' :
+      lguId.includes('naga') ? 'https://naga.gov.ph' :
+      lguId === 'nagcarlan-laguna' ? 'https://nagcarlan.gov.ph' :
+      'https://www.google.com'
+    );
+
+    return {
+      facebook: resolvedFacebook,
+      youtube: resolvedYoutube,
+      twitter: resolvedTwitter,
+      website: resolvedWebsite,
+      websiteLabel: `${cleanName} Website`,
+    };
+  };
+
   const goToVerify = () => navigation?.navigate('VerifyIdentity');
+
+  const handleLogout = () => {
+    navigation?.navigate('LogoutConfirm');
+  };
   
   const StatusIcon = badge.icon;
 
@@ -300,7 +348,10 @@ export function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
 
-        {/* Settings blocks */}
+        {/* CATEGORY: Account */}
+        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+          Account
+        </Text>
         <View style={{
           backgroundColor: T.card,
           borderWidth: 1,
@@ -309,13 +360,79 @@ export function ProfileScreen({ navigation }: any) {
           padding: 6,
           marginBottom: 12,
         }}>
+          {/* Account Verification */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={goToVerify}
+            activeOpacity={0.8}
+          >
+            <ShieldTick size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Account Verification</Text>
+            <Text style={{ color: rowStatusColor, fontSize: 12, fontFamily: 'Octarine-Bold', marginRight: 8 }}>{statusLabel(status)}</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+
+          {/* Change Email */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={openEmailModal}
+            activeOpacity={0.8}
+          >
+            <Sms size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change email</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+
+          {/* Change Profile Picture */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={handleChangeAvatar}
+            activeOpacity={0.8}
+            disabled={avatarUploading}
+          >
+            <Camera size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change profile picture</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+
+          {/* History */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={openHistory}
+            activeOpacity={0.8}
+          >
+            <Clock size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>History</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+        </View>
+
+        {/* CATEGORY: Preferences */}
+        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+          Preferences
+        </Text>
+        <View style={{
+          backgroundColor: T.card,
+          borderWidth: 1,
+          borderColor: T.border,
+          borderRadius: 24,
+          padding: 6,
+          marginBottom: 12,
+        }}>
+          {/* Appearance (Dark Mode) */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
             onPress={() => setIsDarkMode(!isDarkMode)}
             activeOpacity={0.8}
           >
-            <Moon size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Dark mode</Text>
+            <Ionicons name="color-palette-outline" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Appearance</Text>
 
             {/* Toggle Track */}
             <View style={{
@@ -337,6 +454,7 @@ export function ProfileScreen({ navigation }: any) {
 
           <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
 
+          {/* GPS Access */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
             onPress={handleToggleGps}
@@ -363,7 +481,10 @@ export function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* Profile Settings — email + profile picture (name stays fixed, must match the verified ID) */}
+        {/* CATEGORY: Support */}
+        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+          Support
+        </Text>
         <View style={{
           backgroundColor: T.card,
           borderWidth: 1,
@@ -372,30 +493,74 @@ export function ProfileScreen({ navigation }: any) {
           padding: 6,
           marginBottom: 12,
         }}>
+          {/* Facebook */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={openEmailModal}
+            onPress={() => Linking.openURL(getSocialLinks().facebook)}
             activeOpacity={0.8}
           >
-            <Sms size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change email</Text>
+            <Feather name="facebook" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Facebook</Text>
             <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
           </TouchableOpacity>
 
           <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
 
+          {/* YouTube */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={handleChangeAvatar}
+            onPress={() => Linking.openURL(getSocialLinks().youtube)}
             activeOpacity={0.8}
-            disabled={avatarUploading}
           >
-            <Camera size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change profile picture</Text>
+            <Feather name="youtube" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>YouTube</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+
+          {/* X */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={() => Linking.openURL('https://x.com')}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: ICON_SIZE, marginRight: 14, alignItems: 'center' }}>
+              <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>1X</Text>
+            </View>
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>X (formerly Twitter)</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+
+          {/* LGU Gov Website */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={() => Linking.openURL(getSocialLinks().website)}
+            activeOpacity={0.8}
+          >
+            <Feather name="globe" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>{getSocialLinks().websiteLabel}</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+
+          {/* About Us */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={() => setInfoModal('security')}
+            activeOpacity={0.8}
+          >
+            <Feather name="heart" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>About Us</Text>
             <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
           </TouchableOpacity>
         </View>
 
+        {/* CATEGORY: Legal */}
+        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+          Legal
+        </Text>
         <View style={{
           backgroundColor: T.card,
           borderWidth: 1,
@@ -403,43 +568,49 @@ export function ProfileScreen({ navigation }: any) {
           borderRadius: 24,
           padding: 6,
         }}>
+          {/* Terms & Conditions */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={goToVerify}
+            onPress={() => setInfoModal('terms')}
             activeOpacity={0.8}
           >
-            <ShieldTick size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Account Verification</Text>
-            <Text style={{ color: rowStatusColor, fontSize: 12, fontFamily: 'Octarine-Bold', marginRight: 8 }}>{statusLabel(status)}</Text>
+            <DocumentText size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Terms and Conditions</Text>
             <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
           </TouchableOpacity>
 
           <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
 
-          {[
-            { icon: ShieldSecurity, label: 'Security', onPress: () => setInfoModal('security'), color: T.text },
-            { icon: Clock, label: 'History', onPress: openHistory, color: T.text },
-            { icon: DocumentText, label: 'Terms & Conditions', onPress: () => setInfoModal('terms'), color: T.text },
-            { icon: Logout, label: 'Logout', onPress: signOut, color: '#DC2626' },
-          ].map((m, i, arr) => {
-            const MenuIcon = m.icon;
-            return (
-              <React.Fragment key={m.label}>
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-                  onPress={m.onPress}
-                  activeOpacity={0.8}
-                >
-                  <MenuIcon size={ICON_SIZE} color={m.color} variant="Bold" style={{ marginRight: 14 }} />
-                  <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: m.color }}>{m.label}</Text>
-                  <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-                </TouchableOpacity>
-                {i < arr.length - 1 && (
-                  <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
-                )}
-              </React.Fragment>
-            );
-          })}
+          {/* Privacy Policy */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={() => setInfoModal('terms')}
+            activeOpacity={0.8}
+          >
+            <DocumentText size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Privacy Policy</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Standalone Logout Button */}
+        <View style={{
+          backgroundColor: T.card,
+          borderWidth: 1,
+          borderColor: T.border,
+          borderRadius: 24,
+          padding: 6,
+          marginTop: 16,
+        }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={handleLogout}
+            activeOpacity={0.8}
+          >
+            <Logout size={ICON_SIZE} color="#DC2626" variant="Bold" style={{ marginRight: 14 }} />
+            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: '#DC2626' }}>Logout</Text>
+            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+          </TouchableOpacity>
         </View>
 
         <Text style={{
@@ -522,7 +693,7 @@ export function ProfileScreen({ navigation }: any) {
               borderBottomColor: T.border,
             }}>
               <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>
-                {infoModal === 'terms' ? 'Terms & Conditions' : infoModal === 'security' ? 'Security' : 'History'}
+                {infoModal === 'terms' ? 'Terms & Conditions' : infoModal === 'security' ? 'About Us & Security' : 'History'}
               </Text>
               <TouchableOpacity onPress={() => setInfoModal(null)}>
                 <CloseSquare size={22} color={T.textMuted} variant="Bold" />
