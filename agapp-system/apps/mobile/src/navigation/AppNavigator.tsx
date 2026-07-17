@@ -29,6 +29,7 @@ import LottieView from 'lottie-react-native';
 import { GuestLguDetectScreen } from '../screens/GuestLguDetectScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SplashGreetingScreen } from '../screens/SplashGreetingScreen';
+import { EmailOtpScreen } from '../screens/EmailOtpScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -431,6 +432,7 @@ export function AppNavigator() {
             ) : null}
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="EmailOtp" component={EmailOtpScreen} />
             <Stack.Screen name="LguSelect" component={LguSelectScreen} />
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />

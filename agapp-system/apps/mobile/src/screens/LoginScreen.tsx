@@ -107,7 +107,8 @@ export function LoginScreen({ navigation, route }: any) {
       if (data.session) {
         showToast('Account created successfully!', 'success');
       } else {
-        showToast('Please confirm your email address, then sign in.', 'info');
+        // Navigate to the OTP verification screen
+        navigation.navigate('EmailOtp', { email: cleanEmail });
       }
     } catch (err: any) {
       showToast(`Registration Failed: ${err.message}`, 'error');

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Manrope } from 'next/font/google';
-import { ArrowRight, Eye, EyeSlash } from 'iconsax-react';
+import { ArrowRight, Eye, EyeSlash, TickCircle, Sms } from 'iconsax-react';
 import { supabase } from '@/lib/supabase';
 import { lguNameFromId, lguIdFromName } from '@/lib/lgu';
 import { AgappLogo } from '@/components/ui/AgappLogo';
@@ -247,15 +247,41 @@ export default function UnifiedLoginPage() {
             Sign in to the admin portal to continue.
           </p>
 
-          {(error || resetStatus) && (
+          {error && (
             <div
-              className={`mb-5 px-4 py-3 border rounded-[10px] text-sm ${error || resetStatus?.type === 'error'
-                  ? 'bg-[#FDF1F0] border-[#F6D6D3] text-[#B3261E]'
-                  : 'bg-[#EEF7F0] border-[#CBE8D3] text-[#1E7A3C]'
-                }`}
+              className="mb-5 px-4 py-3 border border-[#F6D6D3] bg-[#FDF1F0] text-[#B3261E] rounded-[10px] text-sm font-semibold"
               role="alert"
             >
-              {error || resetStatus?.text}
+              {error}
+            </div>
+          )}
+
+          {resetStatus?.type === 'error' && (
+            <div
+              className="mb-5 px-4 py-3 border border-[#F6D6D3] bg-[#FDF1F0] text-[#B3261E] rounded-[10px] text-sm font-semibold"
+              role="alert"
+            >
+              {resetStatus.text}
+            </div>
+          )}
+
+          {resetStatus?.type === 'success' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+              <div className="bg-[#181A1F] border border-[#262930] rounded-2xl p-8 max-w-[380px] w-full text-center shadow-2xl flex flex-col items-center">
+                <div className="w-14 h-14 bg-[#3B82F6]/10 border border-[#3B82F6]/20 rounded-full flex items-center justify-center mb-5">
+                  <Sms className="w-8 h-8 text-[#3B82F6]" variant="Bold" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Check your email</h3>
+                <p className="text-[13px] leading-relaxed text-[#9CA3AF] mb-6">
+                  {resetStatus.text}
+                </p>
+                <button
+                  onClick={() => setResetStatus(null)}
+                  className="w-full h-11 bg-white hover:bg-gray-100 text-[#0E0F11] font-bold rounded-xl text-[14px] transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
             </div>
           )}
 
