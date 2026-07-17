@@ -40,7 +40,7 @@ const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'Service Requests', href: '/lgu/services', icon: DocumentText, section: 'services' },
   { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: Scroll },
   { label: 'Issue Reports', href: '/lgu/reports', icon: Danger, section: 'reports' },
-  { label: 'News', href: '/lgu/news', icon: Book },
+  { label: 'Community', href: '/lgu/news', icon: Book },
   { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum' },
   { label: 'Facilities', href: '/lgu/facilities', icon: Location },
   { label: 'Citizen Guide', href: '/lgu/citizen-guide', icon: InfoCircle },

@@ -31,6 +31,7 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SplashGreetingScreen } from '../screens/SplashGreetingScreen';
 import { EmailOtpScreen } from '../screens/EmailOtpScreen';
 import { CitizenGuideScreen } from '../screens/CitizenGuideScreen';
+import { NewsScreen } from '../screens/NewsScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -446,6 +447,7 @@ export function AppNavigator() {
             <Stack.Screen name="EmailOtp" component={EmailOtpScreen} />
             <Stack.Screen name="LguSelect" component={LguSelectScreen} />
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+            <Stack.Screen name="News" component={NewsScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="CitizenGuide" component={CitizenGuideScreen} />
@@ -462,6 +464,7 @@ export function AppNavigator() {
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="TrackingDetail" component={TrackingDetailScreen} />
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+            <Stack.Screen name="News" component={NewsScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="CitizenGuide" component={CitizenGuideScreen} />

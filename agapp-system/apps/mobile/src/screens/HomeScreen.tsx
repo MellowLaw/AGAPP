@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, TouchableOpacity, ScrollView, Linking, Image, Alert, Modal, TextInput, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking, Image, Alert, Modal, TextInput, ActivityIndicator, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,6 +84,7 @@ export function HomeScreen({ navigation }: any) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [trendingThread, setTrendingThread] = useState<any | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Search Overlay State
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -288,51 +289,69 @@ export function HomeScreen({ navigation }: any) {
     return () => clearTimeout(delayDebounce);
   }, [searchText, activeLgu.id, profile?.id]);
 
-  useEffect(() => {
-    const fetchPublicData = async () => {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // 1. Fetch public news
       const { data: newsData } = await supabase
         .from('news_announcements')
         .select('*')
         .eq('lgu_id', activeLgu.id)
-        .eq('status', 'published')
+        .or('status.eq.published,and(status.eq.archived,is_public.eq.true)')
         .order('published_at', { ascending: false })
-        .limit(5);
+        .limit(20);
 
-      if (newsData) setNews(newsData);
+      if (newsData) {
+        const unexpired = newsData.filter((item: any) => {
+          if (item.expires_at) {
+            return new Date(item.expires_at).getTime() > Date.now();
+          }
+          return true;
+        });
 
-      // Fetch trending threads
+        const sorted = [...unexpired].sort((a: any, b: any) => {
+          const typePriority = (type: string) => {
+            if (type === 'advisory') return 3;
+            if (type === 'announcement') return 2;
+            return 1;
+          };
+          const priorityA = typePriority(a.type);
+          const priorityB = typePriority(b.type);
+          if (priorityA !== priorityB) {
+            return priorityB - priorityA;
+          }
+          return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
+        });
+
+        setNews(sorted.slice(0, 5));
+      }
+
+      // 2. Fetch trending threads
       const { data: forumData } = await supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, citizen:users!citizen_id(avatar_url, name))')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name))')
         .eq('lgu_id', activeLgu.id)
         .eq('is_approved', true)
         .limit(10);
 
       if (forumData) {
         const mapped = forumData.map((p: any) => {
-          const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
+          const approvedComments = (p.forum_comments || [])
+            .filter((c: any) => c.is_approved)
+            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           
-          // Get unique replier avatars
           const replierAvatars: string[] = [];
+          const seenCitizenIds = new Set<string>();
+
           approvedComments.forEach((c: any) => {
-            const avatar = c.citizen?.avatar_url;
-            if (avatar && !replierAvatars.includes(avatar)) {
+            if (replierAvatars.length >= 3) return;
+            const citizenId = c.citizen_id || c.citizen?.id || c.citizen_name;
+            if (citizenId && !seenCitizenIds.has(citizenId)) {
+              seenCitizenIds.add(citizenId);
+              const avatar = c.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
               replierAvatars.push(avatar);
             }
           });
-
-          // Fallbacks for avatar stack
-          if (approvedComments.length > 0) {
-            const presets = [
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80',
-              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80',
-              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop&q=80',
-            ];
-            while (replierAvatars.length < Math.min(3, approvedComments.length)) {
-              const fallback = presets[replierAvatars.length % presets.length];
-              replierAvatars.push(fallback);
-            }
-          }
 
           return {
             ...p,
@@ -341,7 +360,6 @@ export function HomeScreen({ navigation }: any) {
           };
         });
 
-        // Sort by comments count to find top trending
         const sorted = mapped.sort((a, b) => b.commentsCount - a.commentsCount);
         if (sorted.length > 0) {
           setTrendingThread(sorted[0]);
@@ -349,41 +367,45 @@ export function HomeScreen({ navigation }: any) {
           setTrendingThread(null);
         }
       }
-    };
 
-    const fetchPrivateData = async () => {
-      if (!profile) return;
+      // 3. Fetch private data if authenticated
+      if (profile) {
+        const { data: reportsData } = await supabase
+          .from('reports')
+          .select('*')
+          .eq('citizen_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      const { data: reportsData } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('citizen_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        if (reportsData) setReports(reportsData);
 
-      if (reportsData) setReports(reportsData);
+        const { data: requestsData } = await supabase
+          .from('service_requests')
+          .select('*')
+          .eq('citizen_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      const { data: requestsData } = await supabase
-        .from('service_requests')
-        .select('*')
-        .eq('citizen_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        if (requestsData) setRequests(requestsData);
 
-      if (requestsData) setRequests(requestsData);
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profile.id)
+          .eq('is_read', false);
 
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', profile.id)
-        .eq('is_read', false);
-
-      setUnreadCount(count || 0);
-    };
-
-    fetchPublicData();
-    fetchPrivateData();
+        setUnreadCount(count || 0);
+      }
+    } catch (err) {
+      console.error('Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
   }, [activeLgu.id, profile]);
+
+  useEffect(() => {
+    onRefresh();
+  }, [activeLgu.id, profile, onRefresh]);
 
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';
 
@@ -447,7 +469,7 @@ export function HomeScreen({ navigation }: any) {
     { icon: Briefcase, label: 'E-Services', onPress: () => navigation.navigate('ServicesTab') },
     { icon: Danger, label: 'Report', onPress: () => navigation.navigate('ReportsTab') },
     { icon: Scroll, label: 'Citizen Guide', onPress: () => navigation.navigate('CitizenGuide') },
-    { icon: DocumentText, label: 'News', onPress: () => setActiveTab('community') },
+    { icon: DocumentText, label: 'News', onPress: () => navigation.navigate('News') },
     { icon: Messages, label: 'Forum', onPress: () => navigation.navigate('Forum') },
     { icon: ChatboxIcon, label: 'Chatbot', onPress: () => navigation.navigate('Assistant') },
     { icon: Map, label: 'Explore', onPress: () => navigation.navigate('Explore') },
@@ -563,13 +585,84 @@ export function HomeScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 140 }} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[T.accent]}
+            tintColor={T.accent}
+          />
+        }
+      >
         
         {/* TAB 1: FOR YOU */}
         {activeTab === 'for_you' && (
           <View style={{ paddingHorizontal: 20 }}>
             {/* Greeting & Location Meta Block */}
             <View style={{ marginTop: 12, marginBottom: 16 }}>
+              {/* Announcement/Advisory Alert Box above Date/Time */}
+              {(() => {
+                const activeAdvisory = news.find(n => n.type === 'advisory');
+                const activeAnnouncement = news.find(n => n.type === 'announcement');
+
+                const activeItem = activeAdvisory || activeAnnouncement;
+                if (!activeItem) return null;
+
+                const isAdvisory = activeItem.type === 'advisory';
+
+                const bgColor = isAdvisory ? '#FEF2F2' : T.accent + '12';
+                const borderColor = isAdvisory ? '#FECACA' : T.accent + '33';
+                const textColor = isAdvisory ? '#991B1B' : T.text;
+                const badgeBg = isAdvisory ? '#EF4444' : T.accent;
+                const badgeTextColor = isAdvisory ? '#FFFFFF' : T.onAccent;
+                const label = isAdvisory ? 'Advisory!' : 'Announcement!';
+                const arrowColor = isAdvisory ? '#EF4444' : T.accent;
+                const message = isAdvisory 
+                  ? 'An official advisory has been posted. Tap to view.' 
+                  : 'An official announcement has been posted. Tap to view.';
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveTab('community');
+                    }}
+                    style={{
+                      backgroundColor: bgColor,
+                      borderWidth: 1,
+                      borderColor: borderColor,
+                      borderRadius: 16,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      marginBottom: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                      <View style={{
+                        backgroundColor: badgeBg,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'Octarine-Bold', color: badgeTextColor, textTransform: 'uppercase' }}>
+                          {label}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: textColor, flex: 1 }} numberOfLines={1}>
+                        {message}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: arrowColor }}>&rarr;</Text>
+                  </TouchableOpacity>
+                );
+              })()}
               <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                 {(() => {
                   const lguName = (activeLgu?.name || 'Municipality of Liliw').replace(/^Municipality of\s*/i, '');
@@ -905,7 +998,10 @@ export function HomeScreen({ navigation }: any) {
                   </Text>
 
                   <TouchableOpacity
-                    onPress={() => navigation.navigate('NewsDetail', { newsId: news[carouselIndex].id })}
+                    onPress={() => {
+                      setActiveTab('community');
+                      navigation.navigate('News');
+                    }}
                     activeOpacity={0.8}
                     style={{
                       flexDirection: 'row',
@@ -942,198 +1038,215 @@ export function HomeScreen({ navigation }: any) {
         )}
 
         {/* TAB 2: COMMUNITY / ANNOUNCEMENTS */}
-        {activeTab === 'community' && (
-          <View style={{ paddingHorizontal: 20 }}>
-            {/* Trending Discussion Section */}
-            {trendingThread && (
-              <>
-                <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
-                  Trending Discussion
-                </Text>
-                
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => navigation.navigate('Forum', { initialPostId: trendingThread.id })}
-                  style={{
-                    backgroundColor: T.card,
-                    borderWidth: 1,
-                    borderColor: T.border,
-                    borderRadius: 24,
-                    padding: 20,
-                    marginBottom: 20,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    {/* Badge */}
-                    <View style={{
-                      backgroundColor: '#FADEE1',
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                      borderRadius: 12,
-                    }}>
-                      <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: '#7E2532' }}>
-                        #{trendingThread.category || 'General'}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }}>
-                      {trendingThread.created_at ? new Date(trendingThread.created_at).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
-                    </Text>
-                  </View>
+        {activeTab === 'community' && (() => {
+          const announcementsOnly = news.filter(n => n.type === 'announcement' || n.type === 'advisory');
+          const newsOnly = news.filter(n => n.type !== 'announcement' && n.type !== 'advisory');
 
-                  <Text style={{ fontSize: 18, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 22, marginBottom: 8 }}>
-                    {trendingThread.title}
+          const renderItemCard = (n: any) => {
+            const imageAttachment = Array.isArray(n.attachments)
+              ? n.attachments.find((att: any) => att.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)/i.test(att.url))
+              : null;
+            const imageUrl = imageAttachment?.url || activeLgu.banner_url || 'https://placehold.co/800x400/A2B59F/1A1A1A?text=Announcement';
+
+            return (
+              <View
+                key={n.id}
+                style={{
+                  backgroundColor: T.card,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 24,
+                  marginBottom: 16,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* 1. Image block at the top */}
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={{ width: '100%', height: 180, backgroundColor: T.border }}
+                  resizeMode="cover"
+                />
+
+                {/* 2. Content section */}
+                <View style={{ padding: 20 }}>
+                  {/* Title */}
+                  <Text style={{ fontSize: 22, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 26, marginBottom: 6 }}>
+                    {n.title}
                   </Text>
 
-                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: T.textMuted, lineHeight: 18, marginBottom: 16 }} numberOfLines={3}>
-                    {trendingThread.content}
+                  {/* Date */}
+                  <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 12 }}>
+                    {new Date(n.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                   </Text>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: T.border, paddingTop: 12 }}>
-                    {/* Replier Avatars Row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', marginRight: 8 }}>
-                        {trendingThread.replierAvatars?.slice(0, 3).map((url: string, index: number) => (
-                          <View
-                            key={index}
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 12,
-                              borderWidth: 1.5,
-                              borderColor: T.card,
-                              marginLeft: index === 0 ? 0 : -8,
-                              backgroundColor: T.border,
-                              overflow: 'hidden',
-                              zIndex: 3 - index,
-                            }}
-                          >
-                            <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
-                          </View>
-                        ))}
-                      </View>
-                      <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.text }}>
-                        +{trendingThread.commentsCount || 0} replies
-                      </Text>
-                    </View>
-
-                    {/* Action text */}
-                    <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.accent }}>
-                      Join Discussion &rarr;
+                  {/* Description with blend cover & button */}
+                  <View style={{ position: 'relative' }}>
+                    <Text style={{ fontSize: 14, fontFamily: 'Inter-Medium', color: T.text, lineHeight: 20, paddingBottom: 64 }} numberOfLines={4}>
+                      {n.body || n.content}
                     </Text>
+                    
+                    {/* Blend gradient overlay at the bottom fading out text (blends with T.card) */}
+                    <LinearGradient
+                      colors={[`${T.card}00`, `${T.card}CC`, T.card]}
+                      locations={[0, 0.45, 0.9]}
+                      style={{
+                        position: 'absolute',
+                        left: -20,
+                        right: -20,
+                        bottom: -20,
+                        height: 110,
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        paddingBottom: 20,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('NewsDetail', { newsId: n.id })}
+                        activeOpacity={0.85}
+                        style={{
+                          backgroundColor: '#292929', // Solid high-contrast black ink button
+                          borderRadius: 999, // Perfect pill shape
+                          paddingHorizontal: 24,
+                          paddingVertical: 10,
+                          borderWidth: 1,
+                          borderColor: T.border,
+                          elevation: 3,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                        }}
+                      >
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: '#FFFFFF' }}>
+                          Read Full Article
+                        </Text>
+                      </TouchableOpacity>
+                    </LinearGradient>
                   </View>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {/* Announcements Section */}
-            <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
-              Announcements
-            </Text>
-            {news.length === 0 ? (
-              <View style={{
-                backgroundColor: T.cardAlt,
-                borderWidth: 1,
-                borderColor: T.border,
-                borderRadius: 20,
-                padding: 32,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 20,
-              }}>
-                <DocumentText size={32} color={T.textMuted} variant="Bold" />
-                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 12, textAlign: 'center' }}>
-                  No announcements published yet.
-                </Text>
+                </View>
               </View>
-            ) : (
-              news.map((n) => {
-                const imageAttachment = Array.isArray(n.attachments)
-                  ? n.attachments.find((att: any) => att.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)/i.test(att.url))
-                  : null;
-                const imageUrl = imageAttachment?.url || activeLgu.banner_url || 'https://placehold.co/800x400/A2B59F/1A1A1A?text=Announcement';
-                
-                return (
-                  <View
-                    key={n.id}
+            );
+          };
+
+          return (
+            <View style={{ paddingHorizontal: 20 }}>
+              {/* 1. Announcements Section */}
+              {announcementsOnly.length > 0 && (
+                <>
+                  <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
+                    Announcements
+                  </Text>
+                  {announcementsOnly.map(renderItemCard)}
+                </>
+              )}
+
+              {/* 2. Trending Discussion Section */}
+              {trendingThread && (
+                <>
+                  <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
+                    Trending Discussion
+                  </Text>
+                  
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => navigation.navigate('Forum', { initialPostId: trendingThread.id })}
                     style={{
                       backgroundColor: T.card,
                       borderWidth: 1,
                       borderColor: T.border,
-                      borderRadius: 24, // High-end radii
-                      marginBottom: 16,
-                      overflow: 'hidden',
+                      borderRadius: 24,
+                      padding: 20,
+                      marginBottom: 20,
                     }}
                   >
-                    {/* 1. Image block at the top */}
-                    <Image
-                      source={{ uri: imageUrl }}
-                      style={{ width: '100%', height: 180, backgroundColor: T.border }}
-                      resizeMode="cover"
-                    />
-
-                    {/* 2. Content section */}
-                    <View style={{ padding: 20 }}>
-                      {/* Title */}
-                      <Text style={{ fontSize: 22, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 26, marginBottom: 6 }}>
-                        {n.title}
-                      </Text>
-
-                      {/* Date */}
-                      <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 12 }}>
-                        {new Date(n.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </Text>
-
-                      {/* Description with blend cover & button */}
-                      <View style={{ position: 'relative' }}>
-                        <Text style={{ fontSize: 14, fontFamily: 'Inter-Medium', color: T.text, lineHeight: 20, paddingBottom: 64 }} numberOfLines={4}>
-                          {n.body || n.content}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      {/* Badge */}
+                      <View style={{
+                        backgroundColor: '#FADEE1',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 12,
+                      }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: '#7E2532' }}>
+                          #{trendingThread.category || 'General'}
                         </Text>
-                        
-                        {/* Blend gradient overlay at the bottom fading out text (blends with T.card) */}
-                        <LinearGradient
-                          colors={[`${T.card}00`, `${T.card}CC`, T.card]}
-                          locations={[0, 0.45, 0.9]}
-                          style={{
-                            position: 'absolute',
-                            left: -20,
-                            right: -20,
-                            bottom: -20,
-                            height: 110,
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            paddingBottom: 20,
-                          }}
-                        >
-                          <TouchableOpacity
-                            onPress={() => navigation.navigate('NewsDetail', { newsId: n.id })}
-                            activeOpacity={0.85}
-                            style={{
-                              backgroundColor: '#292929', // Solid high-contrast black ink button
-                              borderRadius: 999, // Perfect pill shape
-                              paddingHorizontal: 24,
-                              paddingVertical: 10,
-                              borderWidth: 1,
-                              borderColor: T.border,
-                              elevation: 3,
-                              shadowColor: '#000',
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.1,
-                              shadowRadius: 4,
-                            }}
-                          >
-                            <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: '#FFFFFF' }}>
-                              Read Full Article
-                            </Text>
-                          </TouchableOpacity>
-                        </LinearGradient>
                       </View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                        {trendingThread.created_at ? new Date(trendingThread.created_at).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+                      </Text>
                     </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        )}
+
+                    <Text style={{ fontSize: 18, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 22, marginBottom: 8 }}>
+                      {trendingThread.title}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: T.textMuted, lineHeight: 18, marginBottom: 16 }} numberOfLines={3}>
+                      {trendingThread.content}
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: T.border, paddingTop: 12 }}>
+                      {/* Replier Avatars Row */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', marginRight: 8 }}>
+                          {trendingThread.replierAvatars?.slice(0, 3).map((url: string, index: number) => (
+                            <View
+                              key={index}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 12,
+                                borderWidth: 1.5,
+                                borderColor: T.card,
+                                marginLeft: index === 0 ? 0 : -8,
+                                backgroundColor: T.border,
+                                overflow: 'hidden',
+                                zIndex: 3 - index,
+                              }}
+                            >
+                              <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+                            </View>
+                          ))}
+                        </View>
+                        <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.text }}>
+                          +{trendingThread.commentsCount || 0} replies
+                        </Text>
+                      </View>
+
+                      {/* Action text */}
+                      <Text style={{ fontSize: 12, fontFamily: 'Octarine-Bold', color: T.accent }}>
+                        Join Discussion &rarr;
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* 3. Feed Section */}
+              <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginTop: 12, marginBottom: 12 }}>
+                News Feed
+              </Text>
+              {newsOnly.length === 0 ? (
+                <View style={{
+                  backgroundColor: T.cardAlt,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 20,
+                  padding: 32,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 20,
+                }}>
+                  <DocumentText size={32} color={T.textMuted} variant="Bold" />
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 12, textAlign: 'center' }}>
+                    No feed items published yet.
+                  </Text>
+                </View>
+              ) : (
+                newsOnly.map(renderItemCard)
+              )}
+            </View>
+          );
+        })()}
 
       </ScrollView>
 
