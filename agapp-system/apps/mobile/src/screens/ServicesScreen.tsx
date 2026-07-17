@@ -31,6 +31,88 @@ const OFFICE_ICONS: Record<string, any> = {
   'Municipal Planning and Development Office': Location,
 };
 
+const PURPOSE_PRESETS: Record<string, string[]> = {
+  'New Business Permit': [
+    'Start a new retail business',
+    'Open a food service shop',
+    'Register local service agency',
+    'Commercial branch expansion',
+  ],
+  'Business Permit Renewal': [
+    'Annual license renewal',
+    'Update business operations',
+  ],
+  'Community Tax Certificate (Cedula)': [
+    'Employment requirement',
+    'Business permit application',
+    'Real estate transaction',
+    'Government ID application',
+    'Notarization requirement',
+  ],
+  'Birth Certificate (Certified Copy)': [
+    'Passport/Travel application',
+    'School enrollment',
+    'Employment requirement',
+    'Marriage license requirement',
+    'Government ID application',
+  ],
+  'Marriage Certificate (Certified Copy)': [
+    'Spousal benefit claim',
+    'Change of surname',
+    'Visa/Travel application',
+    'Legal documentation',
+  ],
+  'Marriage License Application': [
+    'Upcoming church wedding',
+    'Upcoming civil wedding',
+  ],
+  'Death Certificate (Certified Copy)': [
+    'Claiming insurance/benefits',
+    'Estate/Legal settlement',
+    'Burial arrangements',
+  ],
+  'Certificate of Indigency': [
+    'Medical assistance/Medicine aid',
+    'Financial/Social assistance',
+    'Educational scholarship',
+    'Legal aid/PAO support',
+    'Burial assistance',
+  ],
+  'Mayor\'s Clearance': [
+    'Local employment',
+    'Overseas employment (seaman/OFW)',
+    'Firearm license application',
+    'Transfer of residency',
+  ],
+  'Sanitary Permit': [
+    'Food business health compliance',
+    'Beauty/Health salon compliance',
+    'Commercial space compliance',
+  ],
+  'Health Certificate': [
+    'Food handler employment',
+    'Non-food handler work clearance',
+    'School health clearance',
+  ],
+  'Zoning/Locational Clearance': [
+    'Building construction permit',
+    'Business zoning compliance',
+    'Renovation clearance',
+  ],
+  'Occupational/Work Permit': [
+    'Local employment permit',
+    'Special work clearance',
+  ],
+};
+
+const DEFAULT_PRESETS = [
+  'Employment requirement',
+  'Government ID application',
+  'School requirement',
+  'Travel/Visa application',
+  'Business requirement',
+];
+
 export function ServicesScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
@@ -279,6 +361,57 @@ export function ServicesScreen({ navigation }: any) {
             />
 
             <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>PURPOSE</Text>
+            
+            {/* Purpose Presets Chips */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {(PURPOSE_PRESETS[selectedService?.name] || DEFAULT_PRESETS).map((preset) => {
+                const isSelected = purpose === preset;
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    onPress={() => setPurpose(preset)}
+                    activeOpacity={0.7}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                      backgroundColor: isSelected ? T.accentSoft : T.cardAlt,
+                      borderWidth: 1,
+                      borderColor: isSelected ? T.accent : T.border,
+                    }}
+                  >
+                    <Text style={{
+                      color: isSelected ? T.onAccentSoft : T.text,
+                      fontFamily: 'Inter-Medium',
+                      fontSize: 12,
+                    }}>
+                      {preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                onPress={() => setPurpose('')}
+                activeOpacity={0.7}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 20,
+                  backgroundColor: T.cardAlt,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                }}
+              >
+                <Text style={{
+                  color: T.textMuted,
+                  fontFamily: 'Inter-Medium',
+                  fontSize: 12,
+                }}>
+                  Custom / Clear
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <TextInput
               style={{
                 borderRadius: 14,

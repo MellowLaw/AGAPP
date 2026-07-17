@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking, Image, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking, Image, Alert, Modal, TextInput, ActivityIndicator, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,8 @@ import {
   ArrowRight2,
   Forward,
   Call,
+  CloseSquare,
+  TickCircle,
 } from 'iconsax-react-native';
 
 // User hand-picked this exact glyph (Ionicons "chatbox-ellipses", bold/filled)
@@ -38,7 +40,7 @@ function ChatboxIcon({ size, color }: { size: number; color: string; variant?: s
 
 export function HomeScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
-  const { session, profile, selectedLgu, guestLgu } = useAuth();
+  const { session, profile, selectedLgu, guestLgu, setGuestLgu } = useAuth();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -94,6 +96,21 @@ export function HomeScreen({ navigation }: any) {
     reportCategories: any[];
     myReports: any[];
   }>({ news: [], services: [], offices: [], forum: [], reportCategories: [], myReports: [] });
+
+  // Guest LGU Picker State
+  const [showLguModal, setShowLguModal] = useState(false);
+  const [lgus, setLgus] = useState<any[]>([]);
+  const [loadingLgus, setLoadingLgus] = useState(false);
+
+  useEffect(() => {
+    if (showLguModal && lgus.length === 0) {
+      setLoadingLgus(true);
+      supabase.from('lgus').select('*').eq('is_active', true).then(({ data }) => {
+        if (data) setLgus(data);
+        setLoadingLgus(false);
+      });
+    }
+  }, [showLguModal]);
 
   const activeLgu = selectedLgu || guestLgu || { id: 'liliw-laguna', name: 'Liliw, Laguna' };
 
@@ -465,28 +482,57 @@ export function HomeScreen({ navigation }: any) {
           <View style={{ paddingHorizontal: 20 }}>
             {/* Greeting & Location Meta Block */}
             <View style={{ marginTop: 12, marginBottom: 16 }}>
-              {(() => {
-                const lguName = (activeLgu?.name || 'Municipality of Liliw').replace(/^Municipality of\s*/i, '');
-                const lguId = activeLgu?.id || 'liliw-laguna';
-                const parts = lguId.split('-');
-                const rawProvince = parts.length > 1 ? parts[parts.length - 1] : '';
-                const province = rawProvince.charAt(0).toUpperCase() + rawProvince.slice(1);
-                
-                const cleanLocation = lguName.toLowerCase().includes(province.toLowerCase())
-                  ? lguName
-                  : `${lguName}, ${province}`;
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                {(() => {
+                  const lguName = (activeLgu?.name || 'Municipality of Liliw').replace(/^Municipality of\s*/i, '');
+                  const lguId = activeLgu?.id || 'liliw-laguna';
+                  const parts = lguId.split('-');
+                  const rawProvince = parts.length > 1 ? parts[parts.length - 1] : '';
+                  const province = rawProvince.charAt(0).toUpperCase() + rawProvince.slice(1);
+                  
+                  const cleanLocation = lguName.toLowerCase().includes(province.toLowerCase())
+                    ? lguName
+                    : `${lguName}, ${province}`;
 
-                const rawBarangay = session && profile?.barangay ? profile.barangay : 'Poblacion';
-                const barangay = rawBarangay.toLowerCase().startsWith('brgy') 
-                  ? rawBarangay 
-                  : `Brgy. ${rawBarangay}`;
+                  const isVerified = session && profile?.verification_status === 'verified';
+                  let barangayText = '';
+                  if (isVerified && profile?.barangay) {
+                    const brgyMatch = profile.barangay.match(/Brgy\.\s*([^,]+)/i);
+                    if (brgyMatch) {
+                      barangayText = `Brgy. ${brgyMatch[1].trim()} · `;
+                    } else {
+                      const brgyParts = profile.barangay.split(',');
+                      barangayText = brgyParts.length > 1 ? `Brgy. ${brgyParts[1].trim()} · ` : `${profile.barangay} · `;
+                    }
+                  }
 
-                return (
-                  <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
-                    {barangay} · {cleanLocation} · {formatDateTime()}
-                  </Text>
-                );
-              })()}
+                  return (
+                    <Text style={{ fontSize: 12, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                      {barangayText}{cleanLocation} · {formatDateTime()}
+                    </Text>
+                  );
+                })()}
+
+                {!session && (
+                  <TouchableOpacity
+                    onPress={() => setShowLguModal(true)}
+                    activeOpacity={0.7}
+                    style={{
+                      marginLeft: 8,
+                      backgroundColor: T.accentSoft,
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      borderWidth: 0.5,
+                      borderColor: T.accent,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.onAccentSoft }}>
+                      Change LGU
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 36 }}>
@@ -1410,7 +1456,91 @@ export function HomeScreen({ navigation }: any) {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+
+      {/* Guest LGU Selection Modal */}
+      <Modal visible={showLguModal} transparent animationType="slide" onRequestClose={() => setShowLguModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            maxHeight: '60%',
+            backgroundColor: T.card,
+            borderWidth: 1,
+            borderColor: T.border,
+            paddingBottom: 40,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: 18,
+              borderBottomWidth: 1,
+              borderBottomColor: T.border,
+            }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Select Municipality</Text>
+              <TouchableOpacity onPress={() => setShowLguModal(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+
+            {loadingLgus ? (
+              <ActivityIndicator color={T.text} style={{ padding: 40 }} />
+            ) : (
+              <FlatList
+                data={lgus}
+                keyExtractor={(item: any) => item.id}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8 }}
+                renderItem={({ item }: { item: any }) => {
+                  const isSelected = activeLgu.id === item.id;
+                  const logoSource = item.logo && item.logo.startsWith('http')
+                    ? { uri: item.logo }
+                    : require('../../assets/brand/liliw-seal.jpg');
+
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: T.cardAlt,
+                        borderWidth: 1,
+                        borderColor: isSelected ? T.accent : T.border,
+                        borderRadius: 16,
+                        padding: 12,
+                        marginBottom: 8,
+                      }}
+                      onPress={async () => {
+                        await setGuestLgu(item);
+                        setShowLguModal(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={logoSource}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          borderWidth: 1,
+                          borderColor: T.border,
+                          marginRight: 12,
+                          backgroundColor: '#FFFFFF',
+                        }}
+                        resizeMode="contain"
+                      />
+                      <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, flex: 1 }}>
+                        {item.name}
+                      </Text>
+                      {isSelected && <TickCircle size={18} color={T.accent} variant="Bold" />}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      </SafeAreaView>
     </ScreenBackground>
   );
 }
