@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -15,17 +15,24 @@ import { Book, Add, Calendar, Clock, Paperclip, Eye, Trash, Edit, Send, Image as
 
 type AnnouncementStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 
+type AnnouncementType = 'news' | 'announcement' | 'advisory';
+
 interface AnnouncementItem {
   id: string; // underlying news_announcements.id
   title: string;
   content: string;
   status: AnnouncementStatus;
+  type: AnnouncementType;
+  durationHours: number | null;
+  expiresAt?: string;
+  isPublic: boolean;
   publishedAt?: string;
   scheduledFor?: string;
   publishedAtRaw?: string | null;
   scheduledForRaw?: string | null;
   views: number;
   attachments: number; // count
+  attachmentsRaw?: any[];
 }
 
 const mapDbStatusToStatus = (status: string | null): AnnouncementStatus => {
@@ -48,12 +55,17 @@ const mapAnnouncementRowToItem = (row: any): AnnouncementItem => {
     title: row.title,
     content: row.content,
     status: mapDbStatusToStatus(row.status),
+    type: (row.type as AnnouncementType) || 'news',
+    durationHours: row.duration_hours ?? null,
+    expiresAt: row.expires_at ? new Date(row.expires_at).toLocaleString() : undefined,
+    isPublic: row.is_public ?? true,
     publishedAt: row.published_at ? new Date(row.published_at).toLocaleString() : undefined,
     scheduledFor: row.scheduled_for ? new Date(row.scheduled_for).toLocaleString() : undefined,
     publishedAtRaw: row.published_at ?? null,
     scheduledForRaw: row.scheduled_for ?? null,
     views: row.views ?? 0,
     attachments: Array.isArray(row.attachments) ? row.attachments.length : 0,
+    attachmentsRaw: row.attachments || [],
   };
 };
 
@@ -62,7 +74,48 @@ export default function NewsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [formType, setFormType] = useState<'news' | 'announcement' | 'advisory'>('news');
+  const [durationHours, setDurationHours] = useState<string>('manual');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setAttachments(prev => [...prev, ...selectedFiles]);
+    }
+  };
+
+  const uploadAttachments = async (): Promise<any[]> => {
+    const uploadedUrls: any[] = [];
+    for (const file of attachments) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUserId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('service_attachments')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Upload error:', error);
+        showToast(`Failed to upload ${file.name}`, 'error');
+        throw error;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('service_attachments')
+        .getPublicUrl(fileName);
+
+      uploadedUrls.push({
+        name: file.name,
+        url: urlData.publicUrl,
+        type: file.type,
+      });
+    }
+    return uploadedUrls;
+  };
   const { showToast, ToastContainer } = useToast();
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -126,6 +179,22 @@ export default function NewsPage() {
     }
 
     const now = new Date();
+    let expiresAtVal: string | null = null;
+    let durationHoursVal: number | null = null;
+    if ((formType === 'announcement' || formType === 'advisory') && durationHours !== 'manual') {
+      durationHoursVal = parseInt(durationHours, 10);
+      const expires = new Date(now.getTime() + durationHoursVal * 60 * 60 * 1000);
+      expiresAtVal = expires.toISOString();
+    }
+
+    // Upload files
+    let uploaded = [];
+    try {
+      uploaded = await uploadAttachments();
+    } catch (e) {
+      return; // Stop on upload error
+    }
+    const finalAttachments = [...existingAttachments, ...uploaded];
 
     if (editingAnnouncement) {
       const { data, error } = await supabase
@@ -134,8 +203,13 @@ export default function NewsPage() {
           title,
           content,
           status: 'published',
+          is_public: isPublic,
+          type: formType,
+          duration_hours: durationHoursVal,
+          expires_at: expiresAtVal,
           published_at: now.toISOString(),
           scheduled_for: null,
+          attachments: finalAttachments,
         })
         .eq('id', editingAnnouncement.id)
         .eq('lgu_id', lguId)
@@ -159,9 +233,13 @@ export default function NewsPage() {
           title,
           content,
           status: 'published',
+          is_public: isPublic,
+          type: formType,
+          duration_hours: durationHoursVal,
+          expires_at: expiresAtVal,
           published_at: now.toISOString(),
           scheduled_for: null,
-          attachments: [],
+          attachments: finalAttachments,
         })
         .select('*')
         .single();
@@ -176,11 +254,15 @@ export default function NewsPage() {
       setAnnouncementsList(prev => [mapped, ...prev]);
     }
 
-    showToast('Announcement published successfully!', 'success');
+    showToast('Published successfully!', 'success');
     setShowCreateForm(false);
     setTitle('');
     setContent('');
+    setIsPublic(true);
+    setFormType('news');
+    setDurationHours('manual');
     setAttachments([]);
+    setExistingAttachments([]);
     setEditingAnnouncement(null);
     setScheduleDate('');
     setScheduleTime('');
@@ -188,13 +270,29 @@ export default function NewsPage() {
 
   const openSchedule = () => {
     setShowScheduleModal(true);
-  };
+  };  
   const confirmSchedule = async () => {
     if (!scheduleDate || !scheduleTime) {
       showToast('Please select date and time', 'info');
       return;
     }
     const when = new Date(`${scheduleDate}T${scheduleTime}`);
+    let expiresAtVal: string | null = null;
+    let durationHoursVal: number | null = null;
+    if ((formType === 'announcement' || formType === 'advisory') && durationHours !== 'manual') {
+      durationHoursVal = parseInt(durationHours, 10);
+      const expires = new Date(when.getTime() + durationHoursVal * 60 * 60 * 1000);
+      expiresAtVal = expires.toISOString();
+    }
+
+    // Upload files
+    let uploaded = [];
+    try {
+      uploaded = await uploadAttachments();
+    } catch (e) {
+      return; // Stop on upload error
+    }
+    const finalAttachments = [...existingAttachments, ...uploaded];
 
     if (editingAnnouncement) {
       const { data, error } = await supabase
@@ -203,8 +301,13 @@ export default function NewsPage() {
           title,
           content,
           status: 'scheduled',
+          is_public: isPublic,
+          type: formType,
+          duration_hours: durationHoursVal,
+          expires_at: expiresAtVal,
           scheduled_for: when.toISOString(),
           published_at: null,
+          attachments: finalAttachments,
         })
         .eq('id', editingAnnouncement.id)
         .eq('lgu_id', lguId)
@@ -228,9 +331,13 @@ export default function NewsPage() {
           title,
           content,
           status: 'scheduled',
+          is_public: isPublic,
+          type: formType,
+          duration_hours: durationHoursVal,
+          expires_at: expiresAtVal,
           scheduled_for: when.toISOString(),
           published_at: null,
-          attachments: [],
+          attachments: finalAttachments,
         })
         .select('*')
         .single();
@@ -246,11 +353,15 @@ export default function NewsPage() {
     }
 
     setShowScheduleModal(false);
-    showToast('Announcement scheduled successfully!', 'success');
+    showToast('Scheduled successfully!', 'success');
     setShowCreateForm(false);
     setTitle('');
     setContent('');
+    setIsPublic(true);
+    setFormType('news');
+    setDurationHours('manual');
     setAttachments([]);
+    setExistingAttachments([]);
     setScheduleDate('');
     setScheduleTime('');
     setEditingAnnouncement(null);
@@ -261,6 +372,10 @@ export default function NewsPage() {
     setShowCreateForm(true);
     setTitle(announcement.title);
     setContent(announcement.content);
+    setIsPublic(announcement.isPublic);
+    setFormType(announcement.type || 'news');
+    setDurationHours(announcement.durationHours ? announcement.durationHours.toString() : 'manual');
+    setExistingAttachments(Array.isArray(announcement.attachmentsRaw) ? announcement.attachmentsRaw : []);
     if (announcement.scheduledForRaw) {
       const date = new Date(announcement.scheduledForRaw);
       setScheduleDate(date.toISOString().slice(0, 10));
@@ -301,7 +416,11 @@ export default function NewsPage() {
     setShowCreateForm(false);
     setTitle('');
     setContent('');
+    setIsPublic(true);
+    setFormType('news');
+    setDurationHours('manual');
     setAttachments([]);
+    setExistingAttachments([]);
     setScheduleDate('');
     setScheduleTime('');
     setEditingAnnouncement(null);
@@ -310,12 +429,22 @@ export default function NewsPage() {
   return (
     <DashboardLayout 
       role="lgu-admin" 
-      title="News and Announcements"
+      title="Community"
       action={
-        <Button onClick={() => { setShowCreateForm(true); setEditingAnnouncement(null); }}>
-          <Add className="w-4 h-4 mr-1" />
-          Create New
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => { setShowCreateForm(true); setFormType('news'); setEditingAnnouncement(null); }}>
+            <Add className="w-4 h-4 mr-1" />
+            Make News
+          </Button>
+          <Button onClick={() => { setShowCreateForm(true); setFormType('announcement'); setEditingAnnouncement(null); }}>
+            <Add className="w-4 h-4 mr-1" />
+            Make Announcement
+          </Button>
+          <Button onClick={() => { setShowCreateForm(true); setFormType('advisory'); setEditingAnnouncement(null); }}>
+            <Add className="w-4 h-4 mr-1" />
+            Make Advisory
+          </Button>
+        </div>
       }
     >
       <ToastContainer />
@@ -333,7 +462,9 @@ export default function NewsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Create Form */}
           <Card>
-            <h2 className="text-lg font-semibold text-text-primary mb-6">Create Announcement</h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-6">
+              Create {formType === 'advisory' ? 'Advisory' : formType === 'announcement' ? 'Announcement' : 'News'}
+            </h2>
             
             <div className="space-y-4">
               <Input
@@ -351,16 +482,99 @@ export default function NewsPage() {
                 rows={8}
               />
 
+              {/* Public/Private Toggle Option */}
+              <div className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id="isPublicCheckbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-4 h-4 rounded border-theme text-primary focus:ring-primary"
+                />
+                <label htmlFor="isPublicCheckbox" className="text-sm font-medium text-text-primary select-none cursor-pointer">
+                  Visible to Citizens (Make Public)
+                </label>
+              </div>
+
+              {/* Announcement-only duration selection */}
+              {(formType === 'announcement' || formType === 'advisory') && (
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-text-muted">
+                    Removal Schedule (Duration)
+                  </label>
+                  <select
+                    value={durationHours}
+                    onChange={(e) => setDurationHours(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="manual">Manual removal</option>
+                    <option value="2">Remove automatically after 2 hours</option>
+                    <option value="4">Remove automatically after 4 hours</option>
+                    <option value="12">Remove automatically after 12 hours</option>
+                    <option value="24">Remove automatically after 24 hours</option>
+                  </select>
+                </div>
+              )}
+
               {/* Attachments */}
               <div>
                 <label className="block text-sm text-text-muted mb-2">Attachments</label>
-                <div className="border border-dashed border-theme rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  multiple
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border border-dashed border-theme rounded-lg p-6 text-center cursor-pointer hover:bg-surface-alt transition-colors"
+                >
                   <div className="w-10 h-10 bg-surface-alt rounded-md flex items-center justify-center mx-auto mb-2">
                     <Paperclip variant="Bold" className="w-5 h-5 text-text-muted" />
                   </div>
-                  <p className="text-sm text-text-muted">Drop files here or click to upload</p>
-                  <p className="text-xs text-text-faint mt-1">Images and PDFs supported</p>
+                  <p className="text-sm text-text-muted">Click to select files</p>
+                  <p className="text-xs text-text-faint mt-1">Images and PDFs supported (Max 5MB each)</p>
                 </div>
+                
+                {/* Existing attachments */}
+                {editingAnnouncement && existingAttachments.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <label className="block text-xs font-semibold text-text-muted">Currently Uploaded Files</label>
+                    {existingAttachments.map((file: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between bg-surface-alt px-3 py-2 rounded-md text-sm text-text-primary">
+                        <span className="truncate max-w-[80%]">{file.name || 'Attachment'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setExistingAttachments(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-red-500 hover:text-red-700 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New attachments queue */}
+                {attachments.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <label className="block text-xs font-semibold text-text-muted">Files to Upload</label>
+                    {attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-surface-alt px-3 py-2 rounded-md text-sm text-text-primary">
+                        <span className="truncate max-w-[80%]">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-red-500 hover:text-red-700 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -425,10 +639,19 @@ export default function NewsPage() {
                       variant={
                         announcement.status === 'published' ? 'success' :
                         announcement.status === 'scheduled' ? 'info' :
+                        announcement.status === 'archived' ? 'warning' :
                         'default'
                       }
                     >
                       {announcement.status}
+                    </Badge>
+                    <Badge 
+                      variant={announcement.isPublic ? 'success' : 'default'}
+                    >
+                      {announcement.isPublic ? 'Public' : 'Private'}
+                    </Badge>
+                    <Badge variant={announcement.type === 'advisory' ? 'error' : announcement.type === 'announcement' ? 'info' : 'default'}>
+                      {announcement.type === 'advisory' ? 'Advisory' : announcement.type === 'announcement' ? 'Announcement' : 'News'}
                     </Badge>
                   </div>
                   
@@ -459,11 +682,63 @@ export default function NewsPage() {
                         {announcement.attachments} attachment{announcement.attachments > 1 ? 's' : ''}
                       </span>
                     )}
+                    {(announcement.type === 'announcement' || announcement.type === 'advisory') && (
+                      <span className="text-xs text-text-muted">
+                        · {announcement.durationHours ? `Duration: ${announcement.durationHours}h` : 'Manual removal'}
+                        {announcement.expiresAt && ` (Expires: ${announcement.expiresAt})`}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-start gap-2 ml-4">
+                  {announcement.status === 'published' && (
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={async () => {
+                        const { data, error } = await supabase
+                          .from('news_announcements')
+                          .update({ status: 'archived' })
+                          .eq('id', announcement.id)
+                          .select('*')
+                          .single();
+                        if (error) {
+                          console.error(error);
+                          showToast('Failed to archive news', 'error');
+                        } else {
+                          setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
+                          showToast('News archived successfully', 'success');
+                        }
+                      }}
+                    >
+                      Archive
+                    </Button>
+                  )}
+                  {announcement.status === 'archived' && (
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={async () => {
+                        const { data, error } = await supabase
+                          .from('news_announcements')
+                          .update({ status: 'published', published_at: new Date().toISOString() })
+                          .eq('id', announcement.id)
+                          .select('*')
+                          .single();
+                        if (error) {
+                          console.error(error);
+                          showToast('Failed to publish news', 'error');
+                        } else {
+                          setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
+                          showToast('News published successfully', 'success');
+                        }
+                      }}
+                    >
+                      Publish
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="sm"
