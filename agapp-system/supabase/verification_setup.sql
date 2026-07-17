@@ -114,6 +114,72 @@ CREATE POLICY "Super admins can read all verification requests" ON verification_
 -- so no UPDATE policy is granted to clients directly.
 
 -- --------------------------------------------------------
+-- 2.5 submit_verification_request() RPC — atomic submit (2026-07-06)
+--     The mobile client used to (a) UPDATE users.lgu_id as a "sync" step,
+--     trusting supabase-js's error:null without checking a row actually
+--     changed, then (b) INSERT verification_requests, whose RLS WITH CHECK
+--     re-reads users.lgu_id. Two separate requests racing/going stale
+--     produced an opaque RLS 42501 that the client could only guess at
+--     ("municipality doesn't match your account"), sometimes masking a
+--     different real cause. This RPC does the sync + insert atomically and
+--     raises a specific message per actual failure (already pending, already
+--     verified, invalid/inactive LGU, missing photos).
+--
+--     Briefly extended 2026-07-06 with a back-of-ID photo + liveness-check
+--     result param; both were dropped 2026-07-17 along with the back-photo
+--     capture step and the two-shot "blink twice" liveness flow (back to the
+--     original 5-arg signature). See
+--     Docs/Planning/Plan-ID-Verification-Redesign.md's "Simplified 2026-07-17".
+-- --------------------------------------------------------
+CREATE OR REPLACE FUNCTION submit_verification_request(
+  p_lgu_id text,
+  p_id_type text,
+  p_id_document_path text,
+  p_selfie_path text,
+  p_declared_barangay text
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_status text;
+  v_new_id uuid;
+BEGIN
+  SELECT verification_status INTO v_status FROM users WHERE id = auth.uid();
+  IF v_status IS NULL THEN
+    RAISE EXCEPTION 'Account not found. Please sign out and back in, then try again.';
+  END IF;
+  IF v_status NOT IN ('unverified', 'rejected') THEN
+    RAISE EXCEPTION 'Your account is already %. A new verification request can''t be submitted.', v_status;
+  END IF;
+  IF EXISTS (SELECT 1 FROM verification_requests WHERE user_id = auth.uid() AND status = 'pending') THEN
+    RAISE EXCEPTION 'You already have a verification request pending review.';
+  END IF;
+  IF p_lgu_id IS NULL OR NOT EXISTS (SELECT 1 FROM lgus WHERE id = p_lgu_id AND is_active) THEN
+    RAISE EXCEPTION 'Please select a valid, active municipality and try again.';
+  END IF;
+  IF p_id_document_path IS NULL OR p_selfie_path IS NULL THEN
+    RAISE EXCEPTION 'Both an ID document and a selfie are required.';
+  END IF;
+
+  UPDATE users SET lgu_id = p_lgu_id WHERE id = auth.uid();
+
+  INSERT INTO verification_requests (
+    user_id, lgu_id, id_type, id_document_path, selfie_path, declared_barangay, status
+  )
+  VALUES (
+    auth.uid(), p_lgu_id, p_id_type, p_id_document_path, p_selfie_path, p_declared_barangay, 'pending'
+  )
+  RETURNING id INTO v_new_id;
+
+  RETURN v_new_id;
+END;
+$$;
+-- If migrating an existing DB that still has the 7-arg overload from the
+-- 2026-07-06 redesign, drop it first: DROP FUNCTION IF EXISTS
+-- submit_verification_request(text, text, text, text, text, text, boolean);
+REVOKE ALL ON FUNCTION submit_verification_request(text, text, text, text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION submit_verification_request(text, text, text, text, text) TO authenticated;
+
+-- --------------------------------------------------------
 -- 3. verify_citizen() RPC — secure approve/reject
 --    Enforces the caller is an LGU_ADMIN of the same LGU,
 --    then atomically updates the request AND the user row.
@@ -274,6 +340,32 @@ CREATE POLICY "LGU admins read citizen-ids in their LGU" ON storage.objects
 DROP POLICY IF EXISTS "Super admins read all citizen-ids" ON storage.objects;
 CREATE POLICY "Super admins read all citizen-ids" ON storage.objects
   FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'citizen-ids'
+    AND EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role = 'SUPER_ADMIN'
+    )
+  );
+
+-- LGU admins (their own LGU) and super admins can DELETE citizen-ids files —
+-- needed so the verification review UI can purge the ID/selfie photos once a
+-- decision (approve/reject) is recorded (2026-07-17 data-minimization change).
+DROP POLICY IF EXISTS "LGU admins delete citizen-ids in their LGU" ON storage.objects;
+CREATE POLICY "LGU admins delete citizen-ids in their LGU" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'citizen-ids'
+    AND EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.id = auth.uid()
+        AND u.role = 'LGU_ADMIN'
+        AND u.lgu_id = (storage.foldername(objects.name))[1]
+    )
+  );
+
+DROP POLICY IF EXISTS "Super admins delete all citizen-ids" ON storage.objects;
+CREATE POLICY "Super admins delete all citizen-ids" ON storage.objects
+  FOR DELETE TO authenticated
   USING (
     bucket_id = 'citizen-ids'
     AND EXISTS (

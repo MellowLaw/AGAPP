@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { SupabaseService } from './supabase.service';
 import { PushService } from './push/push.service';
-import { ReportController, ChatbotController } from './app.controllers';
+import { ReportController, ChatbotController, VerificationController } from './app.controllers';
 
 @Module({
   imports: [
@@ -14,7 +14,8 @@ import { ReportController, ChatbotController } from './app.controllers';
   ],
   controllers: [
     ReportController,
-    ChatbotController
+    ChatbotController,
+    VerificationController
   ],
   providers: [
     SupabaseService,

@@ -9,7 +9,7 @@
 export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export const ID_TYPES = [
-  { value: 'PhilSys',  label: 'PhilSys ID / PhilID' },
+  { value: 'PhilSys',  label: 'National ID (PhilSys / PhilID)' },
   { value: 'Barangay', label: 'Barangay ID / Clearance' },
   { value: 'Voter',    label: "Voter's ID / COMELEC" },
   { value: 'Driver',   label: "Driver's License" },

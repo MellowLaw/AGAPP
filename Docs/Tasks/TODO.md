@@ -5,6 +5,31 @@
 
 ## 🔴 Now (active)
 
+- [x] **Simplified ID verification: dropped back-of-ID capture and the
+      two-shot "blink twice" liveness check (2026-07-17)**, per explicit
+      request. Single front-only ID photo + single selfie now. Removed:
+      `id_back` step/state/handlers, `requiresBack` from `ID_TYPES`,
+      `POST /api/verification/check-liveness` (was never wired to a real
+      vendor anyway), and the `id_document_back_path`/`liveness_passed`/
+      `liveness_checked_at` columns. `submit_verification_request()` RPC back
+      to its original 5-arg signature (migration
+      `simplify_verification_drop_back_photo_and_liveness`, live-verified
+      exactly one overload remains). **New:** citizen ID + selfie photos are
+      now deleted from `citizen-ids` storage right after an LGU admin
+      approves/rejects a request (data-minimization; needed a new storage
+      DELETE policy for LGU_ADMIN/SUPER_ADMIN, migration
+      `add_staff_delete_policy_citizen_ids` — previously only the file owner
+      could delete). See `Plan-ID-Verification-Redesign.md`'s "Simplified
+      2026-07-17" section.
+- [ ] **One pre-existing test verification request still has live photos in
+      storage** (rejected, `nagcarlan-laguna`, from before the auto-delete
+      change above) — not retroactively purged; ask before deleting real
+      stored files without an explicit go-ahead.
+- [ ] **Device-test the simplified ID verification flow (2026-07-17)** — single
+      front ID photo + single selfie, OCR autofill, and the atomic submit RPC
+      end-to-end on a real phone; plus the still-open guide-box/output
+      alignment issue from the prior device-test round. See
+      `Plan-ID-Verification-Redesign.md`'s Verification section.
 - [ ] **Device-test the reporting overhaul (2026-07-06)** — camera-only capture, automatic
       GPS with denied/loading states, and the stamped-photo review step were all built and
       typecheck clean, but never run on a physical device/simulator (none available in this
@@ -77,6 +102,56 @@
 
 ## ✅ Done
 
+- [x] **ID verification redesign built (2026-07-06, DB+API by me, mobile UI via
+      subagent, all independently re-verified)** — `Plan-ID-Verification-Redesign.md`
+      implemented end-to-end. **DB** (`verification_setup.sql`, applied + synced):
+      `verification_requests` gained `id_document_back_path`, `liveness_passed`
+      (nullable, never fabricated — same tri-state convention as `reports.ml_verified`),
+      `liveness_checked_at`; `submit_verification_request` RPC extended to 7 args
+      (old 5-arg overload dropped to avoid PostgREST resolution ambiguity — confirmed
+      exactly one overload exists live). **API** (`app.controllers.ts`, `tsc` clean):
+      two new guarded endpoints mirroring `verify-image`'s exact pattern — a shared
+      `isOwnStorageUrl()` helper (refactored out of the existing pothole/stray-pet
+      check) now validates EITHER public-bucket URLs or signed private-bucket URLs;
+      `extract-id-text` (OCR.space, needs `OCR_SPACE_API_KEY`, returns `{text:null}`
+      gracefully without it) and `check-liveness` (intentionally stubbed pending a
+      vendor decision, always `{analyzed:false, passed:null}`, never blocks). Caught
+      and fixed one real bug before the mobile side was built against it: the first
+      draft of `isOwnStorageUrl` only recognized public URLs, but `citizen-ids` is a
+      PRIVATE bucket — would have rejected every real OCR/liveness call; fixed to
+      also accept signed URLs, restricted per-endpoint to the `citizen-ids` bucket
+      specifically. **Mobile** (`VerifyIdentityScreen.tsx` reworked, new
+      `GuidedCapture.tsx` component, `ID_TYPES` gained `requiresBack`): new step order
+      ID front → ID back (conditional) → Residency (OCR-prefilled ZIP + seeded street
+      address) → Selfie (two-shot liveness, second shot canonical, first shot
+      best-effort deleted after the liveness call) → Review; `GuidedCapture` is a
+      reusable full-screen camera + SVG true-cutout guide overlay (card ratio for ID,
+      oval for face) + auto-crop (`expo-image-manipulator`, inverting the camera's
+      "cover" fit to map the on-screen guide back to photo-pixel space) + Retake/Use-
+      this-photo review — camera-only throughout, no gallery option anywhere in the
+      new flow. Independently re-verified (not just trusting the subagent's report):
+      re-ran `tsc --noEmit` myself (clean), confirmed `react-native-svg` was an
+      already-hoisted dependency (not a new/missing one), read `GuidedCapture.tsx` and
+      the final RPC call site directly to confirm the crop math and the 7-parameter
+      wiring were actually correct. **Not device-tested — see 🔴 Now above.**
+- [x] **Fixed: misleading "municipality doesn't match your account" verification-submit
+      error (2026-07-06)** — the mobile client did two separate requests (an `UPDATE
+      users.lgu_id` "sync", trusting `error: null` without checking a row actually
+      changed, then a separate `INSERT verification_requests` whose RLS re-reads
+      `users.lgu_id`) — a race/staleness window that could throw an opaque RLS 42501,
+      which the client then guessed was always an LGU mismatch (sometimes masking a
+      different real cause). Checked live DB state first (no lingering pending rows/bad
+      statuses, ruling out the "duplicate pending request" theory) before concluding
+      this was the real bug class. Fixed with a new `submit_verification_request()`
+      SECURITY DEFINER RPC (`verification_setup.sql`, applied live) that does the LGU
+      sync + insert atomically and raises a specific message per actual failure
+      (already pending / already verified / invalid LGU / missing photos) instead of a
+      generic policy-violation guess. `VerifyIdentityScreen.tsx` now calls the RPC
+      instead of two sequential writes; `tsc --noEmit` clean. The bigger redesign asked
+      for alongside this (ID-first OCR autofill, custom selfie camera, blink-twice
+      liveness) is planned separately in `Plan-ID-Verification-Redesign.md` — it needs
+      real vendor/architecture decisions (OCR approach, and the Expo-Go-vs-dev-client
+      tradeoff for liveness detection) before writing code.
 - [x] **Mobile audit fixes — verification enforcement + perf + dead code (2026-07-06,
       subagents + DB)** — from the mobile flow/security/optimization audit. **Server-side
       (migration `verification_enforcement_cooldown_cancel`, verified, `schema.sql` synced):**

@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, Image, Modal, FlatList, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { globalStyles } from '../theme';
 import { supabase } from '../../supabaseClient';
 import { useToast } from '../components/Toast';
+import { GuidedCapture } from '../components/GuidedCapture';
 import {
   ID_TYPES, getVerificationStatus, statusLabel,
 } from '../utils/verification';
@@ -17,25 +17,79 @@ import {
   ArrowLeft2,
   ArrowDown2,
   Camera,
-  Image as ImageIcon,
   TickCircle,
   Warning2,
   Lock,
   CloseSquare,
   Check,
+  InfoCircle,
 } from 'iconsax-react-native';
 
-type Step = 0 | 1 | 2 | 3;
+// ---- guarded API helpers (mirrors utils/mlAnalysis.ts's fetch/timeout/error
+// pattern exactly) — both are best-effort and must never block the flow. ----
+
+async function extractIdText(photoUrl: string, accessToken?: string | null): Promise<string | null> {
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (!apiUrl) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const response = await fetch(`${apiUrl}/verification/extract-id-text`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ photoUrl }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return typeof data?.text === 'string' ? data.text : null;
+  } catch {
+    return null;
+  }
+}
+
+type StepKey = 'id_front' | 'residency' | 'selfie' | 'review';
+type ActiveCapture = 'id_front' | 'selfie' | null;
+
+const STEP_LABEL: Record<StepKey, string> = {
+  id_front: 'ID photo',
+  residency: 'Residency',
+  selfie: 'Selfie',
+  review: 'Review',
+};
 
 export function VerifyIdentityScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
-  const { profile, selectedLgu, refreshProfile } = useAuth();
+  const { profile, selectedLgu, session, refreshProfile } = useAuth();
 
-  const [step, setStep] = useState<Step>(0);
   const [idType, setIdType] = useState<typeof ID_TYPES[number]['value']>('PhilSys');
-  const [idUri, setIdUri] = useState<string | null>(null);
+
+  // Order: ID front -> Residency (OCR-prefilled) -> Selfie -> Review. See
+  // Docs/Planning/Plan-ID-Verification-Redesign.md for the reasoning.
+  const stepKeys: StepKey[] = ['id_front', 'residency', 'selfie', 'review'];
+
+  const [step, setStep] = useState(0);
+  const currentKey = stepKeys[step] ?? 'id_front';
+
+  // Which guided-capture flow is currently open full-screen, if any.
+  const [activeCapture, setActiveCapture] = useState<ActiveCapture>(null);
+
+  // ID front
+  const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
+  const [idFrontPath, setIdFrontPath] = useState<string | null>(null);
+  const [processingIdFront, setProcessingIdFront] = useState(false);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [ocrNoteDismissed, setOcrNoteDismissed] = useState(false);
+
+  // Selfie
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const [selfiePath, setSelfiePath] = useState<string | null>(null);
+  const [processingSelfie, setProcessingSelfie] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
 
   // Address hierarchy states
@@ -109,7 +163,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const handleSelectRegion = async (code: string, name: string) => {
     setRegionCode(code);
     setRegionName(name);
-    
+
     // Reset lower levels
     setProvinceCode('');
     setProvinceName('');
@@ -158,7 +212,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const handleSelectProvince = async (code: string, name: string) => {
     setProvinceCode(code);
     setProvinceName(name);
-    
+
     // Reset lower levels
     setCityCode('');
     setCityName('');
@@ -184,7 +238,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const handleSelectCity = async (code: string, name: string) => {
     setCityCode(code);
     setCityName(name);
-    
+
     // Reset barangay
     setBarangay('');
     setBarangaysList([]);
@@ -204,49 +258,15 @@ export function VerifyIdentityScreen({ navigation }: any) {
     }
   };
 
-  // ----- image capture -----
-  const captureImage = async (
-    setter: (u: string) => void,
-    aspect: [number, number] = [4, 3],
-    cameraFacing: 'back' | 'front' = 'back',
-  ) => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      showToast('We need camera access to capture your ID.', 'error');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-      cameraType: cameraFacing,
-    } as any);
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      setter(result.assets[0].uri);
-    }
-  };
-
-  const pickFromLibrary = async (setter: (u: string) => void, aspect: [number, number] = [4, 3]) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      showToast('We need photo library access to pick your ID.', 'error');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      setter(result.assets[0].uri);
-    }
-  };
-
-  const uploadPrivate = async (uri: string, kind: 'id' | 'selfie'): Promise<string> => {
+  // ----- storage helpers -----
+  const uploadPrivate = async (
+    uri: string,
+    kind: 'id_front' | 'selfie',
+  ): Promise<string> => {
     const response = await fetch(uri);
     const arrayBuffer = await response.arrayBuffer();
     if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
-      throw new Error(`${kind === 'id' ? 'ID' : 'Selfie'} image is larger than 10MB.`);
+      throw new Error('Photo is larger than 10MB.');
     }
     const ext = (uri.split('.').pop() || 'jpg').toLowerCase();
     const path = `${lguId}/${profile.id}/${kind}_${Date.now()}.${ext === 'png' ? 'png' : 'jpg'}`;
@@ -256,6 +276,67 @@ export function VerifyIdentityScreen({ navigation }: any) {
       .upload(path, arrayBuffer, { contentType, upsert: false });
     if (error) throw error;
     return path;
+  };
+
+  const getSignedUrl = async (path: string): Promise<string | null> => {
+    try {
+      const { data } = await supabase.storage.from('citizen-ids').createSignedUrl(path, 300);
+      return data?.signedUrl || null;
+    } catch {
+      return null;
+    }
+  };
+
+  // ----- OCR autofill (best-effort — never blocks) -----
+  const prefillFromOcr = (text: string) => {
+    const zipMatch = text.match(/\b\d{4}\b/);
+    if (zipMatch && !zipCode.trim()) setZipCode(zipMatch[0]);
+    if (!streetAddress.trim()) setStreetAddress(text.trim());
+  };
+
+  // ----- guided-capture completion handlers -----
+  const handleIdFrontCapture = async (uri: string) => {
+    setActiveCapture(null);
+    setProcessingIdFront(true);
+    try {
+      const path = await uploadPrivate(uri, 'id_front');
+      setIdFrontUri(uri);
+      setIdFrontPath(path);
+
+      const signedUrl = await getSignedUrl(path);
+      if (signedUrl) {
+        const text = await extractIdText(signedUrl, session?.access_token);
+        if (text) {
+          setOcrText(text);
+          setOcrNoteDismissed(false);
+          prefillFromOcr(text);
+        }
+      }
+    } catch (err: any) {
+      showToast(`Could not upload your ID photo: ${err?.message || 'please try again.'}`, 'error');
+    } finally {
+      setProcessingIdFront(false);
+    }
+  };
+
+  const handleSelfieCapture = async (uri: string) => {
+    setActiveCapture(null);
+    setSelfieUri(uri);
+    setProcessingSelfie(true);
+    try {
+      const path = await uploadPrivate(uri, 'selfie');
+      setSelfiePath(path);
+    } catch (err: any) {
+      showToast(`Could not upload your selfie: ${err?.message || 'please try again.'}`, 'error');
+    } finally {
+      setProcessingSelfie(false);
+    }
+  };
+
+  const resetSelfieAndRestart = () => {
+    setSelfieUri(null);
+    setSelfiePath(null);
+    setActiveCapture('selfie');
   };
 
   const getActiveBarangay = () => useManualAddress ? manualBarangay.trim() : barangay.trim();
@@ -268,8 +349,8 @@ export function VerifyIdentityScreen({ navigation }: any) {
       showToast('Missing account or LGU. Please re-select your municipality.', 'error');
       return;
     }
-    if (!idUri || !selfieUri) {
-      showToast('Please capture both your ID and a selfie.', 'error');
+    if (!idFrontPath || !selfiePath) {
+      showToast('Please complete your ID and selfie photos.', 'error');
       return;
     }
 
@@ -280,36 +361,23 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
     if (!activeBarangay || !activeCity || !activeRegion || !streetAddress.trim() || !zipCode.trim()) {
       showToast('Please complete all address fields.', 'error');
-      setStep(0);
+      setStep(stepKeys.indexOf('residency'));
       return;
     }
 
     setSubmitting(true);
-    const uploadedPaths: string[] = [];
     try {
-      // Synchronize the citizen's LGU ID to their users profile row
-      // to satisfy the postgres RLS constraint on verification_requests.
-      const { error: syncError } = await supabase
-        .from('users')
-        .update({ lgu_id: lguId })
-        .eq('id', profile.id);
-      if (syncError) throw syncError;
-
-      const idPath = await uploadPrivate(idUri, 'id');
-      uploadedPaths.push(idPath);
-      const selfiePath = await uploadPrivate(selfieUri, 'selfie');
-      uploadedPaths.push(selfiePath);
-
       const fullAddress = `${streetAddress.trim()}, Brgy. ${activeBarangay}, ${activeCity}, ${activeProvince ? activeProvince + ', ' : ''}${activeRegion}, ${zipCode.trim()}`;
 
-      const { error: reqError } = await supabase.from('verification_requests').insert({
-        user_id: profile.id,
-        lgu_id: lguId,
-        id_type: idType,
-        id_document_path: idPath,
-        selfie_path: selfiePath,
-        declared_barangay: fullAddress,
-        status: 'pending',
+      // ID photo and selfie are uploaded progressively during their own steps
+      // (not batched here) — this call is a single atomic RPC that just
+      // records the already-known paths.
+      const { error: reqError } = await supabase.rpc('submit_verification_request', {
+        p_lgu_id: lguId,
+        p_id_type: idType,
+        p_id_document_path: idFrontPath,
+        p_selfie_path: selfiePath,
+        p_declared_barangay: fullAddress,
       });
       if (reqError) throw reqError;
 
@@ -321,16 +389,8 @@ export function VerifyIdentityScreen({ navigation }: any) {
       );
       navigation.goBack();
     } catch (err: any) {
-      if (uploadedPaths.length > 0) {
-        await supabase.storage.from('citizen-ids').remove(uploadedPaths).catch(() => {});
-      }
-
-      const raw = err?.message || '';
-      const isRls = err?.code === '42501' || /row-level security|policy/i.test(raw);
       showToast(
-        isRls
-          ? 'Submission failed: the municipality you selected doesn’t match your account. Please re-select your LGU and try again.'
-          : `Submission failed: ${raw || 'Please try again.'} Your ID and selfie are still attached — tap Submit for review to try again.`,
+        `Submission failed: ${err?.message || 'Please try again.'}`,
         'error',
       );
     } finally {
@@ -338,19 +398,20 @@ export function VerifyIdentityScreen({ navigation }: any) {
     }
   };
 
-  const canNext = [
-    // Step 0 check
-    !!streetAddress.trim() &&
-      !!zipCode.trim() &&
-      !!getActiveBarangay() &&
-      !!getActiveCity() &&
-      !!getActiveRegion(), 
-    !!idUri,            // step 1
-    !!selfieUri,        // step 2
-    true,               // step 3
-  ];
-
-  const stepLabels = ['Residency', 'ID document', 'Selfie', 'Review'];
+  const canNextForStep = (key: StepKey): boolean => {
+    switch (key) {
+      case 'id_front': return !!idFrontPath && !processingIdFront;
+      case 'residency':
+        return !!streetAddress.trim() &&
+          !!zipCode.trim() &&
+          !!getActiveBarangay() &&
+          !!getActiveCity() &&
+          !!getActiveRegion();
+      case 'selfie': return !!selfiePath && !processingSelfie;
+      case 'review': return true;
+      default: return false;
+    }
+  };
 
   if (status === 'verified' || status === 'pending') {
     return (
@@ -459,8 +520,8 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
         {/* Stepper */}
         <View style={[styles.stepper, { borderBottomColor: T.border }]}>
-          {stepLabels.map((label, i) => (
-            <View key={label} style={styles.stepItem}>
+          {stepKeys.map((key, i) => (
+            <View key={key} style={styles.stepItem}>
               <View style={[
                 styles.stepDot,
                 {
@@ -474,7 +535,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
                   <Text style={{ color: i <= step ? '#292929' : T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 12 }}>{i + 1}</Text>
                 )}
               </View>
-              <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: i <= step ? T.text : T.textMuted, marginTop: 4 }}>{label}</Text>
+              <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: i <= step ? T.text : T.textMuted, marginTop: 4 }}>{STEP_LABEL[key]}</Text>
             </View>
           ))}
         </View>
@@ -491,8 +552,54 @@ export function VerifyIdentityScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* STEP 0 — Residency */}
-          {step === 0 && (
+          {/* STEP — ID front */}
+          {currentKey === 'id_front' && (
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Photograph your ID</Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
+                  Use a government-issued ID. Camera only — align it within the frame for a clean, auto-cropped capture.
+                </Text>
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ID TYPE</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                  onPress={() => setPickerOpen('idType')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium' }}>
+                    {ID_TYPES.find(t => t.value === idType)?.label}
+                  </Text>
+                  <ArrowDown2 size={18} color={T.textMuted} variant="Bold" />
+                </TouchableOpacity>
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>ID PHOTO — FRONT</Text>
+                {idFrontUri ? (
+                  <View>
+                    <Image source={{ uri: idFrontUri }} style={[styles.preview, { borderColor: T.border }]} resizeMode="contain" />
+                    {processingIdFront && <ActivityIndicator style={{ marginTop: 8 }} color={T.text} />}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => setActiveCapture('id_front')} />
+                    </View>
+                  </View>
+                ) : processingIdFront ? (
+                  <View style={[styles.preview, { borderColor: T.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <ActivityIndicator color={T.text} />
+                    <Text style={{ color: T.textMuted, marginTop: 8, fontFamily: 'Inter-Medium', fontSize: 13 }}>Uploading…</Text>
+                  </View>
+                ) : (
+                  <CaptureEntryButton T={T} label="Open camera" onPress={() => setActiveCapture('id_front')} />
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* STEP — Residency */}
+          {currentKey === 'residency' && (
             <View style={{ gap: 16 }}>
               <View>
                 <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Confirm residency</Text>
@@ -500,6 +607,19 @@ export function VerifyIdentityScreen({ navigation }: any) {
                   Enter your address printed on your ID. Your LGU admin will visually confirm it matches.
                 </Text>
               </View>
+
+              {/* OCR autofill note — only when we actually scanned something */}
+              {!!ocrText && !ocrNoteDismissed && (
+                <View style={[styles.notice, { backgroundColor: T.cardAlt, borderColor: T.border }]}>
+                  <InfoCircle size={20} color={T.textMuted} variant="Bold" />
+                  <Text style={[styles.noticeText, { color: T.textMuted, fontFamily: 'Inter-Medium' }]}>
+                    We scanned your ID — please review and edit the address below.
+                  </Text>
+                  <TouchableOpacity onPress={() => setOcrNoteDismissed(true)}>
+                    <CloseSquare size={18} color={T.textMuted} variant="Bold" />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* LGU Prefill Card */}
               <View>
@@ -604,11 +724,11 @@ export function VerifyIdentityScreen({ navigation }: any) {
                     <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>CITY / MUNICIPALITY</Text>
                     <TouchableOpacity
                       style={[
-                        styles.dropdownBtn, 
-                        { 
-                          borderColor: T.border, 
-                          backgroundColor: T.cardAlt, 
-                          opacity: (provinces.length > 0 && !provinceName) || !regionName ? 0.5 : 1 
+                        styles.dropdownBtn,
+                        {
+                          borderColor: T.border,
+                          backgroundColor: T.cardAlt,
+                          opacity: (provinces.length > 0 && !provinceName) || !regionName ? 0.5 : 1
                         }
                       ]}
                       disabled={(provinces.length > 0 && !provinceName) || !regionName}
@@ -729,58 +849,13 @@ export function VerifyIdentityScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* STEP 1 — ID document */}
-          {step === 1 && (
-            <View style={{ gap: 16 }}>
-              <View>
-                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Photograph your ID</Text>
-                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
-                  Use a government-issued ID. Make sure all text is sharp and readable.
-                </Text>
-              </View>
-
-              <View>
-                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ID TYPE</Text>
-                <TouchableOpacity
-                  style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
-                  onPress={() => setPickerOpen('idType')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium' }}>
-                    {ID_TYPES.find(t => t.value === idType)?.label}
-                  </Text>
-                  <ArrowDown2 size={18} color={T.textMuted} variant="Bold" />
-                </TouchableOpacity>
-              </View>
-
-              <View>
-                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>ID PHOTO</Text>
-                {idUri ? (
-                  <View>
-                    <Image source={{ uri: idUri }} style={[styles.preview, { borderColor: T.border }]} resizeMode="contain" />
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setIdUri)} />
-                      <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setIdUri)} />
-                    </View>
-                  </View>
-                ) : (
-                  <CapturePicker
-                    T={T}
-                    onCamera={() => captureImage(setIdUri)}
-                    onLibrary={() => pickFromLibrary(setIdUri)}
-                  />
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* STEP 2 — Selfie */}
-          {step === 2 && (
+          {/* STEP — Selfie */}
+          {currentKey === 'selfie' && (
             <View style={{ gap: 16 }}>
               <View>
                 <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Capture a selfie</Text>
                 <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
-                  We visually compare your face with your ID document to prevent identity fraud.
+                  Look straight at the camera and align your face within the frame.
                 </Text>
               </View>
 
@@ -789,24 +864,25 @@ export function VerifyIdentityScreen({ navigation }: any) {
                 {selfieUri ? (
                   <View>
                     <Image source={{ uri: selfieUri }} style={[styles.previewSquare, { borderColor: T.border }]} resizeMode="contain" />
+                    {processingSelfie && <ActivityIndicator style={{ marginTop: 8 }} color={T.text} />}
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setSelfieUri, [3, 4], 'front')} />
-                      <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setSelfieUri, [3, 4])} />
+                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={resetSelfieAndRestart} />
                     </View>
                   </View>
+                ) : processingSelfie ? (
+                  <View style={[styles.previewSquare, { borderColor: T.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <ActivityIndicator color={T.text} />
+                    <Text style={{ color: T.textMuted, marginTop: 8, fontFamily: 'Inter-Medium', fontSize: 13 }}>Uploading…</Text>
+                  </View>
                 ) : (
-                  <CapturePicker
-                    T={T}
-                    onCamera={() => captureImage(setSelfieUri, [3, 4], 'front')}
-                    onLibrary={() => pickFromLibrary(setSelfieUri, [3, 4])}
-                  />
+                  <CaptureEntryButton T={T} label="Start selfie capture" onPress={() => setActiveCapture('selfie')} />
                 )}
               </View>
             </View>
           )}
 
-          {/* STEP 3 — Review */}
-          {step === 3 && (
+          {/* STEP — Review */}
+          {currentKey === 'review' && (
             <View style={{ gap: 16 }}>
               <View>
                 <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Review submission</Text>
@@ -817,12 +893,11 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
               <View style={[globalStyles.card, { borderColor: T.border, backgroundColor: T.card, padding: 18, gap: 12 }]}>
                 <ReviewRow T={T} label="ID Type" value={ID_TYPES.find(t => t.value === idType)?.label || idType} />
-                <ReviewRow 
-                  T={T} 
-                  label="Declared Address" 
-                  value={`${streetAddress.trim()}, Brgy. ${getActiveBarangay()}, ${getActiveCity()}, ${getActiveProvince() ? getActiveProvince() + ', ' : ''}${getActiveRegion()}, ${zipCode.trim()}`} 
+                <ReviewRow
+                  T={T}
+                  label="Declared Address"
+                  value={`${streetAddress.trim()}, Brgy. ${getActiveBarangay()}, ${getActiveCity()}, ${getActiveProvince() ? getActiveProvince() + ', ' : ''}${getActiveRegion()}, ${zipCode.trim()}`}
                 />
-                
                 <View style={{ borderTopWidth: 1, borderTopColor: T.border, paddingTop: 12, gap: 4, flexDirection: 'row', alignItems: 'center' }}>
                   <Lock size={16} color={T.textMuted} variant="Bold" style={{ marginRight: 6 }} />
                   <Text style={{ color: T.textMuted, fontSize: 11, fontFamily: 'Inter-Medium', flex: 1, lineHeight: 15 }}>
@@ -847,28 +922,28 @@ export function VerifyIdentityScreen({ navigation }: any) {
                 alignItems: 'center',
                 marginRight: 8,
               }}
-              onPress={() => setStep((step - 1) as Step)}
+              onPress={() => setStep(step - 1)}
               disabled={submitting}
               activeOpacity={0.8}
             >
               <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Back</Text>
             </TouchableOpacity>
           )}
-          {step < 3 ? (
+          {currentKey !== 'review' ? (
             <TouchableOpacity
               style={{
                 height: 52,
                 borderRadius: 999, // Pill layout
-                backgroundColor: canNext[step] ? T.text : T.chip,
+                backgroundColor: canNextForStep(currentKey) ? T.text : T.chip,
                 flex: 2,
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
-              onPress={() => canNext[step] && setStep((step + 1) as Step)}
-              disabled={!canNext[step]}
+              onPress={() => canNextForStep(currentKey) && setStep(step + 1)}
+              disabled={!canNextForStep(currentKey)}
               activeOpacity={0.8}
             >
-              <Text style={{ color: canNext[step] ? T.bg : T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Continue</Text>
+              <Text style={{ color: canNextForStep(currentKey) ? T.bg : T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Continue</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -961,6 +1036,21 @@ export function VerifyIdentityScreen({ navigation }: any) {
             </View>
           </View>
         </Modal>
+
+        {/* Full-screen guided camera capture (ID front, selfie) */}
+        {activeCapture && (
+          <GuidedCapture
+            key={activeCapture}
+            guideShape={activeCapture === 'selfie' ? 'oval' : 'card'}
+            cameraFacing={activeCapture === 'selfie' ? 'front' : 'back'}
+            instructionText={
+              activeCapture === 'id_front' ? 'Align your ID within the frame' :
+              'Look at the camera and align your face within the frame'
+            }
+            onCapture={activeCapture === 'id_front' ? handleIdFrontCapture : handleSelfieCapture}
+            onCancel={() => setActiveCapture(null)}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -968,42 +1058,23 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
 // ---- small presentational helpers ----
 
-function CapturePicker({ T, onCamera, onLibrary }: { T: any; onCamera: () => void; onLibrary: () => void }) {
+function CaptureEntryButton({ T, label, onPress }: { T: any; label: string; onPress: () => void }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 8 }}>
-      <TouchableOpacity
-        style={{
-          backgroundColor: T.cardAlt,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 20,
-          flex: 1,
-          alignItems: 'center',
-          paddingVertical: 24,
-        }}
-        onPress={onCamera}
-        activeOpacity={0.8}
-      >
-        <Camera size={28} color={T.text} variant="Bold" />
-        <Text style={{ color: T.text, fontSize: 14, fontFamily: 'Octarine-Bold', marginTop: 8 }}>Take photo</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={{
-          backgroundColor: T.cardAlt,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 20,
-          flex: 1,
-          alignItems: 'center',
-          paddingVertical: 24,
-        }}
-        onPress={onLibrary}
-        activeOpacity={0.8}
-      >
-        <ImageIcon size={28} color={T.text} variant="Bold" />
-        <Text style={{ color: T.text, fontSize: 14, fontFamily: 'Octarine-Bold', marginTop: 8 }}>Choose</Text>
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity
+      style={{
+        backgroundColor: T.cardAlt,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 20,
+        alignItems: 'center',
+        paddingVertical: 28,
+      }}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Camera size={28} color={T.text} variant="Bold" />
+      <Text style={{ color: T.text, fontSize: 14, fontFamily: 'Octarine-Bold', marginTop: 8 }}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 

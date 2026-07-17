@@ -31,6 +31,7 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 - [Plan-Reporting-Camera-GPS-Hardening](Planning/Plan-Reporting-Camera-GPS-Hardening.md) — mobile report flow: camera-only, auto-GPS, stamped photo (shipped 2026-07-06, not yet device-tested)
 - [Plan-Phone-Login-SMS](Planning/Plan-Phone-Login-SMS.md) — 🔵 future: phone-number + SMS OTP login; Semaphore (PH) via Supabase SMS hook is the cost-efficient pick
 - [Plan-Mobile-Push-Notifications](Planning/Plan-Mobile-Push-Notifications.md) — push-vs-in-app policy for citizen notifications; biggest gaps: no push on verification approve/reject, no tap-to-navigate (draft)
+- [Plan-ID-Verification-Redesign](Planning/Plan-ID-Verification-Redesign.md) — ID-first OCR autofill, custom in-app selfie camera, two-shot blink liveness (Expo-Go-compatible approach); the "municipality mismatch" submission bug is already fixed separately (draft)
 - [Plan-Mobile-Redesign](Planning/Plan-Mobile-Redesign.md) — citizen app reskin to Brand Kit v2 (self-contained, phased P0–P6; any agent/AI can execute or resume it)
 
 **Tasks**

@@ -130,6 +130,19 @@ export default function VerificationsPage() {
     setRejectReason('');
   };
 
+  // Best-effort: once a decision is recorded, the actual ID/selfie photos are
+  // no longer needed (PII under RA 10173) — purge them from storage. Never
+  // blocks the approve/reject flow if the delete itself fails.
+  const purgeVerificationPhotos = async (req: VerificationRequest) => {
+    const paths = [req.id_document_path, req.selfie_path].filter(Boolean);
+    if (paths.length === 0) return;
+    try {
+      await supabase.storage.from('citizen-ids').remove(paths);
+    } catch (err) {
+      console.error('Failed to purge verification photos:', err);
+    }
+  };
+
   const handleApprove = async () => {
     if (!selectedRequest) return;
     setActionLoading(true);
@@ -140,6 +153,7 @@ export default function VerificationsPage() {
         p_reason: '',
       });
       if (error) throw error;
+      await purgeVerificationPhotos(selectedRequest);
       showToast(`Citizen "${selectedRequest.citizen_name}" verified successfully!`, 'success');
       handleCloseModal();
       fetchRequests();
@@ -164,6 +178,7 @@ export default function VerificationsPage() {
         p_reason: rejectReason.trim(),
       });
       if (error) throw error;
+      await purgeVerificationPhotos(selectedRequest);
       showToast(`Verification rejected for "${selectedRequest.citizen_name}".`, 'info');
       handleCloseModal();
       fetchRequests();
@@ -407,6 +422,10 @@ export default function VerificationsPage() {
                     alt="Government ID"
                     className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
                   />
+                ) : selectedRequest.status !== 'pending' ? (
+                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-text-muted">Photo deleted after verification</p>
+                  </div>
                 ) : (
                   <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
                     <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>
@@ -430,6 +449,10 @@ export default function VerificationsPage() {
                     alt="Selfie with ID"
                     className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
                   />
+                ) : selectedRequest.status !== 'pending' ? (
+                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
+                    <p className="text-sm text-text-muted">Photo deleted after verification</p>
+                  </div>
                 ) : (
                   <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
                     <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>

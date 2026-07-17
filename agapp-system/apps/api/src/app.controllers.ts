@@ -38,6 +38,37 @@ export class ChatbotAskDto {
 
 type FaqEntry = { question: string; answer: string; source: string; keywords: string[] };
 
+// Shared by ReportController.verifyImage and VerificationController below: only
+// ever relay a client-supplied photo URL to a paid hosted model if it's a URL
+// in THIS project's own Supabase storage — otherwise a caller could point it
+// at any arbitrary URL and burn quota on attacker-chosen images. Derives the
+// allowed prefix from the origin (not string concatenation) so a trailing
+// slash on SUPABASE_URL doesn't produce a double-slash and reject legitimate
+// URLs. On an unparseable/unset SUPABASE_URL, fails open (skips the check)
+// rather than crashing the request — SUPABASE_URL is a core required var
+// elsewhere in this file already, so this is a defensive fallback, not the
+// expected path.
+//
+// Accepts BOTH public-bucket URLs (`/object/public/...`, e.g. report-photos —
+// what ReportController uses) and SIGNED private-bucket URLs
+// (`/object/sign/...`, required for `citizen-ids`, which is private —
+// VerificationController's ID/selfie photos have no public URL at all, the
+// client must generate a short-lived signed URL and pass that instead).
+// Pass `bucket` to restrict to one specific bucket (VerificationController
+// should only ever touch `citizen-ids`, never any other bucket).
+function isOwnStorageUrl(photoUrl: string, bucket?: string): boolean {
+  try {
+    const base = new URL(process.env.SUPABASE_URL || '').origin;
+    const seg = bucket ? `${bucket}/` : '';
+    return (
+      photoUrl.startsWith(`${base}/storage/v1/object/public/${seg}`) ||
+      photoUrl.startsWith(`${base}/storage/v1/object/sign/${seg}`)
+    );
+  } catch {
+    return true;
+  }
+}
+
 // 1. REPORTS — server-side ML boundary (Roboflow Hosted inference).
 // Two categories have deployed models (2026-07-06):
 //   - pothole:      a fine-tuned YOLOv8n (RSDD + New Pothole Detection) — every
@@ -72,21 +103,9 @@ export class ReportController {
       return NOT_ANALYZED;
     }
 
-    // Only ever relay photoUrl to Roboflow if it's a public URL in this
-    // project's own Supabase storage — otherwise a caller could point
-    // photoUrl at any arbitrary URL and burn paid Roboflow quota on
-    // attacker-chosen images. Derive the allowed prefix from the origin
-    // (not string concatenation) so a trailing slash on SUPABASE_URL
-    // doesn't produce a double-slash and reject legitimate URLs.
-    try {
-      const base = new URL(process.env.SUPABASE_URL || '').origin;
-      const allowedPrefix = `${base}/storage/v1/object/public/`;
-      if (!photoUrl.startsWith(allowedPrefix)) {
-        console.warn(`[ReportController] verify-image rejected photoUrl outside Supabase storage: ${photoUrl}`);
-        return NOT_ANALYZED;
-      }
-    } catch {
-      // SUPABASE_URL unset/unparseable — fail safe without crashing the request.
+    if (!isOwnStorageUrl(photoUrl)) {
+      console.warn(`[ReportController] verify-image rejected photoUrl outside Supabase storage: ${photoUrl}`);
+      return NOT_ANALYZED;
     }
 
     try {
@@ -120,6 +139,66 @@ export class ReportController {
       return NOT_ANALYZED; // never block report submission on an ML/network failure
     }
   }
+}
+
+// 1.5 ID VERIFICATION — OCR text extraction (autofills the residency address
+// from a captured ID photo). See Docs/Planning/Plan-ID-Verification-Redesign.md.
+// (Liveness-check endpoint was removed 2026-07-17 — the two-shot "blink twice"
+// selfie flow was dropped for a single selfie capture; see that plan's
+// "Simplified 2026-07-17" section.)
+@Controller('api/verification')
+export class VerificationController {
+  // Best-effort OCR over a captured ID photo, used by the mobile app to
+  // pre-fill the residency address fields (which stay fully editable — this
+  // never auto-submits unreviewed text). Hosted, not on-device: keeps the app
+  // on plain Expo Go (no custom dev-client migration for an OCR native module).
+  @Post('extract-id-text')
+  @UseGuards(SupabaseAuthGuard)
+  // Each call is a billed OCR.space request.
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  async extractIdText(@Body() body: { photoUrl?: string }) {
+    const NOT_ANALYZED = { text: null };
+    const { photoUrl } = body || {};
+    if (!photoUrl) return NOT_ANALYZED;
+
+    // citizen-ids is a PRIVATE bucket — the client must pass a signed URL
+    // (createSignedUrl), not a public one; restrict to this bucket specifically
+    // since this endpoint should never touch any other bucket.
+    if (!isOwnStorageUrl(photoUrl, 'citizen-ids')) {
+      console.warn(`[VerificationController] extract-id-text rejected photoUrl outside citizen-ids storage: ${photoUrl}`);
+      return NOT_ANALYZED;
+    }
+
+    const apiKey = process.env.OCR_SPACE_API_KEY;
+    if (!apiKey) {
+      console.warn('[VerificationController] OCR_SPACE_API_KEY not set — extract-id-text returning null');
+      return NOT_ANALYZED;
+    }
+
+    try {
+      // OCR.space's URL-based endpoint: GET/POST with the image URL + apikey.
+      // OCREngine=2 + scale=true are generally more accurate for printed
+      // documents/small text than the default engine — verify against
+      // OCR.space's current docs if extraction quality looks off, their API
+      // has changed shape before.
+      const url = `https://api.ocr.space/parse/imageurl?apikey=${encodeURIComponent(apiKey)}&url=${encodeURIComponent(photoUrl)}&OCREngine=2&scale=true`;
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error(`OCR.space returned HTTP ${res.status}`);
+
+      const data: any = await res.json();
+      if (data?.IsErroredOnProcessing) {
+        console.warn('[VerificationController] OCR.space reported a processing error:', data?.ErrorMessage);
+        return NOT_ANALYZED;
+      }
+
+      const text = data?.ParsedResults?.[0]?.ParsedText;
+      return { text: typeof text === 'string' && text.trim() ? text.trim() : null };
+    } catch (err) {
+      console.error('[VerificationController] OCR extraction failed:', (err as any).message);
+      return NOT_ANALYZED; // never block the verification flow on an OCR/network failure
+    }
+  }
+
 }
 
 function scoreFaq(query: string, keywords: string[]): number {
