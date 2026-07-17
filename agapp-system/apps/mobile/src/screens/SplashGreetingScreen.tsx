@@ -49,6 +49,7 @@ export function SplashGreetingScreen({ navigation, onFinish }: any) {
           style={{ width: '100%', height: '100%' }}
           autoPlay
           loop={false}
+          renderMode="HARDWARE"
           resizeMode="contain"
         />
       </Animated.View>

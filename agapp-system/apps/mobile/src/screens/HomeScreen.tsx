@@ -341,7 +341,7 @@ export function HomeScreen({ navigation }: any) {
   const quickActions = [
     { icon: Briefcase, label: 'E-Services', onPress: () => navigation.navigate('ServicesTab') },
     { icon: Danger, label: 'Report', onPress: () => navigation.navigate('ReportsTab') },
-    { icon: Scroll, label: 'Citizen Guide', onPress: () => navigation.navigate('Assistant', { initialQuery: 'Citizen Guide' }) },
+    { icon: Scroll, label: 'Citizen Guide', onPress: () => navigation.navigate('CitizenGuide') },
     { icon: DocumentText, label: 'News', onPress: () => setActiveTab('community') },
     { icon: Messages, label: 'Forum', onPress: () => navigation.navigate('Forum') },
     { icon: ChatboxIcon, label: 'Chatbot', onPress: () => navigation.navigate('Assistant') },

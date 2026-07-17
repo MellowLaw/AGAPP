@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Animated, Dimensions } from 'react-native';
+import { View, Animated, Dimensions, Platform } from 'react-native';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
@@ -72,6 +72,9 @@ function FloatingSparkle({ top, left, size, delay, shape, color }: { top: number
   const anim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    if (Platform.OS === 'android') {
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
@@ -83,8 +86,8 @@ function FloatingSparkle({ top, left, size, delay, shape, color }: { top: number
     return () => loop.stop();
   }, [anim, delay]);
 
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
+  const translateY = Platform.OS === 'android' ? 0 : anim.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
+  const opacity = Platform.OS === 'android' ? 0.6 : anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
 
   return (
     <Animated.View
@@ -93,7 +96,7 @@ function FloatingSparkle({ top, left, size, delay, shape, color }: { top: number
         top,
         left: left as any,
         opacity,
-        transform: [{ translateY }],
+        transform: Platform.OS === 'android' ? [] : [{ translateY }],
       }}
     >
       <SparkleGlyph shape={shape} size={size} color={color} />

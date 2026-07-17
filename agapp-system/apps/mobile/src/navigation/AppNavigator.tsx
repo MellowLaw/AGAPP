@@ -30,6 +30,7 @@ import { GuestLguDetectScreen } from '../screens/GuestLguDetectScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SplashGreetingScreen } from '../screens/SplashGreetingScreen';
 import { EmailOtpScreen } from '../screens/EmailOtpScreen';
+import { CitizenGuideScreen } from '../screens/CitizenGuideScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -116,6 +117,7 @@ function AuthGate({ label, navigation }: { label: string; navigation: any }) {
         source={require('../../assets/brand/sign-up-animation.json')}
         autoPlay
         loop
+        renderMode="HARDWARE"
         style={{
           width: SCREEN_WIDTH * 0.95,
           height: SCREEN_WIDTH * 0.95,
@@ -206,12 +208,20 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
 
   React.useEffect(() => {
     if (!innerWidth) return; // no layout yet — avoid animating from 0
-    Animated.spring(translateX, {
-      toValue: state.index * slotWidth,
-      useNativeDriver: true,
-      friction: 10,
-      tension: 90,
-    }).start();
+    if (Platform.OS === 'android') {
+      Animated.timing(translateX, {
+        toValue: state.index * slotWidth,
+        duration: 120,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.spring(translateX, {
+        toValue: state.index * slotWidth,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 90,
+      }).start();
+    }
   }, [state.index, innerWidth, slotWidth, translateX]);
 
   return (
@@ -220,7 +230,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         position: 'absolute',
         left: 16,
         right: 16,
-        bottom: Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 10) : 10,
+        bottom: Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 10) : insets.bottom + 10,
         height: 68,
         borderRadius: 999,
         backgroundColor: T.card,
@@ -242,7 +252,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
           activeOpacity={0.85}
           style={{
             position: 'absolute',
-            left: 12,
+            left: -8,
             top: -72,
             width: 90,
             height: 90,
@@ -251,10 +261,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             zIndex: 10,
           }}
         >
-          <Image
-            source={require('../../assets/brand/sticker-15.png')}
+          <LottieView
+            source={require('../../assets/brand/ai-floating.json')}
             style={{ width: 90, height: 90 }}
-            resizeMode="contain"
+            autoPlay
+            loop
           />
         </TouchableOpacity>
       )}
@@ -437,6 +448,7 @@ export function AppNavigator() {
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
+            <Stack.Screen name="CitizenGuide" component={CitizenGuideScreen} />
             <Stack.Screen name="Assistant">
               {({ navigation }) => <AuthGate label="use the assistant" navigation={navigation} />}
             </Stack.Screen>
@@ -452,6 +464,7 @@ export function AppNavigator() {
             <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
             <Stack.Screen name="Explore" component={MapExplorerScreen} />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
+            <Stack.Screen name="CitizenGuide" component={CitizenGuideScreen} />
             <Stack.Screen name="Assistant" component={ChatbotScreen} />
             <Stack.Screen name="LogoutConfirm" component={LogoutConfirmScreen} />
           </>

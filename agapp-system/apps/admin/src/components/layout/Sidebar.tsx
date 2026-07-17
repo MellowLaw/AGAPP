@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll } from 'iconsax-react';
+import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll, InfoCircle } from 'iconsax-react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
@@ -43,6 +43,7 @@ const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'News', href: '/lgu/news', icon: Book },
   { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum' },
   { label: 'Facilities', href: '/lgu/facilities', icon: Location },
+  { label: 'Citizen Guide', href: '/lgu/citizen-guide', icon: InfoCircle },
   { label: 'Verifications', href: '/lgu/verifications', icon: Personalcard, section: 'verifications' },
   { label: 'Settings', href: '/lgu/settings', icon: Setting2 },
 ];

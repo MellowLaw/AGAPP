@@ -1123,3 +1123,72 @@ CREATE TRIGGER trg_moderate_forum_comment
   BEFORE INSERT OR UPDATE ON forum_comments
   FOR EACH ROW
   EXECUTE FUNCTION check_forum_profanity();
+
+-- 14. CITIZEN GUIDES (for directory of local offices and resources)
+CREATE TABLE public.citizen_guides (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lgu_id text REFERENCES public.lgus(id) ON DELETE CASCADE NOT NULL,
+    section text NOT NULL,
+    title text NOT NULL,
+    address text,
+    schedule text,
+    website text,
+    phone text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.citizen_guides ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to citizen_guides"
+  ON public.citizen_guides FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow staff to insert citizen_guides"
+  ON public.citizen_guides FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid()
+        AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL')
+        AND u.lgu_id = citizen_guides.lgu_id
+    )
+  );
+
+CREATE POLICY "Allow staff to update citizen_guides"
+  ON public.citizen_guides FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid()
+        AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL')
+        AND u.lgu_id = citizen_guides.lgu_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid()
+        AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL')
+        AND u.lgu_id = citizen_guides.lgu_id
+    )
+  );
+
+CREATE POLICY "Allow staff to delete citizen_guides"
+  ON public.citizen_guides FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid()
+        AND (u.role = 'LGU_ADMIN' OR u.role = 'LGU_PERSONNEL')
+        AND u.lgu_id = citizen_guides.lgu_id
+    )
+  );
+
+CREATE POLICY "Allow super admin full control to citizen_guides"
+  ON public.citizen_guides FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid() AND u.role = 'SUPER_ADMIN'
+    )
+  );
