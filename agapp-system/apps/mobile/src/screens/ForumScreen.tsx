@@ -102,7 +102,7 @@ export function ForumScreen({ navigation, route }: any) {
   const { profile, selectedLgu, guestLgu, session } = useAuth();
   const insets = useSafeAreaInsets();
   
-  const bottomPaddingForTabBar = Platform.OS === 'ios' ? insets.bottom + 78 : 88;
+  const bottomPaddingForTabBar = insets.bottom + (Platform.OS === 'ios' ? 78 : 88);
   
   // ── Swipeable Row component (swipe right → reply) ──────────────────────
   const SwipeableRow = useCallback(({ children, onSwipe }: { children: React.ReactNode; onSwipe: () => void }) => {

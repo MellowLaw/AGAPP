@@ -19,7 +19,8 @@ TRUNCATE TABLE
     service_requests,
     reports,
     users,
-    lgus
+    lgus,
+    citizen_guides
 RESTART IDENTITY CASCADE;
 
 -- (Optional) Also clear Supabase Auth users.

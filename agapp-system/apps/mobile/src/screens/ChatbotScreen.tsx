@@ -40,6 +40,7 @@ const ThinkingIndicator = ({ T }: { T: any }) => {
           style={{ width: 120, height: 120 }}
           autoPlay
           loop
+          renderMode="HARDWARE"
           colorFilters={[
             { keypath: 'head', color: T.accent },
             { keypath: 'ear', color: T.accent }
@@ -295,7 +296,8 @@ export function ChatbotScreen() {
                         source={require('../../assets/brand/chatbot-message.json')}
                         style={{ width: 120, height: 120, marginBottom: -20 }}
                         autoPlay
-                        loop
+                        loop={idx === messages.length - 1}
+                        renderMode="HARDWARE"
                         colorFilters={[
                           { keypath: 'head', color: T.accent },
                           { keypath: 'ear', color: T.accent }

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, Image, Modal, FlatList,
+  ActivityIndicator, Image, Modal, FlatList, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,7 +11,7 @@ import { globalStyles } from '../theme';
 import { supabase } from '../../supabaseClient';
 import { useToast } from '../components/Toast';
 import {
-  ID_TYPES, getBarangays, getVerificationStatus, statusLabel,
+  ID_TYPES, getVerificationStatus, statusLabel,
 } from '../utils/verification';
 import {
   ArrowLeft2,
@@ -36,13 +36,173 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const [idType, setIdType] = useState<typeof ID_TYPES[number]['value']>('PhilSys');
   const [idUri, setIdUri] = useState<string | null>(null);
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
-  const [barangay, setBarangay] = useState<string>(profile?.barangay || '');
   const [submitting, setSubmitting] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState<null | 'idType' | 'barangay'>(null);
+
+  // Address hierarchy states
+  const [useManualAddress, setUseManualAddress] = useState(false);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [barangaysList, setBarangaysList] = useState<any[]>([]);
+
+  // Selected codes/names
+  const [regionCode, setRegionCode] = useState('');
+  const [regionName, setRegionName] = useState('');
+  const [provinceCode, setProvinceCode] = useState('');
+  const [provinceName, setProvinceName] = useState('');
+  const [cityCode, setCityCode] = useState('');
+  const [cityName, setCityName] = useState('');
+  const [barangay, setBarangay] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [zipCode, setZipCode] = useState('');
+
+  // Manual input fallbacks
+  const [manualRegion, setManualRegion] = useState('');
+  const [manualProvince, setManualProvince] = useState('');
+  const [manualCity, setManualCity] = useState('');
+  const [manualBarangay, setManualBarangay] = useState('');
+
+  // Loading states for dropdown data
+  const [loadingRegions, setLoadingRegions] = useState(false);
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [loadingBarangays, setLoadingBarangays] = useState(false);
+
+  const [pickerOpen, setPickerOpen] = useState<null | 'idType' | 'region' | 'province' | 'city' | 'barangay'>(null);
+  const [searchText, setSearchText] = useState('');
+
+  const [resolvedLgu, setResolvedLgu] = useState<any>(null);
+
+  useEffect(() => {
+    if (selectedLgu) {
+      setResolvedLgu(selectedLgu);
+    } else if (profile?.lgu_id) {
+      supabase.from('lgus').select('*').eq('id', profile.lgu_id).single().then(({ data }) => {
+        if (data) setResolvedLgu(data);
+      });
+    }
+  }, [selectedLgu, profile]);
 
   const status = getVerificationStatus(profile);
-  const barangays = getBarangays(selectedLgu?.id);
-  const lguId = selectedLgu?.id;
+  const lguId = resolvedLgu?.id || selectedLgu?.id || profile?.lgu_id;
+
+  // Load regions on mount
+  useEffect(() => {
+    const loadRegions = async () => {
+      setLoadingRegions(true);
+      try {
+        const res = await fetch('https://psgc.gitlab.io/api/regions/');
+        if (!res.ok) throw new Error('Failed to fetch regions');
+        const data = await res.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        setRegions(data);
+      } catch (err) {
+        console.warn('Failed to load regions from API, toggling manual address fallback:', err);
+        setUseManualAddress(true);
+      } finally {
+        setLoadingRegions(false);
+      }
+    };
+    loadRegions();
+  }, []);
+
+  const handleSelectRegion = async (code: string, name: string) => {
+    setRegionCode(code);
+    setRegionName(name);
+    
+    // Reset lower levels
+    setProvinceCode('');
+    setProvinceName('');
+    setProvinces([]);
+    setCityCode('');
+    setCityName('');
+    setCities([]);
+    setBarangay('');
+    setBarangaysList([]);
+
+    setLoadingProvinces(true);
+    try {
+      // 1. Fetch provinces under this region
+      const res = await fetch(`https://psgc.gitlab.io/api/regions/${code}/provinces/`);
+      if (res.ok) {
+        const data = await res.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        setProvinces(data);
+        if (data.length > 0) {
+          setLoadingProvinces(false);
+          return; // Wait for province selection
+        }
+      }
+    } catch (e) {
+      console.warn('Region has no provinces, fetching cities directly:', e);
+    } finally {
+      setLoadingProvinces(false);
+    }
+
+    // 2. Fetch cities directly under region (like NCR)
+    setLoadingCities(true);
+    try {
+      const cityRes = await fetch(`https://psgc.gitlab.io/api/regions/${code}/cities-municipalities/`);
+      if (cityRes.ok) {
+        const data = await cityRes.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        setCities(data);
+      }
+    } catch (e) {
+      console.error('Failed to load direct cities:', e);
+    } finally {
+      setLoadingCities(false);
+    }
+  };
+
+  const handleSelectProvince = async (code: string, name: string) => {
+    setProvinceCode(code);
+    setProvinceName(name);
+    
+    // Reset lower levels
+    setCityCode('');
+    setCityName('');
+    setCities([]);
+    setBarangay('');
+    setBarangaysList([]);
+
+    setLoadingCities(true);
+    try {
+      const res = await fetch(`https://psgc.gitlab.io/api/provinces/${code}/cities-municipalities/`);
+      if (res.ok) {
+        const data = await res.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        setCities(data);
+      }
+    } catch (e) {
+      console.error('Failed to load cities under province:', e);
+    } finally {
+      setLoadingCities(false);
+    }
+  };
+
+  const handleSelectCity = async (code: string, name: string) => {
+    setCityCode(code);
+    setCityName(name);
+    
+    // Reset barangay
+    setBarangay('');
+    setBarangaysList([]);
+
+    setLoadingBarangays(true);
+    try {
+      const res = await fetch(`https://psgc.gitlab.io/api/cities-municipalities/${code}/barangays/`);
+      if (res.ok) {
+        const data = await res.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        setBarangaysList(data);
+      }
+    } catch (e) {
+      console.error('Failed to load barangays:', e);
+    } finally {
+      setLoadingBarangays(false);
+    }
+  };
 
   // ----- image capture -----
   const captureImage = async (
@@ -57,8 +217,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect,
+      allowsEditing: false,
       quality: 0.8,
       cameraType: cameraFacing,
     } as any);
@@ -75,8 +234,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect,
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets?.[0]?.uri) {
@@ -100,6 +258,11 @@ export function VerifyIdentityScreen({ navigation }: any) {
     return path;
   };
 
+  const getActiveBarangay = () => useManualAddress ? manualBarangay.trim() : barangay.trim();
+  const getActiveCity = () => useManualAddress ? manualCity.trim() : cityName.trim();
+  const getActiveProvince = () => useManualAddress ? manualProvince.trim() : provinceName.trim();
+  const getActiveRegion = () => useManualAddress ? manualRegion.trim() : regionName.trim();
+
   const handleSubmit = async () => {
     if (!profile || !lguId) {
       showToast('Missing account or LGU. Please re-select your municipality.', 'error');
@@ -109,8 +272,14 @@ export function VerifyIdentityScreen({ navigation }: any) {
       showToast('Please capture both your ID and a selfie.', 'error');
       return;
     }
-    if (!barangay.trim()) {
-      showToast('Please select the barangay printed on your ID.', 'error');
+
+    const activeBarangay = getActiveBarangay();
+    const activeCity = getActiveCity();
+    const activeProvince = getActiveProvince();
+    const activeRegion = getActiveRegion();
+
+    if (!activeBarangay || !activeCity || !activeRegion || !streetAddress.trim() || !zipCode.trim()) {
+      showToast('Please complete all address fields.', 'error');
       setStep(0);
       return;
     }
@@ -118,10 +287,20 @@ export function VerifyIdentityScreen({ navigation }: any) {
     setSubmitting(true);
     const uploadedPaths: string[] = [];
     try {
+      // Synchronize the citizen's LGU ID to their users profile row
+      // to satisfy the postgres RLS constraint on verification_requests.
+      const { error: syncError } = await supabase
+        .from('users')
+        .update({ lgu_id: lguId })
+        .eq('id', profile.id);
+      if (syncError) throw syncError;
+
       const idPath = await uploadPrivate(idUri, 'id');
       uploadedPaths.push(idPath);
       const selfiePath = await uploadPrivate(selfieUri, 'selfie');
       uploadedPaths.push(selfiePath);
+
+      const fullAddress = `${streetAddress.trim()}, Brgy. ${activeBarangay}, ${activeCity}, ${activeProvince ? activeProvince + ', ' : ''}${activeRegion}, ${zipCode.trim()}`;
 
       const { error: reqError } = await supabase.from('verification_requests').insert({
         user_id: profile.id,
@@ -129,7 +308,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
         id_type: idType,
         id_document_path: idPath,
         selfie_path: selfiePath,
-        declared_barangay: barangay.trim(),
+        declared_barangay: fullAddress,
         status: 'pending',
       });
       if (reqError) throw reqError;
@@ -160,7 +339,12 @@ export function VerifyIdentityScreen({ navigation }: any) {
   };
 
   const canNext = [
-    !!barangay.trim(),  // step 0
+    // Step 0 check
+    !!streetAddress.trim() &&
+      !!zipCode.trim() &&
+      !!getActiveBarangay() &&
+      !!getActiveCity() &&
+      !!getActiveRegion(), 
     !!idUri,            // step 1
     !!selfieUri,        // step 2
     true,               // step 3
@@ -225,6 +409,24 @@ export function VerifyIdentityScreen({ navigation }: any) {
       </SafeAreaView>
     );
   }
+
+  // Set up values for Picker Modal
+  let pickerData: { key: string; label: string }[] = [];
+  if (pickerOpen === 'idType') {
+    pickerData = ID_TYPES.map(t => ({ key: t.value, label: t.label }));
+  } else if (pickerOpen === 'region') {
+    pickerData = regions.map(r => ({ key: r.code, label: r.regionName ? `${r.regionName} (${r.name})` : r.name }));
+  } else if (pickerOpen === 'province') {
+    pickerData = provinces.map(p => ({ key: p.code, label: p.name }));
+  } else if (pickerOpen === 'city') {
+    pickerData = cities.map(c => ({ key: c.code, label: c.name }));
+  } else if (pickerOpen === 'barangay') {
+    pickerData = barangaysList.map(b => ({ key: b.name, label: b.name }));
+  }
+
+  const filteredPickerData = pickerData.filter(item =>
+    item.label.toLowerCase().includes(searchText.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
@@ -291,154 +493,342 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
           {/* STEP 0 — Residency */}
           {step === 0 && (
-            <View>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8, fontSize: 24 }}>Confirm residency</Text>
-              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 20 }}>
-                Select the barangay printed on your ID. Your LGU will confirm it matches during review.
-              </Text>
-
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>LGU</Text>
-              <View style={{
-                backgroundColor: T.cardAlt,
-                borderWidth: 1,
-                borderColor: T.border,
-                borderRadius: 20,
-                padding: 16,
-                marginBottom: 16,
-              }}>
-                <Text style={{ color: T.text, fontSize: 16, fontFamily: 'Inter-Medium' }}>{selectedLgu?.name || 'No LGU selected'}</Text>
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Confirm residency</Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
+                  Enter your address printed on your ID. Your LGU admin will visually confirm it matches.
+                </Text>
               </View>
 
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>BARANGAY (AS ON YOUR ID)</Text>
-              <TouchableOpacity
-                style={{
-                  height: 48,
-                  borderColor: T.border,
+              {/* LGU Prefill Card */}
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>VERIFYING MUNICIPALITY</Text>
+                <View style={{
                   backgroundColor: T.cardAlt,
-                  borderRadius: 999, // Pill layout
                   borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 14,
+                  padding: 14,
+                }}>
+                  <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-SemiBold' }}>{resolvedLgu?.name || selectedLgu?.name || 'Loading LGU details...'}</Text>
+                </View>
+              </View>
+
+              {/* Toggle switch for manual address */}
+              <TouchableOpacity
+                onPress={() => setUseManualAddress(!useManualAddress)}
+                activeOpacity={0.8}
+                style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingHorizontal: 16,
+                  padding: 14,
+                  backgroundColor: T.card,
+                  borderColor: T.border,
+                  borderWidth: 1,
+                  borderRadius: 14,
                 }}
-                onPress={() => setPickerOpen('barangay')}
-                activeOpacity={0.8}
               >
-                <Text style={{ color: barangay ? T.text : T.textMuted, fontSize: 15, fontFamily: 'Inter-Medium' }}>
-                  {barangay || 'Select your barangay'}
-                </Text>
-                <ArrowDown2 size={18} color={T.textMuted} variant="Bold" />
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ color: T.text, fontFamily: 'Inter-SemiBold', fontSize: 13 }}>Offline / Address loading issue?</Text>
+                  <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 2 }}>
+                    Toggle this to type in your address manually instead of selecting.
+                  </Text>
+                </View>
+                <View style={{
+                  width: 44,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: useManualAddress ? T.accent : T.border,
+                  padding: 2,
+                  justifyContent: 'center',
+                  alignItems: useManualAddress ? 'flex-end' : 'flex-start',
+                }}>
+                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' }} />
+                </View>
               </TouchableOpacity>
+
+              {/* Automatic cascade dropdowns */}
+              {!useManualAddress ? (
+                <>
+                  {/* Region Selection */}
+                  <View>
+                    <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>REGION</Text>
+                    <TouchableOpacity
+                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                      onPress={() => {
+                        setSearchText('');
+                        setPickerOpen('region');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      {loadingRegions ? (
+                        <ActivityIndicator size="small" color={T.text} />
+                      ) : (
+                        <Text style={{ color: regionName ? T.text : T.textMuted, fontSize: 14, fontFamily: 'Inter-Medium', flex: 1 }}>
+                          {regionName || 'Select Region'}
+                        </Text>
+                      )}
+                      <ArrowDown2 size={16} color={T.textMuted} variant="Bold" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Province Selection (conditional) */}
+                  {(provinces.length > 0 || loadingProvinces) && (
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>PROVINCE</Text>
+                      <TouchableOpacity
+                        style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt, opacity: !regionName ? 0.5 : 1 }]}
+                        disabled={!regionName}
+                        onPress={() => {
+                          setSearchText('');
+                          setPickerOpen('province');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        {loadingProvinces ? (
+                          <ActivityIndicator size="small" color={T.text} />
+                        ) : (
+                          <Text style={{ color: provinceName ? T.text : T.textMuted, fontSize: 14, fontFamily: 'Inter-Medium', flex: 1 }}>
+                            {provinceName || 'Select Province'}
+                          </Text>
+                        )}
+                        <ArrowDown2 size={16} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* City/Municipality Selection */}
+                  <View>
+                    <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>CITY / MUNICIPALITY</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdownBtn, 
+                        { 
+                          borderColor: T.border, 
+                          backgroundColor: T.cardAlt, 
+                          opacity: (provinces.length > 0 && !provinceName) || !regionName ? 0.5 : 1 
+                        }
+                      ]}
+                      disabled={(provinces.length > 0 && !provinceName) || !regionName}
+                      onPress={() => {
+                        setSearchText('');
+                        setPickerOpen('city');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      {loadingCities ? (
+                        <ActivityIndicator size="small" color={T.text} />
+                      ) : (
+                        <Text style={{ color: cityName ? T.text : T.textMuted, fontSize: 14, fontFamily: 'Inter-Medium', flex: 1 }}>
+                          {cityName || 'Select City/Municipality'}
+                        </Text>
+                      )}
+                      <ArrowDown2 size={16} color={T.textMuted} variant="Bold" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Barangay Selection */}
+                  <View>
+                    <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>BARANGAY</Text>
+                    <TouchableOpacity
+                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt, opacity: !cityName ? 0.5 : 1 }]}
+                      disabled={!cityName}
+                      onPress={() => {
+                        setSearchText('');
+                        setPickerOpen('barangay');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      {loadingBarangays ? (
+                        <ActivityIndicator size="small" color={T.text} />
+                      ) : (
+                        <Text style={{ color: barangay ? T.text : T.textMuted, fontSize: 14, fontFamily: 'Inter-Medium', flex: 1 }}>
+                          {barangay || 'Select Barangay'}
+                        </Text>
+                      )}
+                      <ArrowDown2 size={16} color={T.textMuted} variant="Bold" />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Manual input form */}
+                  <View style={{ gap: 12 }}>
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>REGION (MANUAL)</Text>
+                      <TextInput
+                        style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                        value={manualRegion}
+                        onChangeText={setManualRegion}
+                        placeholder="e.g. Region IV-A"
+                        placeholderTextColor={T.textMuted}
+                      />
+                    </View>
+
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>PROVINCE (MANUAL)</Text>
+                      <TextInput
+                        style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                        value={manualProvince}
+                        onChangeText={setManualProvince}
+                        placeholder="e.g. Laguna"
+                        placeholderTextColor={T.textMuted}
+                      />
+                    </View>
+
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>CITY / MUNICIPALITY (MANUAL)</Text>
+                      <TextInput
+                        style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                        value={manualCity}
+                        onChangeText={setManualCity}
+                        placeholder="e.g. Liliw"
+                        placeholderTextColor={T.textMuted}
+                      />
+                    </View>
+
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>BARANGAY (MANUAL)</Text>
+                      <TextInput
+                        style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                        value={manualBarangay}
+                        onChangeText={setManualBarangay}
+                        placeholder="e.g. Poblacion I"
+                        placeholderTextColor={T.textMuted}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* Shared Address Fields */}
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>STREET ADDRESS / HOUSE NO.</Text>
+                <TextInput
+                  style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                  value={streetAddress}
+                  onChangeText={setStreetAddress}
+                  placeholder="e.g. 123 Rizal St"
+                  placeholderTextColor={T.textMuted}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ZIP CODE</Text>
+                <TextInput
+                  style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                  value={zipCode}
+                  onChangeText={setZipCode}
+                  placeholder="e.g. 4004"
+                  placeholderTextColor={T.textMuted}
+                  keyboardType="number-pad"
+                />
+              </View>
             </View>
           )}
 
           {/* STEP 1 — ID document */}
           {step === 1 && (
-            <View>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8, fontSize: 24 }}>Photograph your ID</Text>
-              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 20 }}>
-                Use a government-issued ID. Make sure all text is sharp and readable.
-              </Text>
-
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>ID TYPE</Text>
-              <TouchableOpacity
-                style={{
-                  height: 48,
-                  borderColor: T.border,
-                  backgroundColor: T.cardAlt,
-                  borderRadius: 999, // Pill layout
-                  borderWidth: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 16,
-                }}
-                onPress={() => setPickerOpen('idType')}
-                activeOpacity={0.8}
-              >
-                <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium' }}>
-                  {ID_TYPES.find(t => t.value === idType)?.label}
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Photograph your ID</Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
+                  Use a government-issued ID. Make sure all text is sharp and readable.
                 </Text>
-                <ArrowDown2 size={18} color={T.textMuted} variant="Bold" />
-              </TouchableOpacity>
+              </View>
 
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginTop: 16, marginBottom: 8 }}>ID PHOTO</Text>
-              {idUri ? (
-                <View>
-                  <Image source={{ uri: idUri }} style={[styles.preview, { borderColor: T.border }]} resizeMode="cover" />
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setIdUri)} />
-                    <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setIdUri)} />
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ID TYPE</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                  onPress={() => setPickerOpen('idType')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium' }}>
+                    {ID_TYPES.find(t => t.value === idType)?.label}
+                  </Text>
+                  <ArrowDown2 size={18} color={T.textMuted} variant="Bold" />
+                </TouchableOpacity>
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>ID PHOTO</Text>
+                {idUri ? (
+                  <View>
+                    <Image source={{ uri: idUri }} style={[styles.preview, { borderColor: T.border }]} resizeMode="contain" />
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setIdUri)} />
+                      <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setIdUri)} />
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <CapturePicker
-                  T={T}
-                  onCamera={() => captureImage(setIdUri)}
-                  onLibrary={() => pickFromLibrary(setIdUri)}
-                />
-              )}
+                ) : (
+                  <CapturePicker
+                    T={T}
+                    onCamera={() => captureImage(setIdUri)}
+                    onLibrary={() => pickFromLibrary(setIdUri)}
+                  />
+                )}
+              </View>
             </View>
           )}
 
           {/* STEP 2 — Selfie */}
           {step === 2 && (
-            <View>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8, fontSize: 24 }}>Selfie with your ID</Text>
-              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 20 }}>
-                Hold your ID next to your face so we can verify the ID owner.
-              </Text>
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Capture a selfie</Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
+                  We visually compare your face with your ID document to prevent identity fraud.
+                </Text>
+              </View>
 
-              {selfieUri ? (
-                <View>
-                  <Image source={{ uri: selfieUri }} style={[styles.previewSquare, { borderColor: T.border }]} resizeMode="cover" />
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setSelfieUri, [3, 4], 'front')} />
-                    <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setSelfieUri, [3, 4])} />
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 8 }}>YOUR PORTRAIT PHOTO</Text>
+                {selfieUri ? (
+                  <View>
+                    <Image source={{ uri: selfieUri }} style={[styles.previewSquare, { borderColor: T.border }]} resizeMode="contain" />
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <SecondaryButton T={T} icon={Camera} label="Retake" onPress={() => captureImage(setSelfieUri, [3, 4], 'front')} />
+                      <SecondaryButton T={T} icon={ImageIcon} label="Choose" onPress={() => pickFromLibrary(setSelfieUri, [3, 4])} />
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <CapturePicker
-                  T={T}
-                  onCamera={() => captureImage(setSelfieUri, [3, 4], 'front')}
-                  onLibrary={() => pickFromLibrary(setSelfieUri, [3, 4])}
-                />
-              )}
+                ) : (
+                  <CapturePicker
+                    T={T}
+                    onCamera={() => captureImage(setSelfieUri, [3, 4], 'front')}
+                    onLibrary={() => pickFromLibrary(setSelfieUri, [3, 4])}
+                  />
+                )}
+              </View>
             </View>
           )}
 
           {/* STEP 3 — Review */}
           {step === 3 && (
-            <View>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 8, fontSize: 24 }}>Review &amp; submit</Text>
-              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 20 }}>
-                Double-check details before submitting. Stored securely per RA 10173.
-              </Text>
-
-              <View style={{
-                backgroundColor: T.card,
-                borderColor: T.border,
-                borderWidth: 1,
-                borderRadius: 24,
-                padding: 16,
-              }}>
-                <ReviewRow T={T} label="LGU" value={selectedLgu?.name || '-'} />
-                <ReviewRow T={T} label="Barangay" value={barangay} />
-                <ReviewRow T={T} label="ID type" value={ID_TYPES.find(t => t.value === idType)?.label || idType} />
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, marginBottom: 4, fontSize: 24 }}>Review submission</Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginBottom: 8, fontSize: 13, lineHeight: 18 }}>
+                  Confirm all details are correct. You cannot modify them once submitted.
+                </Text>
               </View>
 
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginTop: 16, marginBottom: 8 }}>ID DOCUMENT</Text>
-              {idUri && <Image source={{ uri: idUri }} style={[styles.preview, { borderColor: T.border }]} resizeMode="cover" />}
-
-              <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginTop: 16, marginBottom: 8 }}>SELFIE WITH ID</Text>
-              {selfieUri && <Image source={{ uri: selfieUri }} style={[styles.previewSquare, { borderColor: T.border }]} resizeMode="cover" />}
-
-              <View style={[styles.notice, { backgroundColor: T.cardAlt, borderColor: T.border, marginTop: 16 }]}>
-                <Lock size={18} color={T.textMuted} variant="Bold" />
-                <Text style={[styles.noticeText, { color: T.textMuted, fontFamily: 'Inter-Medium' }]}>
-                  Your ID is private. Only LGU staff in {selectedLgu?.name?.replace('Municipality of ', '') || 'your municipality'} can view it for verification.
-                </Text>
+              <View style={[globalStyles.card, { borderColor: T.border, backgroundColor: T.card, padding: 18, gap: 12 }]}>
+                <ReviewRow T={T} label="ID Type" value={ID_TYPES.find(t => t.value === idType)?.label || idType} />
+                <ReviewRow 
+                  T={T} 
+                  label="Declared Address" 
+                  value={`${streetAddress.trim()}, Brgy. ${getActiveBarangay()}, ${getActiveCity()}, ${getActiveProvince() ? getActiveProvince() + ', ' : ''}${getActiveRegion()}, ${zipCode.trim()}`} 
+                />
+                
+                <View style={{ borderTopWidth: 1, borderTopColor: T.border, paddingTop: 12, gap: 4, flexDirection: 'row', alignItems: 'center' }}>
+                  <Lock size={16} color={T.textMuted} variant="Bold" style={{ marginRight: 6 }} />
+                  <Text style={{ color: T.textMuted, fontSize: 11, fontFamily: 'Inter-Medium', flex: 1, lineHeight: 15 }}>
+                    Your ID is private. Only LGU staff in {(resolvedLgu?.name || selectedLgu?.name || 'your municipality').replace('Municipality of ', '')} can view it for verification.
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -501,35 +891,68 @@ export function VerifyIdentityScreen({ navigation }: any) {
           )}
         </View>
 
-        {/* Picker modal (idType + barangay) */}
+        {/* Dynamic Searchable Picker Modal */}
         <Modal visible={pickerOpen !== null} transparent animationType="slide" onRequestClose={() => setPickerOpen(null)}>
           <View style={styles.pickerOverlay}>
             <View style={[styles.pickerSheet, { backgroundColor: T.card, borderWidth: 1, borderColor: T.border }]}>
               <View style={[styles.pickerHeader, { borderBottomColor: T.border }]}>
                 <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>
-                  {pickerOpen === 'idType' ? 'Select ID type' : 'Select barangay'}
+                  {pickerOpen === 'idType' && 'Select ID type'}
+                  {pickerOpen === 'region' && 'Select Region'}
+                  {pickerOpen === 'province' && 'Select Province'}
+                  {pickerOpen === 'city' && 'Select City/Municipality'}
+                  {pickerOpen === 'barangay' && 'Select Barangay'}
                 </Text>
                 <TouchableOpacity onPress={() => setPickerOpen(null)}>
                   <CloseSquare size={22} color={T.textMuted} variant="Bold" />
                 </TouchableOpacity>
               </View>
+
+              {/* Search filter for picker sheet */}
+              {pickerOpen !== 'idType' && (
+                <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+                  <TextInput
+                    style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium', height: 44 }]}
+                    placeholder="Search..."
+                    placeholderTextColor={T.textMuted}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                  />
+                </View>
+              )}
+
               <FlatList
-                data={pickerOpen === 'idType' ? ID_TYPES.map(t => ({ key: t.value, label: t.label })) : barangays.map(b => ({ key: b, label: b }))}
+                data={filteredPickerData}
                 keyExtractor={(item) => item.key}
                 contentContainerStyle={{ paddingBottom: 40 }}
                 renderItem={({ item }) => {
-                  const selected = pickerOpen === 'idType' ? idType === item.key : barangay === item.key;
+                  let selected = false;
+                  if (pickerOpen === 'idType') selected = idType === item.key;
+                  else if (pickerOpen === 'region') selected = regionCode === item.key;
+                  else if (pickerOpen === 'province') selected = provinceCode === item.key;
+                  else if (pickerOpen === 'city') selected = cityCode === item.key;
+                  else if (pickerOpen === 'barangay') selected = barangay === item.key;
+
                   return (
                     <TouchableOpacity
                       style={[styles.pickerRow, { borderBottomColor: T.border }]}
                       onPress={() => {
-                        if (pickerOpen === 'idType') setIdType(item.key as any);
-                        else setBarangay(item.key);
+                        if (pickerOpen === 'idType') {
+                          setIdType(item.key as any);
+                        } else if (pickerOpen === 'region') {
+                          handleSelectRegion(item.key, item.label);
+                        } else if (pickerOpen === 'province') {
+                          handleSelectProvince(item.key, item.label);
+                        } else if (pickerOpen === 'city') {
+                          handleSelectCity(item.key, item.label);
+                        } else if (pickerOpen === 'barangay') {
+                          setBarangay(item.key);
+                        }
                         setPickerOpen(null);
                       }}
                       activeOpacity={0.8}
                     >
-                      <Text style={{ color: T.text, fontSize: 16, fontFamily: 'Inter-Medium', flex: 1 }}>{item.label}</Text>
+                      <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium', flex: 1 }}>{item.label}</Text>
                       {selected && <TickCircle size={20} color={T.accent} variant="Bold" />}
                     </TouchableOpacity>
                   );
@@ -612,7 +1035,7 @@ function ReviewRow({ T, label, value }: { T: any; label: string; value: string }
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 2 }}>{label.toUpperCase()}</Text>
-      <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 15 }}>{value}</Text>
+      <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 15, lineHeight: 20 }}>{value}</Text>
     </View>
   );
 }
@@ -649,5 +1072,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     padding: 16, borderBottomWidth: 1,
   },
-  pickerRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  pickerRow: {
+    flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1,
+  },
+  dropdownBtn: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  textInput: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontSize: 14,
+  },
 });

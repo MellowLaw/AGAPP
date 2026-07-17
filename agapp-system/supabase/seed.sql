@@ -252,3 +252,18 @@ VALUES
   ('nagcarlan-laguna', 'What are the office hours of the Municipal Hall?', 'The Nagcarlan Municipal Hall is open Monday to Friday, 8:00 AM to 5:00 PM, and is closed on weekends and holidays. Some offices take a lunch break from 12:00 NN to 1:00 PM.', 'Nagcarlan LGU', ARRAY['hours', 'open', 'time', 'schedule']),
   ('nagcarlan-laguna', 'Where is the Municipal Hall located?', 'The Nagcarlan Municipal Hall is at the town center (poblacion). You can use the AGAPP Map Explorer to get directions to the hall and other public offices.', 'Nagcarlan LGU', ARRAY['where', 'location', 'address', 'map'])
 ON CONFLICT DO NOTHING;
+
+-- 7. SEED CITIZEN GUIDES
+INSERT INTO citizen_guides (lgu_id, section, title, address, schedule, website, phone)
+VALUES
+  ('nagcarlan-laguna', 'ID Registration and Licenses', 'NBI - National Bureau of Investigation', 'Maria Cristina St, Naga City', 'Weekdays, 8:00 AM - 5:00 PM', 'https://clearance.nbi.gov.ph/', '(054) 473 3346'),
+  ('nagcarlan-laguna', 'Benefits & Contributions', 'SSS - Social Security System', 'SSS Bldg., Concepcion, Pequeña, Naga City', 'Weekdays, 7:00 AM - 5:00 PM', 'https://www.sss.gov.ph/', '(054) 472 3880'),
+  ('nagcarlan-laguna', 'Specialized Assistance', 'PDAO - Persons with Disability Affairs Office', 'Room 107, Ground Floor, Naga City Hall Building, Juan Q. Miranda Avenue, Naga City', NULL, 'https://www.facebook.com/pdaonagacity/', NULL),
+  ('nagcarlan-laguna', 'Other Local Government Offices', 'Naga City Post Office', 'Yorktown St, Naga City', 'Weekdays, 8:00 AM - 5:00 PM', 'https://phlpost.gov.ph/', NULL),
+  
+  ('liliw-laguna', 'ID Registration and Licenses', 'NBI - National Bureau of Investigation', 'Maria Cristina St, Naga City', 'Weekdays, 8:00 AM - 5:00 PM', 'https://clearance.nbi.gov.ph/', '(054) 473 3346'),
+  ('liliw-laguna', 'Benefits & Contributions', 'SSS - Social Security System', 'SSS Bldg., Concepcion, Pequeña, Naga City', 'Weekdays, 7:00 AM - 5:00 PM', 'https://www.sss.gov.ph/', '(054) 472 3880'),
+  ('liliw-laguna', 'Specialized Assistance', 'PDAO - Persons with Disability Affairs Office', 'Room 107, Ground Floor, Naga City Hall Building, Juan Q. Miranda Avenue, Naga City', NULL, 'https://www.facebook.com/pdaonagacity/', NULL),
+  ('liliw-laguna', 'Other Local Government Offices', 'Naga City Post Office', 'Yorktown St, Naga City', 'Weekdays, 8:00 AM - 5:00 PM', 'https://phlpost.gov.ph/', NULL)
+ON CONFLICT DO NOTHING;
+
