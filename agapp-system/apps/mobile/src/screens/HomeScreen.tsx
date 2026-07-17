@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity, ScrollView, Linking, Image, Alert, Modal, TextInput, ActivityIndicator, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -95,7 +96,68 @@ export function HomeScreen({ navigation }: any) {
     forum: any[];
     reportCategories: any[];
     myReports: any[];
-  }>({ news: [], services: [], offices: [], forum: [], reportCategories: [], myReports: [] });
+    guides: any[];
+    serviceRequests: any[];
+  }>({
+    news: [],
+    services: [],
+    offices: [],
+    forum: [],
+    reportCategories: [],
+    myReports: [],
+    guides: [],
+    serviceRequests: [],
+  });
+
+  // Search History
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const HISTORY_KEY = 'search_history_v1';
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(HISTORY_KEY);
+        if (raw) {
+          setSearchHistory(JSON.parse(raw));
+        }
+      } catch (e) {
+        console.warn('AsyncStorage read error', e);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  const saveToHistory = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    try {
+      const updated = [trimmed, ...searchHistory.filter(h => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, 15);
+      setSearchHistory(updated);
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('AsyncStorage write error', e);
+    }
+  }, [searchHistory]);
+
+  const deleteHistoryItem = useCallback(async (item: string) => {
+    try {
+      const updated = searchHistory.filter(h => h !== item);
+      setSearchHistory(updated);
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('AsyncStorage write error', e);
+    }
+  }, [searchHistory]);
+
+  const clearHistory = useCallback(async () => {
+    try {
+      setSearchHistory([]);
+      await AsyncStorage.removeItem(HISTORY_KEY);
+    } catch (e) {
+      console.warn('AsyncStorage delete error', e);
+    }
+  }, []);
 
   // Guest LGU Picker State
   const [showLguModal, setShowLguModal] = useState(false);
@@ -116,7 +178,16 @@ export function HomeScreen({ navigation }: any) {
 
   useEffect(() => {
     if (!searchText.trim()) {
-      setSearchResults({ news: [], services: [], offices: [], forum: [], reportCategories: [], myReports: [] });
+      setSearchResults({
+        news: [],
+        services: [],
+        offices: [],
+        forum: [],
+        reportCategories: [],
+        myReports: [],
+        guides: [],
+        serviceRequests: [],
+      });
       setSearching(false);
       return;
     }
@@ -157,16 +228,22 @@ export function HomeScreen({ navigation }: any) {
             .select('*')
             .eq('lgu_id', activeLgu.id)
             .ilike('name', `%${query}%`)
-            .limit(5),
+            .limit(10), // Limit 10 to cover emergency hospital/police listings
           supabase
             .from('forum_posts')
             .select('*, citizen:users!citizen_id(avatar_url)')
             .eq('lgu_id', activeLgu.id)
             .ilike('title', `%${query}%`)
             .limit(5),
+          supabase
+            .from('citizen_guides')
+            .select('*')
+            .eq('lgu_id', activeLgu.id)
+            .ilike('title', `%${query}%`)
+            .limit(5),
         ];
 
-        // Search submitted reports if citizen has a profile
+        // Search submitted reports & service requests if citizen has a profile
         if (profile?.id) {
           queries.push(
             supabase
@@ -176,11 +253,20 @@ export function HomeScreen({ navigation }: any) {
               .or(`description.ilike.%${query}%,category.ilike.%${query}%`)
               .limit(5)
           );
+          queries.push(
+            supabase
+              .from('service_requests')
+              .select('*')
+              .eq('citizen_id', profile.id)
+              .ilike('service_type', `%${query}%`)
+              .limit(5)
+          );
         } else {
+          queries.push(Promise.resolve({ data: [] }));
           queries.push(Promise.resolve({ data: [] }));
         }
 
-        const [newsRes, servicesRes, officesRes, forumRes, reportsRes] = await Promise.all(queries);
+        const [newsRes, servicesRes, officesRes, forumRes, guidesRes, reportsRes, serviceRequestsRes] = await Promise.all(queries);
 
         setSearchResults({
           news: newsRes.data || [],
@@ -189,6 +275,8 @@ export function HomeScreen({ navigation }: any) {
           forum: forumRes.data || [],
           reportCategories: matchingCategories,
           myReports: reportsRes.data || [],
+          guides: guidesRes.data || [],
+          serviceRequests: serviceRequestsRes.data || [],
         });
       } catch (err) {
         console.error('Search failed:', err);
@@ -1088,11 +1176,13 @@ export function HomeScreen({ navigation }: any) {
                   fontFamily: 'Inter-Medium',
                   color: T.text,
                 }}
-                placeholder="Search news, services, offices..."
+                placeholder="Search anything..."
                 placeholderTextColor={T.textMuted}
                 value={searchText}
                 onChangeText={setSearchText}
                 autoFocus
+                returnKeyType="search"
+                onSubmitEditing={() => saveToHistory(searchText)}
               />
               {searchText !== '' && (
                 <TouchableOpacity onPress={() => setSearchText('')}>
@@ -1101,7 +1191,7 @@ export function HomeScreen({ navigation }: any) {
               )}
             </View>
 
-            {/* Circular Close Button */}
+            {/* Close Button */}
             <TouchableOpacity
               onPress={() => {
                 setShowSearchModal(false);
@@ -1132,29 +1222,471 @@ export function HomeScreen({ navigation }: any) {
             {searching ? (
               <ActivityIndicator color={T.text} style={{ marginTop: 40 }} />
             ) : searchText.trim() === '' ? (
-              <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-                <SearchNormal1 size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
-                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14 }}>
-                  Type keywords to search news articles, civic services, government offices, or community discussions.
-                </Text>
-              </View>
-            ) : (searchResults.news.length === 0 &&
-                 searchResults.services.length === 0 &&
-                 searchResults.offices.length === 0 &&
-                 searchResults.forum.length === 0 &&
-                 searchResults.reportCategories.length === 0 &&
-                 searchResults.myReports.length === 0) ? (
-              <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18, marginBottom: 8 }}>
-                  No Results Found
-                </Text>
-                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14 }}>
-                  We couldn't find anything matching "{searchText}". Try checking your spelling or search terms.
-                </Text>
+              /* Search History Empty State */
+              <View style={{ paddingTop: 8 }}>
+                {searchHistory.length === 0 ? (
+                  <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+                    <SearchNormal1 size={48} color={T.textMuted} variant="Linear" style={{ marginBottom: 12 }} />
+                    <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14 }}>
+                      Search news, services, settings, forum, and hotlines.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 24,
+                    padding: 20,
+                    marginTop: 8,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                      <Text style={{ flex: 1, fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted }}>
+                        Recent Searches
+                      </Text>
+                      <TouchableOpacity onPress={clearHistory} activeOpacity={0.7}>
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 12, color: '#EF4444' }}>Clear all</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {(showAllHistory ? searchHistory : searchHistory.slice(0, 5)).map((item, index) => (
+                      <View
+                        key={item + index}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          borderBottomWidth: index < (showAllHistory ? searchHistory : searchHistory.slice(0, 5)).length - 1 ? 1 : 0,
+                          borderBottomColor: T.border,
+                          paddingVertical: 11,
+                        }}
+                      >
+                        <TouchableOpacity
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                          onPress={() => setSearchText(item)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="time-outline" size={16} color={T.textMuted} />
+                          <Text style={{ fontFamily: 'Inter-Medium', fontSize: 14, color: T.text }}>{item}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => deleteHistoryItem(item)} activeOpacity={0.7} style={{ padding: 4 }}>
+                          <Ionicons name="close" size={16} color={T.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {searchHistory.length > 5 && (
+                      <TouchableOpacity
+                        onPress={() => setShowAllHistory(p => !p)}
+                        activeOpacity={0.7}
+                        style={{ marginTop: 12, alignItems: 'center' }}
+                      >
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: T.accent }}>
+                          {showAllHistory ? 'Show less' : `View all ${searchHistory.length} searches`}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             ) : (
               <View style={{ gap: 20, marginTop: 10 }}>
-                {/* 1. Articles / News Results */}
+                {/* Search Confirm Row */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 20,
+                    padding: 16,
+                    gap: 12,
+                  }}
+                  activeOpacity={0.7}
+                  onPress={() => saveToHistory(searchText)}
+                >
+                  <Ionicons name="search" size={20} color="#DC2626" />
+                  <Text style={{ fontFamily: 'Inter-Medium', fontSize: 15, color: T.text }}>
+                    Search "{searchText}"
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 1. Tools Grid (App Shortcuts) */}
+                {(() => {
+                  const ALL_SHORTCUTS = [
+                    { id: 'services', label: 'Services', icon: 'settings-outline', route: 'ServicesTab', keywords: ['services', 'service', 'apply'] },
+                    { id: 'eservices', label: 'E-Services', icon: 'globe-outline', route: 'ServicesTab', keywords: ['eservices', 'e-services', 'online'] },
+                    { id: 'utilities', label: 'Utilities', icon: 'bulb-outline', route: 'Explore', keywords: ['utilities', 'electricity', 'water', 'power'] },
+                    { id: 'settings', label: 'Settings', icon: 'settings-outline', route: 'Profile', keywords: ['settings', 'profile', 'account', 'password', 'verify', 'logout'] },
+                    { id: 'home', label: 'Home', icon: 'home-outline', route: 'Home', keywords: ['home', 'main', 'feed', 'announcement'] },
+                    { id: 'forum', label: 'Forum', icon: 'chatbubbles-outline', route: 'Forum', keywords: ['forum', 'posts', 'discussion', 'chat'] },
+                    { id: 'reports', label: 'Reports', icon: 'warning-outline', route: 'ReportsTab', keywords: ['reports', 'report', 'issue', 'pothole', 'drainage'] },
+                    { id: 'emergency', label: 'Emergency', icon: 'call-outline', route: 'Emergency', keywords: ['emergency', 'police', 'fire', 'hospital', 'ambulance', '911'] },
+                    { id: 'chatbot', label: 'Chatbot', icon: 'chatbox-ellipses-outline', route: 'Assistant', keywords: ['chatbot', 'ai', 'assistant'] },
+                  ];
+
+                  const matched = ALL_SHORTCUTS.filter(s =>
+                    s.label.toLowerCase().includes(searchText.toLowerCase()) ||
+                    s.keywords.some(k => k.includes(searchText.toLowerCase()))
+                  );
+
+                  if (matched.length === 0) return null;
+
+                  return (
+                    <View style={{
+                      backgroundColor: T.card,
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      borderRadius: 24,
+                      padding: 20,
+                    }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 14 }}>
+                        Tools
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                        {matched.map(item => (
+                          <TouchableOpacity
+                            key={item.id}
+                            onPress={() => {
+                              saveToHistory(searchText);
+                              setShowSearchModal(false);
+                              setSearchText('');
+                              navigation.navigate(item.route);
+                            }}
+                            activeOpacity={0.7}
+                            style={{
+                              alignItems: 'center',
+                              width: '28%',
+                              marginBottom: 8,
+                            }}
+                          >
+                            <View style={{
+                              width: 56,
+                              height: 56,
+                              borderRadius: 16,
+                              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              marginBottom: 6,
+                            }}>
+                              <Ionicons name={item.icon as any} size={24} color="#DC2626" />
+                            </View>
+                            <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.text, textAlign: 'center' }} numberOfLines={1}>
+                              {item.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* 2. Services Results */}
+                {searchResults.services.length > 0 && (
+                  <View style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 24,
+                    padding: 20,
+                  }}>
+                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
+                      Services
+                    </Text>
+                    {searchResults.services.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => {
+                          saveToHistory(searchText);
+                          setShowSearchModal(false);
+                          setSearchText('');
+                          navigation.navigate('ServicesTab', { serviceId: item.id });
+                        }}
+                        activeOpacity={0.7}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          borderBottomWidth: index < searchResults.services.length - 1 ? 1 : 0,
+                          borderBottomColor: T.border,
+                          paddingVertical: 12,
+                          paddingTop: index === 0 ? 0 : 12,
+                        }}
+                      >
+                        {/* PDF Icon */}
+                        <View style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          backgroundColor: '#FEE2E2',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 12,
+                          borderWidth: 1,
+                          borderColor: '#FCA5A5',
+                        }}>
+                          <View style={{ position: 'relative' }}>
+                            <Ionicons name="document-text" size={18} color="#DC2626" />
+                            <View style={{
+                              position: 'absolute',
+                              bottom: -2,
+                              right: -4,
+                              backgroundColor: '#DC2626',
+                              borderRadius: 4,
+                              paddingHorizontal: 2,
+                              paddingVertical: 0.5,
+                            }}>
+                              <Text style={{ fontSize: 6, color: '#FFF', fontFamily: 'Inter-Bold' }}>PDF</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, lineHeight: 18 }}>
+                            {item.name}
+                          </Text>
+                          <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted, marginTop: 2 }}>
+                            Office: {item.office_name}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={T.textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* 3. Emergency Hotlines */}
+                {(() => {
+                  const emergencyFacilities = searchResults.offices.filter(f =>
+                    ['police', 'fire', 'hospital'].includes(f.category?.toLowerCase()) && f.phone
+                  );
+
+                  if (emergencyFacilities.length === 0) return null;
+
+                  const categoryLabel = (cat: string) => {
+                    switch (cat.toLowerCase()) {
+                      case 'hospital': return 'Hospitals';
+                      case 'police': return 'Police Station';
+                      case 'fire': return 'Fire Station';
+                      default: return 'Hotline';
+                    }
+                  };
+
+                  return (
+                    <View style={{
+                      backgroundColor: T.card,
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      borderRadius: 24,
+                      padding: 20,
+                    }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
+                        Emergency Hotlines
+                      </Text>
+                      {emergencyFacilities.map((item, index) => (
+                        <View
+                          key={item.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            borderBottomWidth: index < emergencyFacilities.length - 1 ? 1 : 0,
+                            borderBottomColor: T.border,
+                            paddingVertical: 12,
+                            paddingTop: index === 0 ? 0 : 12,
+                          }}
+                        >
+                          {/* Red Call Icon */}
+                          <View style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: '#FEE2E2',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: 12,
+                          }}>
+                            <Ionicons name="call" size={18} color="#DC2626" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, lineHeight: 18 }}>
+                              {categoryLabel(item.category)} ({item.name})
+                            </Text>
+                            <Text style={{ fontFamily: 'Inter-Medium', fontSize: 13, color: T.textMuted, marginTop: 2 }}>
+                              {item.phone}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              saveToHistory(searchText);
+                              Linking.openURL(`tel:${item.phone}`);
+                            }}
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#FFF5F5',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              borderWidth: 1,
+                              borderColor: '#FEE2E2',
+                            }}
+                          >
+                            <Ionicons name="call" size={16} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })()}
+
+                {/* 4. Non-Emergency Government Offices */}
+                {(() => {
+                  const offices = searchResults.offices.filter(f =>
+                    !['police', 'fire', 'hospital'].includes(f.category?.toLowerCase())
+                  );
+
+                  if (offices.length === 0) return null;
+
+                  return (
+                    <View style={{
+                      backgroundColor: T.card,
+                      borderWidth: 1,
+                      borderColor: T.border,
+                      borderRadius: 24,
+                      padding: 20,
+                    }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
+                        Government Offices
+                      </Text>
+                      {offices.map((item, index) => (
+                        <TouchableOpacity
+                          key={item.id}
+                          onPress={() => {
+                            saveToHistory(searchText);
+                            setShowSearchModal(false);
+                            setSearchText('');
+                            navigation.navigate('Explore');
+                          }}
+                          activeOpacity={0.7}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            borderBottomWidth: index < offices.length - 1 ? 1 : 0,
+                            borderBottomColor: T.border,
+                            paddingVertical: 12,
+                            paddingTop: index === 0 ? 0 : 12,
+                          }}
+                        >
+                          <View style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: '#F3F4F6',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: 12,
+                            borderWidth: 1,
+                            borderColor: T.border,
+                          }}>
+                            <Ionicons name="business" size={18} color="#E11D48" />
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, lineHeight: 18 }}>
+                              {item.name}
+                            </Text>
+                            <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted, marginTop: 2 }}>
+                              {item.address || 'Municipality Address'}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={T.textMuted} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  );
+                })()}
+
+                {/* 5. Citizen Guides */}
+                {searchResults.guides.length > 0 && (
+                  <View style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 24,
+                    padding: 20,
+                  }}>
+                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
+                      Citizen Guide
+                    </Text>
+                    {searchResults.guides.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => {
+                          saveToHistory(searchText);
+                          setShowSearchModal(false);
+                          setSearchText('');
+                          navigation.navigate('CitizenGuide');
+                        }}
+                        activeOpacity={0.7}
+                        style={{
+                          borderBottomWidth: index < searchResults.guides.length - 1 ? 1 : 0,
+                          borderBottomColor: T.border,
+                          paddingVertical: 12,
+                          paddingTop: index === 0 ? 0 : 12,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted }}>
+                          {item.section}
+                        </Text>
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, marginTop: 2 }}>
+                          {item.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* 6. Forum Discussions */}
+                {searchResults.forum.length > 0 && (
+                  <View style={{
+                    backgroundColor: T.card,
+                    borderWidth: 1,
+                    borderColor: T.border,
+                    borderRadius: 24,
+                    padding: 20,
+                  }}>
+                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
+                      Forum Discussions
+                    </Text>
+                    {searchResults.forum.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => {
+                          saveToHistory(searchText);
+                          setShowSearchModal(false);
+                          setSearchText('');
+                          navigation.navigate('Forum');
+                        }}
+                        activeOpacity={0.7}
+                        style={{
+                          borderBottomWidth: index < searchResults.forum.length - 1 ? 1 : 0,
+                          borderBottomColor: T.border,
+                          paddingVertical: 12,
+                          paddingTop: index === 0 ? 0 : 12,
+                        }}
+                      >
+                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.text, lineHeight: 20 }}>
+                          {item.title}
+                        </Text>
+                        <Text style={{ fontFamily: 'Inter-Medium', fontSize: 13, color: T.textMuted, marginTop: 4, lineHeight: 18 }} numberOfLines={2}>
+                          {item.content}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 8 }}>
+                          Started by {item.citizen_name || 'Citizen'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* 7. Articles / News Results */}
                 {searchResults.news.length > 0 && (
                   <View style={{
                     backgroundColor: T.card,
@@ -1170,6 +1702,7 @@ export function HomeScreen({ navigation }: any) {
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => {
+                          saveToHistory(searchText);
                           setShowSearchModal(false);
                           setSearchText('');
                           navigation.navigate('NewsDetail', { newsId: item.id });
@@ -1196,63 +1729,7 @@ export function HomeScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {/* 2. Services Results */}
-                {searchResults.services.length > 0 && (
-                  <View style={{
-                    backgroundColor: T.card,
-                    borderWidth: 1,
-                    borderColor: T.border,
-                    borderRadius: 24,
-                    padding: 20,
-                  }}>
-                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
-                      Services
-                    </Text>
-                    {searchResults.services.map((item, index) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => {
-                          setShowSearchModal(false);
-                          setSearchText('');
-                          navigation.navigate('ServicesTab');
-                        }}
-                        activeOpacity={0.7}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          borderBottomWidth: index < searchResults.services.length - 1 ? 1 : 0,
-                          borderBottomColor: T.border,
-                          paddingVertical: 12,
-                          paddingTop: index === 0 ? 0 : 12,
-                        }}
-                      >
-                        {/* PDF Icon */}
-                        <View style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          backgroundColor: '#FEE2E2',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: 12,
-                        }}>
-                          <Ionicons name="document-text" size={20} color="#DC2626" />
-                        </View>
-                        <View style={{ flex: 1, paddingRight: 8 }}>
-                          <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, lineHeight: 18 }}>
-                            {item.name}
-                          </Text>
-                          <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted, marginTop: 2 }}>
-                            Office: {item.office_name}
-                          </Text>
-                        </View>
-                        <Forward size={18} color={T.textMuted} variant="Outline" style={{ transform: [{ rotate: '-45deg' }] }} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Report Categories */}
+                {/* 8. Report Categories */}
                 {searchResults.reportCategories.length > 0 && (
                   <View style={{
                     backgroundColor: T.card,
@@ -1268,6 +1745,7 @@ export function HomeScreen({ navigation }: any) {
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => {
+                          saveToHistory(searchText);
                           setShowSearchModal(false);
                           setSearchText('');
                           navigation.navigate('ReportsTab', { initialCategory: item.id });
@@ -1307,7 +1785,7 @@ export function HomeScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {/* My Reports */}
+                {/* 9. My Reports */}
                 {searchResults.myReports.length > 0 && (
                   <View style={{
                     backgroundColor: T.card,
@@ -1323,6 +1801,7 @@ export function HomeScreen({ navigation }: any) {
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => {
+                          saveToHistory(searchText);
                           setShowSearchModal(false);
                           setSearchText('');
                           navigation.navigate('TrackingDetail', { id: item.id, type: 'report' });
@@ -1352,8 +1831,8 @@ export function HomeScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {/* 3. Government Offices / Facilities Results */}
-                {searchResults.offices.length > 0 && (
+                {/* 10. My Service Requests */}
+                {searchResults.serviceRequests.length > 0 && (
                   <View style={{
                     backgroundColor: T.card,
                     borderWidth: 1,
@@ -1362,93 +1841,55 @@ export function HomeScreen({ navigation }: any) {
                     padding: 20,
                   }}>
                     <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
-                      Government Offices
+                      My Service Requests
                     </Text>
-                    {searchResults.offices.map((item, index) => (
+                    {searchResults.serviceRequests.map((item, index) => (
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => {
+                          saveToHistory(searchText);
                           setShowSearchModal(false);
                           setSearchText('');
-                          navigation.navigate('Explore');
+                          navigation.navigate('TrackingDetail', { id: item.id, type: 'service' });
                         }}
                         activeOpacity={0.7}
                         style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          borderBottomWidth: index < searchResults.offices.length - 1 ? 1 : 0,
+                          borderBottomWidth: index < searchResults.serviceRequests.length - 1 ? 1 : 0,
                           borderBottomColor: T.border,
                           paddingVertical: 12,
                           paddingTop: index === 0 ? 0 : 12,
                         }}
                       >
-                        {/* Building Icon */}
-                        <View style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          backgroundColor: '#F3F4F6',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: 12,
-                          borderWidth: 1,
-                          borderColor: T.border,
-                        }}>
-                          <Ionicons name="business" size={18} color="#E11D48" />
-                        </View>
-                        <View style={{ flex: 1, paddingRight: 8 }}>
-                          <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 14, color: T.text, lineHeight: 18 }}>
-                            {item.name}
-                          </Text>
-                          <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted, marginTop: 2 }}>
-                            {item.address || 'Municipality Address'}
-                          </Text>
-                        </View>
-                        <Forward size={16} color={T.accent} variant="Bold" />
+                        <Text style={{ color: T.textMuted, fontSize: 11, fontFamily: 'Inter-Medium' }}>
+                          {item.reference_number}
+                        </Text>
+                        <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Octarine-Bold', marginTop: 2 }}>
+                          {item.service_type}
+                        </Text>
+                        <Text style={{ color: T.accent, fontSize: 12, fontFamily: 'Octarine-Bold', marginTop: 6 }}>
+                          Status: {item.status}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 )}
 
-                {/* 4. Forum Discussion Results */}
-                {searchResults.forum.length > 0 && (
-                  <View style={{
-                    backgroundColor: T.card,
-                    borderWidth: 1,
-                    borderColor: T.border,
-                    borderRadius: 24,
-                    padding: 20,
-                  }}>
-                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.textMuted, marginBottom: 16 }}>
-                      Forum Discussions
+                {/* No Results Found */}
+                {searchResults.news.length === 0 &&
+                 searchResults.services.length === 0 &&
+                 searchResults.offices.length === 0 &&
+                 searchResults.forum.length === 0 &&
+                 searchResults.reportCategories.length === 0 &&
+                 searchResults.myReports.length === 0 &&
+                 searchResults.guides.length === 0 &&
+                 searchResults.serviceRequests.length === 0 && (
+                  <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+                    <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18, marginBottom: 8 }}>
+                      No Results Found
                     </Text>
-                    {searchResults.forum.map((item, index) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => {
-                          setShowSearchModal(false);
-                          setSearchText('');
-                          navigation.navigate('Forum');
-                        }}
-                        activeOpacity={0.7}
-                        style={{
-                          borderBottomWidth: index < searchResults.forum.length - 1 ? 1 : 0,
-                          borderBottomColor: T.border,
-                          paddingVertical: 12,
-                          paddingTop: index === 0 ? 0 : 12,
-                        }}
-                      >
-                        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 15, color: T.text, lineHeight: 20 }}>
-                          {item.title}
-                        </Text>
-                        <Text style={{ fontFamily: 'Inter-Medium', fontSize: 13, color: T.textMuted, marginTop: 4, lineHeight: 18 }} numberOfLines={2}>
-                          {item.content}
-                        </Text>
-                        <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 8 }}>
-                          Started by {item.citizen_name || 'Citizen'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', fontSize: 14 }}>
+                      We couldn't find anything matching "{searchText}". Try checking your spelling or search terms.
+                    </Text>
                   </View>
                 )}
               </View>

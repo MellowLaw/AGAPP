@@ -50,6 +50,7 @@ export function ProfileScreen({ navigation }: any) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => setGpsEnabled(status === 'granted'));
@@ -259,9 +260,44 @@ export function ProfileScreen({ navigation }: any) {
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32 }}>Profile.</Text>
-        <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 4, marginBottom: 22 }}>
+        <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 4, marginBottom: 16 }}>
           Account · settings · privacy
         </Text>
+
+        {/* Settings Search Bar */}
+        <View style={{
+          flexDirection: 'row',
+          height: 46,
+          borderRadius: 23,
+          borderWidth: 1,
+          borderColor: T.border,
+          backgroundColor: T.card,
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          marginBottom: 20,
+        }}>
+          <Ionicons name="search-outline" size={18} color={T.textMuted} style={{ marginRight: 8 }} />
+          <TextInput
+            style={{
+              flex: 1,
+              height: '100%',
+              fontSize: 14,
+              fontFamily: 'Inter-Medium',
+              color: T.text,
+            }}
+            placeholder="Search settings..."
+            placeholderTextColor={T.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={T.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Profile Info Summary Card */}
         <View style={{
@@ -348,270 +384,193 @@ export function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
 
-        {/* CATEGORY: Account */}
-        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
-          Account
-        </Text>
-        <View style={{
-          backgroundColor: T.card,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 24,
-          padding: 6,
-          marginBottom: 12,
-        }}>
-          {/* Account Verification */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={goToVerify}
-            activeOpacity={0.8}
-          >
-            <ShieldTick size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Account Verification</Text>
-            <Text style={{ color: rowStatusColor, fontSize: 12, fontFamily: 'Octarine-Bold', marginRight: 8 }}>{statusLabel(status)}</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
+        {(() => {
+          const ALL_SETTINGS_ITEMS = [
+            { category: 'Account', label: 'Account Verification', icon: ShieldTick, iconType: 'iconsax' as const, cta: statusLabel(status), textStyle: { color: rowStatusColor }, onPress: goToVerify, keywords: ['verify', 'verification', 'identity', 'id', 'status', 'account'] },
+            { category: 'Account', label: 'Change email', icon: Sms, iconType: 'iconsax' as const, onPress: openEmailModal, keywords: ['email', 'change email', 'address', 'mail', 'account'] },
+            { category: 'Account', label: 'Change profile picture', icon: Camera, iconType: 'iconsax' as const, onPress: handleChangeAvatar, disabled: avatarUploading, keywords: ['avatar', 'picture', 'photo', 'image', 'profile picture', 'camera', 'account'] },
+            { category: 'Account', label: 'History', icon: Clock, iconType: 'iconsax' as const, onPress: openHistory, keywords: ['history', 'logs', 'past', 'requests', 'reports', 'activities', 'account'] },
 
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+            { category: 'Preferences', label: 'Appearance', icon: 'color-palette-outline', iconType: 'ionicons' as const, isToggle: true, toggleValue: isDarkMode, onPress: () => setIsDarkMode(!isDarkMode), keywords: ['appearance', 'dark mode', 'theme', 'light mode', 'style', 'color', 'preferences'] },
+            { category: 'Preferences', label: 'GPS Access', icon: LocationIcon, iconType: 'iconsax' as const, isToggle: true, toggleValue: gpsEnabled, onPress: handleToggleGps, keywords: ['gps', 'location', 'map', 'permission', 'tracking', 'access', 'preferences'] },
 
-          {/* Change Email */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={openEmailModal}
-            activeOpacity={0.8}
-          >
-            <Sms size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change email</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
+            { category: 'Support', label: 'Facebook', icon: 'facebook', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().facebook), keywords: ['facebook', 'social', 'contact', 'support', 'lgu'] },
+            { category: 'Support', label: 'YouTube', icon: 'youtube', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().youtube), keywords: ['youtube', 'video', 'channel', 'support', 'lgu'] },
+            { category: 'Support', label: 'X (formerly Twitter)', icon: 'x-logo', iconType: 'custom_x' as const, onPress: () => Linking.openURL('https://x.com'), keywords: ['x', 'twitter', 'social', 'support', 'lgu'] },
+            { category: 'Support', label: getSocialLinks().websiteLabel, icon: 'globe', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().website), keywords: ['website', 'lgu website', 'web', 'gov', 'link', 'support'] },
+            { category: 'Support', label: 'About Us', icon: 'heart', iconType: 'feather' as const, onPress: () => setInfoModal('security'), keywords: ['about us', 'about', 'info', 'app', 'support', 'lgu'] },
 
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+            { category: 'Legal', label: 'Terms and Conditions', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('terms'), keywords: ['terms', 'conditions', 'legal', 'agreement', 'rules'] },
+            { category: 'Legal', label: 'Privacy Policy', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('terms'), keywords: ['privacy', 'policy', 'data', 'legal', 'gdpr', 'safety'] },
 
-          {/* Change Profile Picture */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={handleChangeAvatar}
-            activeOpacity={0.8}
-            disabled={avatarUploading}
-          >
-            <Camera size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Change profile picture</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
+            { category: 'Logout', label: 'Logout', icon: Logout, iconType: 'iconsax' as const, isLogout: true, onPress: handleLogout, keywords: ['logout', 'sign out', 'exit', 'leave'] }
+          ];
 
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+          const filtered = searchQuery.trim() === '' ? ALL_SETTINGS_ITEMS : ALL_SETTINGS_ITEMS.filter(item =>
+            item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.keywords.some(kw => kw.toLowerCase().includes(searchQuery.toLowerCase()))
+          );
 
-          {/* History */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={openHistory}
-            activeOpacity={0.8}
-          >
-            <Clock size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>History</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-        </View>
+          if (filtered.length === 0) {
+            return (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 14 }}>
+                  No settings matching "{searchQuery}" found.
+                </Text>
+              </View>
+            );
+          }
 
-        {/* CATEGORY: Preferences */}
-        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
-          Preferences
-        </Text>
-        <View style={{
-          backgroundColor: T.card,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 24,
-          padding: 6,
-          marginBottom: 12,
-        }}>
-          {/* Appearance (Dark Mode) */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => setIsDarkMode(!isDarkMode)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="color-palette-outline" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Appearance</Text>
+          const renderItemIcon = (item: typeof ALL_SETTINGS_ITEMS[0]) => {
+            if (item.iconType === 'iconsax') {
+              const IconComponent = item.icon as any;
+              return <IconComponent size={ICON_SIZE} color={item.isLogout ? '#DC2626' : T.text} variant="Bold" style={{ marginRight: 14 }} />;
+            } else if (item.iconType === 'ionicons') {
+              return <Ionicons name={item.icon as any} size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />;
+            } else if (item.iconType === 'feather') {
+              return <Feather name={item.icon as any} size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />;
+            } else if (item.iconType === 'custom_x') {
+              return (
+                <View style={{ width: ICON_SIZE, marginRight: 14, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>1X</Text>
+                </View>
+              );
+            }
+            return null;
+          };
 
-            {/* Toggle Track */}
-            <View style={{
-              width: 44,
-              height: 26,
-              borderRadius: 13,
-              justifyContent: 'center',
-              backgroundColor: isDarkMode ? T.accentSoft : T.border,
-            }}>
+          // If searching, render a single card list containing all matching items
+          if (searchQuery.trim() !== '') {
+            return (
               <View style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: '#FFF',
-                transform: [{ translateX: isDarkMode ? 18 : 2 }],
-              }} />
-            </View>
-          </TouchableOpacity>
+                backgroundColor: T.card,
+                borderWidth: 1,
+                borderColor: T.border,
+                borderRadius: 24,
+                padding: 6,
+                marginTop: 8,
+              }}>
+                {filtered.map((item, index) => (
+                  <React.Fragment key={item.label}>
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+                      onPress={item.onPress}
+                      activeOpacity={0.8}
+                      disabled={item.disabled}
+                    >
+                      {renderItemIcon(item)}
+                      <Text style={[{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: item.isLogout ? '#DC2626' : T.text }, item.textStyle]}>
+                        {item.label}
+                      </Text>
+                      {item.isToggle ? (
+                        <View style={{
+                          width: 44,
+                          height: 26,
+                          borderRadius: 13,
+                          justifyContent: 'center',
+                          backgroundColor: item.toggleValue ? T.accentSoft : T.border,
+                        }}>
+                          <View style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 11,
+                            backgroundColor: '#FFF',
+                            transform: [{ translateX: item.toggleValue ? 18 : 2 }],
+                          }} />
+                        </View>
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          {item.cta && (
+                            <Text style={{ color: rowStatusColor, fontSize: 12, fontFamily: 'Octarine-Bold', marginRight: 8 }}>
+                              {item.cta}
+                            </Text>
+                          )}
+                          <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {index < filtered.length - 1 && (
+                      <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
+            );
+          }
 
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+          // Otherwise, render grouped by categories
+          const categories = ['Account', 'Preferences', 'Support', 'Legal', 'Logout'];
 
-          {/* GPS Access */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={handleToggleGps}
-            activeOpacity={0.8}
-          >
-            <LocationIcon size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>GPS Access</Text>
+          return categories.map(cat => {
+            const catItems = filtered.filter(item => item.category === cat);
+            if (catItems.length === 0) return null;
 
-            <View style={{
-              width: 44,
-              height: 26,
-              borderRadius: 13,
-              justifyContent: 'center',
-              backgroundColor: gpsEnabled ? T.accentSoft : T.border,
-            }}>
-              <View style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: '#FFF',
-                transform: [{ translateX: gpsEnabled ? 18 : 2 }],
-              }} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* CATEGORY: Support */}
-        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
-          Support
-        </Text>
-        <View style={{
-          backgroundColor: T.card,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 24,
-          padding: 6,
-          marginBottom: 12,
-        }}>
-          {/* Facebook */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => Linking.openURL(getSocialLinks().facebook)}
-            activeOpacity={0.8}
-          >
-            <Feather name="facebook" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Facebook</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
-
-          {/* YouTube */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => Linking.openURL(getSocialLinks().youtube)}
-            activeOpacity={0.8}
-          >
-            <Feather name="youtube" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>YouTube</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
-
-          {/* X */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => Linking.openURL('https://x.com')}
-            activeOpacity={0.8}
-          >
-            <View style={{ width: ICON_SIZE, marginRight: 14, alignItems: 'center' }}>
-              <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>1X</Text>
-            </View>
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>X (formerly Twitter)</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
-
-          {/* LGU Gov Website */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => Linking.openURL(getSocialLinks().website)}
-            activeOpacity={0.8}
-          >
-            <Feather name="globe" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>{getSocialLinks().websiteLabel}</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-
-          {/* About Us */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => setInfoModal('security')}
-            activeOpacity={0.8}
-          >
-            <Feather name="heart" size={ICON_SIZE} color={T.text} style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>About Us</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-        </View>
-
-        {/* CATEGORY: Legal */}
-        <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
-          Legal
-        </Text>
-        <View style={{
-          backgroundColor: T.card,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 24,
-          padding: 6,
-        }}>
-          {/* Terms & Conditions */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => setInfoModal('terms')}
-            activeOpacity={0.8}
-          >
-            <DocumentText size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Terms and Conditions</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-
-          <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
-
-          {/* Privacy Policy */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={() => setInfoModal('terms')}
-            activeOpacity={0.8}
-          >
-            <DocumentText size={ICON_SIZE} color={T.text} variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>Privacy Policy</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Standalone Logout Button */}
-        <View style={{
-          backgroundColor: T.card,
-          borderWidth: 1,
-          borderColor: T.border,
-          borderRadius: 24,
-          padding: 6,
-          marginTop: 16,
-        }}>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
-            onPress={handleLogout}
-            activeOpacity={0.8}
-          >
-            <Logout size={ICON_SIZE} color="#DC2626" variant="Bold" style={{ marginRight: 14 }} />
-            <Text style={{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: '#DC2626' }}>Logout</Text>
-            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
-          </TouchableOpacity>
-        </View>
+            return (
+              <React.Fragment key={cat}>
+                {cat !== 'Logout' && (
+                  <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+                    {cat}
+                  </Text>
+                )}
+                <View style={{
+                  backgroundColor: T.card,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 24,
+                  padding: 6,
+                  marginBottom: 12,
+                  marginTop: cat === 'Logout' ? 16 : 0,
+                }}>
+                  {catItems.map((item, index) => (
+                    <React.Fragment key={item.label}>
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+                        onPress={item.onPress}
+                        activeOpacity={0.8}
+                        disabled={item.disabled}
+                      >
+                        {renderItemIcon(item)}
+                        <Text style={[{ flex: 1, fontSize: 15, fontFamily: 'Octarine-Bold', color: item.isLogout ? '#DC2626' : T.text }, item.textStyle]}>
+                          {item.label}
+                        </Text>
+                        {item.isToggle ? (
+                          <View style={{
+                            width: 44,
+                            height: 26,
+                            borderRadius: 13,
+                            justifyContent: 'center',
+                            backgroundColor: item.toggleValue ? T.accentSoft : T.border,
+                          }}>
+                            <View style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 11,
+                              backgroundColor: '#FFF',
+                              transform: [{ translateX: item.toggleValue ? 18 : 2 }],
+                            }} />
+                          </View>
+                        ) : (
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {item.cta && (
+                              <Text style={{ color: rowStatusColor, fontSize: 12, fontFamily: 'Octarine-Bold', marginRight: 8 }}>
+                                {item.cta}
+                              </Text>
+                            )}
+                            <ArrowRight2 size={ARROW_SIZE} color={T.textMuted} variant="Bold" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      {index < catItems.length - 1 && (
+                        <View style={{ height: 1, marginLeft: 16, backgroundColor: T.border, opacity: 0.3 }} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+              </React.Fragment>
+            );
+          });
+        })()}
 
         <Text style={{
           color: T.textMuted,

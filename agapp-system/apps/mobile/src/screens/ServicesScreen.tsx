@@ -113,7 +113,7 @@ const DEFAULT_PRESETS = [
   'Business requirement',
 ];
 
-export function ServicesScreen({ navigation }: any) {
+export function ServicesScreen({ route, navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const { showToast } = useToast();
   const { selectedLgu, guestLgu, profile, session } = useAuth();
@@ -126,6 +126,18 @@ export function ServicesScreen({ navigation }: any) {
   useEffect(() => {
     navigation.setParams({ isSubScreen: showForm });
   }, [showForm, navigation]);
+
+  useEffect(() => {
+    if (route?.params?.serviceId && catalog.length > 0) {
+      const found = catalog.find(s => s.id === route.params.serviceId);
+      if (found) {
+        setSelectedService(found);
+        setShowForm(true);
+        // Clear params to avoid loop
+        navigation.setParams({ serviceId: undefined });
+      }
+    }
+  }, [route?.params?.serviceId, catalog, navigation]);
 
   // Form state
   const [fullName, setFullName] = useState(profile?.name || '');

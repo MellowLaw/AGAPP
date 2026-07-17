@@ -377,7 +377,7 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="ServicesTab" options={{ title: 'Services' }}>
-        {({ navigation }) => <ServicesScreen navigation={navigation} />}
+        {({ navigation, route }: any) => <ServicesScreen navigation={navigation} route={route} />}
       </Tab.Screen>
       <Tab.Screen name="ReportsTab" options={{ title: 'Report' }}>
         {({ navigation, route }: any) => <ReportsScreen navigation={navigation} route={route} />}
