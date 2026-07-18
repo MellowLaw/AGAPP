@@ -1,10 +1,58 @@
 # Plan — Citizen mobile push notifications: what should push vs. stay in-app only
 
-> **Status:** 🔵 Draft for review · not started in code · _living doc._
-> **Updated:** 2026-07-06
+> **Status:** 🟢 Built (2026-07-17) — gaps #1–3 below (verification notification,
+> tap-to-navigate, citizen push opt-out) are implemented and typecheck clean.
+> Gap #4 (foreground display restraint) intentionally skipped, per this doc's
+> own recommendation — revisit only if a lower-stakes type (e.g. forum
+> replies) gets added. **Not yet device-tested** — Expo Go (SDK 53+) doesn't
+> support push at all (`registerForPushNotificationsAsync` already no-ops
+> there), so this needs a real dev-client/standalone build to verify the
+> actual push delivery + tap-to-open behavior, not just the code paths.
+> **Updated:** 2026-07-17
 > **Scope:** Citizen-facing mobile notifications only (staff already get their own
 > in-app-only bell — unaffected by this plan). Decide push-vs-in-app policy, then a
 > short list of real technical gaps to close.
+
+## What was built (2026-07-17)
+
+1. **Verification approved/rejected notification** — `verify_citizen()` (in
+   `supabase/verification_setup.sql`) now inserts a `notifications` row on
+   both approve and reject (type `verification_approved` /
+   `verification_rejected`, reject includes the reason), reusing the exact
+   same table/realtime-publication/push pipeline as report/service status
+   changes — no changes needed to `push.service.ts`'s delivery mechanism.
+2. **Tap-to-navigate** — `apps/mobile/App.tsx`'s new `PushNotificationRouter`
+   component listens for `addNotificationResponseReceivedListener` (tap while
+   running) and calls `getLastNotificationResponseAsync()` once on mount
+   (tap while the app was fully closed — the live listener alone doesn't
+   catch that case). Both look up the tapped notification's `type`/`payload`
+   from the DB and route exactly like `NotificationsScreen.tsx`'s existing
+   in-app tap handler (`report_status`/`service_status` → `TrackingDetail`;
+   verification types → `VerifyIdentity`; anything else → `Notifications`).
+   Needed a new `navigationRef` (`createNavigationContainerRef`) exported from
+   `AppNavigator.tsx` so code outside the navigation tree can navigate.
+   Since `TrackingDetail`/`VerifyIdentity`/`Notifications` only exist in the
+   navigator once signed in with an LGU selected (same gate as the earlier
+   Home-bell crash fix), a tap arriving before auth finishes loading queues
+   the target and applies it once `session`/`selectedLgu` become truthy,
+   rather than silently dropping it or crashing.
+   `NotificationsScreen.tsx`'s own in-app tap handler was extended with the
+   same two verification types for consistency.
+3. **Citizen push opt-out** — a "Push Notifications" toggle in
+   `ProfileScreen.tsx`'s Preferences section, reading/writing
+   `users.notification_preferences.push` (mirrors the existing staff-settings
+   pattern). `push.service.ts` now checks this flag before sending (defaults
+   to enabled if unset, matching the column's own DB default) — in-app
+   notifications and the badge count are unaffected by this toggle, only the
+   OS push itself is skipped.
+
+## Explicitly not done in this pass
+- Gap #4 (foreground display restraint) — skipped per the original
+  recommendation below; all current notification types are "should push,"
+  so there's nothing to quiet yet.
+- No changes to `push.service.ts`'s payload shape — the tap handler fetches
+  the notification row by id instead, which was simpler than threading a
+  `subject_id` through the send path and needed no server changes.
 
 ## Current state (verified in code)
 

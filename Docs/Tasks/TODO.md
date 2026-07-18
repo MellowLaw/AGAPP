@@ -5,6 +5,19 @@
 
 ## 🔴 Now (active)
 
+- [x] **Built mobile push notification gaps (2026-07-17)** — per
+      `Plan-Mobile-Push-Notifications.md`: (1) `verify_citizen()` now inserts a
+      `notifications` row on approve/reject (highest-priority gap — the one
+      event that unlocks/blocks app usage had no notification at all before),
+      (2) tap-to-navigate via a new `PushNotificationRouter` in `App.tsx`
+      (handles both live-tap and cold-start-tap via
+      `getLastNotificationResponseAsync`, using a new exported `navigationRef`
+      from `AppNavigator.tsx`), (3) a citizen "Push Notifications" toggle in
+      `ProfileScreen.tsx` writing `users.notification_preferences.push`,
+      checked by `push.service.ts` before sending. Foreground-display
+      restraint (gap #4) intentionally skipped — no lower-stakes notification
+      type exists yet to need it. **Not device-tested** — Expo Go (SDK 53+)
+      doesn't support push at all, needs a real dev-client/standalone build.
 - [x] **Simplified ID verification: dropped back-of-ID capture and the
       two-shot "blink twice" liveness check (2026-07-17)**, per explicit
       request. Single front-only ID photo + single selfie now. Removed:

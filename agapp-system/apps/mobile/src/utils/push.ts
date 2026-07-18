@@ -4,7 +4,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient || Constants?.appOwnership === 'expo';
 
-const getNotificationsModule = () => {
+export const getNotificationsModule = () => {
   if (isExpoGo) return null;
   try {
     return require('expo-notifications');
@@ -14,6 +14,36 @@ const getNotificationsModule = () => {
 };
 
 const Notifications = getNotificationsModule();
+
+// Single source of truth for "which screen does a notification deep-link to",
+// shared by the in-app tap handler (NotificationsScreen.tsx) and the OS-push
+// tap handler (App.tsx) — previously each maintained its own copy of this
+// mapping, which could silently drift out of sync.
+export type NotificationTarget = { screen: string; params?: any };
+
+export function resolveNotificationTarget(type: string, payload: any): NotificationTarget {
+  const p = payload || {};
+  if (type === 'report_status' && p.report_id) {
+    return { screen: 'TrackingDetail', params: { id: p.report_id, type: 'report' } };
+  }
+  if (type === 'service_status' && p.request_id) {
+    return { screen: 'TrackingDetail', params: { id: p.request_id, type: 'service' } };
+  }
+  if (type === 'verification_approved' || type === 'verification_rejected') {
+    return { screen: 'VerifyIdentity' };
+  }
+  return { screen: 'Notifications' };
+}
+
+export function isNotificationNavigable(type: string, payload: any): boolean {
+  const p = payload || {};
+  return (
+    (type === 'report_status' && !!p.report_id) ||
+    (type === 'service_status' && !!p.request_id) ||
+    type === 'verification_approved' ||
+    type === 'verification_rejected'
+  );
+}
 
 export async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'web' || isExpoGo || !Notifications) {

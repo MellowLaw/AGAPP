@@ -183,6 +183,13 @@ GRANT EXECUTE ON FUNCTION submit_verification_request(text, text, text, text, te
 -- 3. verify_citizen() RPC — secure approve/reject
 --    Enforces the caller is an LGU_ADMIN of the same LGU,
 --    then atomically updates the request AND the user row.
+--    The verification-decision notification (approved/rejected) is NOT
+--    inserted here — see trigger_notify_verification_status below, which
+--    fires directly off the users.verification_status UPDATE this function
+--    performs. Moved out of this RPC in a 2026-07-17 code-review fix so the
+--    notification fires regardless of which code path changes that column
+--    (mirrors notify_report_status_change()/notify_service_status_change()
+--    in schema.sql, which are also triggers, not caller-side inserts).
 -- --------------------------------------------------------
 CREATE OR REPLACE FUNCTION verify_citizen(
   p_request_id uuid,
@@ -230,7 +237,8 @@ BEGIN
         reviewed_at = now()
     WHERE id = p_request_id;
 
-  -- 2. Mirror the decision onto the user (source of truth for gating)
+  -- 2. Mirror the decision onto the user (source of truth for gating) —
+  --    trigger_notify_verification_status fires off this UPDATE.
   IF p_action = 'approve' THEN
     UPDATE users
       SET verification_status = 'verified',
@@ -248,6 +256,54 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- --------------------------------------------------------
+-- 3a. verification-decision notification (2026-07-17) — trigger-based, fires
+--     off users.verification_status changing to 'verified'/'rejected',
+--     regardless of which code path performs the UPDATE (currently only
+--     verify_citizen() is allowed through the users_guard_verification
+--     trigger, but this stays correct if that ever changes). Highest-priority
+--     gap from Plan-Mobile-Push-Notifications.md: this is the one event that
+--     unlocks (or blocks) a citizen's ability to use the app at all, and
+--     previously had no notification of any kind.
+--     NULLIF(..., '') treats an empty-string rejection_reason the same as
+--     NULL, so COALESCE's '.' fallback actually applies (a bare
+--     COALESCE(': ' || reason, '.') would otherwise produce
+--     "...not approved:  You can review..." — double space, no period —
+--     for an empty-but-non-NULL reason).
+-- --------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_verification_status_change()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.verification_status IS DISTINCT FROM NEW.verification_status THEN
+    IF NEW.verification_status = 'verified' THEN
+      INSERT INTO notifications (user_id, lgu_id, type, title, body, payload, is_read)
+      VALUES (
+        NEW.id, NEW.lgu_id, 'verification_approved',
+        'Identity Verified!',
+        'You''re verified! You can now submit reports, service requests, and post in the forum.',
+        jsonb_build_object('user_id', NEW.id),
+        false
+      );
+    ELSIF NEW.verification_status = 'rejected' THEN
+      INSERT INTO notifications (user_id, lgu_id, type, title, body, payload, is_read)
+      VALUES (
+        NEW.id, NEW.lgu_id, 'verification_rejected',
+        'Verification Not Approved',
+        'Your verification was not approved' || COALESCE(': ' || NULLIF(NEW.rejection_reason, ''), '.') ||
+          ' You can review and resubmit.',
+        jsonb_build_object('user_id', NEW.id),
+        false
+      );
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_notify_verification_status ON users;
+CREATE TRIGGER trigger_notify_verification_status
+  AFTER UPDATE ON users FOR EACH ROW EXECUTE FUNCTION notify_verification_status_change();
 
 -- --------------------------------------------------------
 -- 3b. PROTECT verification columns from client writes.

@@ -1,23 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles } from '../theme';
+import { getNotificationsModule, resolveNotificationTarget, isNotificationNavigable } from '../utils/push';
 import { ArrowLeft2, ArrowRight2, Notification } from 'iconsax-react-native';
-
-const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient || Constants?.appOwnership === 'expo';
-
-const getNotificationsModule = () => {
-  if (isExpoGo) return null;
-  try {
-    return require('expo-notifications');
-  } catch (e) {
-    return null;
-  }
-};
 
 const Notifications = getNotificationsModule();
 
@@ -85,19 +74,14 @@ export function NotificationsScreen({ navigation }: any) {
       setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: true } : item));
     }
 
-    const payload = n.payload || {};
-
-    if (n.type === 'report_status' && payload.report_id) {
-      navigation.navigate('TrackingDetail', { id: payload.report_id, type: 'report' });
-    } else if (n.type === 'service_status' && payload.request_id) {
-      navigation.navigate('TrackingDetail', { id: payload.request_id, type: 'service' });
+    const target = resolveNotificationTarget(n.type, n.payload);
+    if (isNotificationNavigable(n.type, n.payload)) {
+      navigation.navigate(target.screen, target.params);
     }
     // other types: just mark read, stay on the screen
   };
 
-  const isNavigable = (n: any) =>
-    (n.type === 'report_status' && n.payload?.report_id) ||
-    (n.type === 'service_status' && n.payload?.request_id);
+  const isNavigable = (n: any) => isNotificationNavigable(n.type, n.payload);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>

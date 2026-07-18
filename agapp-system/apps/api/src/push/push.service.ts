@@ -32,15 +32,21 @@ export class PushService implements OnModuleInit {
         if (!newNotification || !newNotification.user_id) return;
         
         try {
-          // Fetch the user's expo push token
+          // Fetch the user's expo push token + push preference
           const { data: user, error } = await this.supabase
             .from('users')
-            .select('expo_push_token')
+            .select('expo_push_token, notification_preferences')
             .eq('id', newNotification.user_id)
             .single();
 
           if (error || !user || !user.expo_push_token) {
              return; // User has no push token
+          }
+
+          // Default to enabled if the preference was never set (matches the
+          // column's own DB default of {push: true, ...}).
+          if (user.notification_preferences?.push === false) {
+            return;
           }
 
           const pushToken = user.expo_push_token;

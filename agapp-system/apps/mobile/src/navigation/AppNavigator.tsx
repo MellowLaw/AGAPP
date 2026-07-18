@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +36,32 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+// Lets code outside the navigation tree (the push notification tap handler in
+// App.tsx) navigate without needing a prop-drilled navigation object.
+export const navigationRef = createNavigationContainerRef<any>();
+
+// A navigation target queued by a push tap that arrived before it was safe to
+// apply — either auth hadn't finished loading yet, or NavigationContainer
+// itself hadn't mounted yet (it's replaced by a fixed-duration splash screen
+// below, independent of auth). Whichever of those two finishes LAST is
+// responsible for applying it: App.tsx's PushNotificationRouter calls this
+// when auth becomes ready, and this file's <NavigationContainer onReady>
+// calls it when the navigator becomes ready — so the race between "auth
+// ready" and "navigator ready" can't silently drop the navigation either way.
+type PendingNavTarget = { screen: string; params?: any };
+let pendingNavTarget: PendingNavTarget | null = null;
+
+export function queueOrApplyNavigation(target: PendingNavTarget, authReady: boolean) {
+  pendingNavTarget = target;
+  tryApplyPendingNavigation(authReady);
+}
+
+export function tryApplyPendingNavigation(authReady: boolean) {
+  if (!pendingNavTarget || !authReady || !navigationRef.isReady()) return;
+  (navigationRef.navigate as any)(pendingNavTarget.screen, pendingNavTarget.params);
+  pendingNavTarget = null;
+}
 
 /**
  * AuthGate — shown on submit-style tabs when the user is browsing without
@@ -429,7 +455,10 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => tryApplyPendingNavigation(!!(session && selectedLgu))}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
           <>

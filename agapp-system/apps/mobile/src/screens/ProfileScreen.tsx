@@ -26,6 +26,7 @@ import {
   Location as LocationIcon,
   Camera,
   Sms,
+  Notification,
 } from 'iconsax-react-native';
 
 const ICON_SIZE = 26; // no more icon-circle backdrop, so icons need to read on their own
@@ -65,6 +66,27 @@ export function ProfileScreen({ navigation }: any) {
     }
     const { status } = await Location.requestForegroundPermissionsAsync();
     setGpsEnabled(status === 'granted');
+  };
+
+  const pushEnabled = profile?.notification_preferences?.push ?? true;
+  const handleTogglePush = async () => {
+    if (!profile?.id) return;
+    const next = !pushEnabled;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          notification_preferences: {
+            ...(profile?.notification_preferences || {}),
+            push: next,
+          },
+        })
+        .eq('id', profile.id);
+      if (error) throw error;
+      await refreshProfile();
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update push notification setting.', 'error');
+    }
   };
 
   const openHistory = async () => {
@@ -393,6 +415,7 @@ export function ProfileScreen({ navigation }: any) {
 
             { category: 'Preferences', label: 'Appearance', icon: 'color-palette-outline', iconType: 'ionicons' as const, isToggle: true, toggleValue: isDarkMode, onPress: () => setIsDarkMode(!isDarkMode), keywords: ['appearance', 'dark mode', 'theme', 'light mode', 'style', 'color', 'preferences'] },
             { category: 'Preferences', label: 'GPS Access', icon: LocationIcon, iconType: 'iconsax' as const, isToggle: true, toggleValue: gpsEnabled, onPress: handleToggleGps, keywords: ['gps', 'location', 'map', 'permission', 'tracking', 'access', 'preferences'] },
+            { category: 'Preferences', label: 'Push Notifications', icon: Notification, iconType: 'iconsax' as const, isToggle: true, toggleValue: pushEnabled, onPress: handleTogglePush, keywords: ['push', 'notifications', 'alerts', 'preferences'] },
 
             { category: 'Support', label: 'Facebook', icon: 'facebook', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().facebook), keywords: ['facebook', 'social', 'contact', 'support', 'lgu'] },
             { category: 'Support', label: 'YouTube', icon: 'youtube', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().youtube), keywords: ['youtube', 'video', 'channel', 'support', 'lgu'] },
