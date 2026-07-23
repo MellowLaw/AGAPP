@@ -32,6 +32,7 @@ import { SplashGreetingScreen } from '../screens/SplashGreetingScreen';
 import { EmailOtpScreen } from '../screens/EmailOtpScreen';
 import { CitizenGuideScreen } from '../screens/CitizenGuideScreen';
 import { NewsScreen } from '../screens/NewsScreen';
+import { BannedScreen } from '../screens/BannedScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -422,7 +423,7 @@ function MainTabNavigator() {
 }
 
 export function AppNavigator() {
-  const { session, selectedLgu, guestLgu, hasCompletedGuestLguChoice, isLoading } = useAuth();
+  const { session, profile, selectedLgu, guestLgu, hasCompletedGuestLguChoice, isLoading } = useAuth();
   const { T } = useTheme();
 
   const [onboardingLoaded, setOnboardingLoaded] = React.useState(false);
@@ -487,6 +488,11 @@ export function AppNavigator() {
           </>
         ) : !selectedLgu ? (
           <Stack.Screen name="LguSelect" component={LguSelectScreen} />
+        ) : profile?.moderation_status === 'banned' ? (
+          <>
+            <Stack.Screen name="Banned" component={BannedScreen} />
+            <Stack.Screen name="LogoutConfirm" component={LogoutConfirmScreen} />
+          </>
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />

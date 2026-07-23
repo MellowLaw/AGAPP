@@ -12,12 +12,23 @@ import { lguIdFromName } from '@/lib/lgu';
 import {
   Personalcard, User, Clock, TickSquare, CloseCircle, Eye,
   SearchNormal1, Danger, Sms, Location, DocumentText, Camera,
-  InfoCircle, ShieldTick, Warning2,
+  InfoCircle, ShieldTick, Warning2, FilterSearch, Sort,
 } from 'iconsax-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
 type TabKey = 'pending' | 'approved' | 'rejected' | 'all';
+type SortOption = 'newest' | 'lowest_ai' | 'highest_ai';
+type FlagFilter = 'all' | 'high_trust' | 'low_trust' | 'flagged';
+
+interface AiResult {
+  id: string;
+  request_id?: string;
+  face_score: number | null;
+  confidence_score: number | null;
+  flags: string[];
+  processing_ms: number | null;
+}
 
 interface VerificationRequest {
   id: string;
@@ -34,14 +45,7 @@ interface VerificationRequest {
   created_at: string;
   citizen_name?: string;
   citizen_email?: string;
-}
-
-interface AiResult {
-  id: string;
-  face_score: number | null;
-  confidence_score: number | null;
-  flags: string[];
-  processing_ms: number | null;
+  ai_result?: AiResult | null;
 }
 
 // ── Preset rejection reasons ───────────────────────────────────────────────
@@ -93,12 +97,14 @@ function ScoreBar({ label, score }: { label: string; score: number | null }) {
   );
 }
 
-// ── Component ─────────────────────────────────────────────────────────────
-
 export default function VerificationsPage() {
   const [requests, setRequests]           = useState<VerificationRequest[]>([]);
   const [activeTab, setActiveTab]         = useState<TabKey>('pending');
   const [searchQuery, setSearchQuery]     = useState('');
+  const [minConfidence, setMinConfidence] = useState<number>(0);
+  const [flagFilter, setFlagFilter]       = useState<FlagFilter>('all');
+  const [sortBy, setSortBy]               = useState<SortOption>('newest');
+
   const [selectedRequest, setSelectedRequest] = useState<VerificationRequest | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason]   = useState('');
@@ -137,18 +143,28 @@ export default function VerificationsPage() {
 
       const rows = data || [];
       const userIds = Array.from(new Set(rows.map(r => r.user_id)));
+      const requestIds = rows.map(r => r.id);
+
+      const [usersRes, aiRes] = await Promise.all([
+        userIds.length > 0 ? supabase.from('users').select('id, name, email').in('id', userIds) : Promise.resolve({ data: [] }),
+        requestIds.length > 0 ? supabase.from('verification_ai_results').select('*').in('request_id', requestIds) : Promise.resolve({ data: [] }),
+      ]);
+
       const usersById = new Map<string, { name: string | null; email: string | null }>();
-      if (userIds.length > 0) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, name, email')
-          .in('id', userIds);
-        for (const u of users || []) usersById.set(u.id, { name: u.name, email: u.email });
-      }
+      for (const u of usersRes.data || []) usersById.set(u.id, { name: u.name, email: u.email });
+
+      const aiByRequestId = new Map<string, AiResult>();
+      for (const ai of aiRes.data || []) aiByRequestId.set((ai as any).request_id, ai as AiResult);
 
       const enriched: VerificationRequest[] = rows.map(req => {
         const u = usersById.get(req.user_id);
-        return { ...req, citizen_name: u?.name || 'Unknown Citizen', citizen_email: u?.email || '' };
+        const ai = aiByRequestId.get(req.id);
+        return {
+          ...req,
+          citizen_name: u?.name || 'Unknown Citizen',
+          citizen_email: u?.email || '',
+          ai_result: ai || null,
+        };
       });
       setRequests(enriched);
     } catch (err: any) {
@@ -175,6 +191,10 @@ export default function VerificationsPage() {
   };
 
   const loadAiResult = async (req: VerificationRequest) => {
+    if (req.ai_result) {
+      setAiResult(req.ai_result);
+      return;
+    }
     setAiLoading(true);
     setAiResult(null);
     try {
@@ -192,7 +212,7 @@ export default function VerificationsPage() {
     setSelectedRequest(req);
     setIdImageUrl(null);
     setSelfieUrl(null);
-    setAiResult(null);
+    setAiResult(req.ai_result || null);
     loadSignedImages(req);
     loadAiResult(req);
   };
@@ -208,7 +228,6 @@ export default function VerificationsPage() {
     setCustomReason('');
   };
 
-  // Best-effort PII purge after a decision is made
   const purgeVerificationPhotos = async (req: VerificationRequest) => {
     const paths = [req.id_document_path, req.selfie_path].filter(Boolean);
     if (paths.length === 0) return;
@@ -264,17 +283,63 @@ export default function VerificationsPage() {
     }
   };
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
+  // ── Filtering & Sorting ────────────────────────────────────────────────────
 
-  const filteredRequests = requests.filter(req => {
-    const matchesTab    = activeTab === 'all' || req.status === activeTab;
-    const matchesSearch =
-      (req.citizen_name    || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.citizen_email   || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.declared_barangay || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.id_type         || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTab && matchesSearch;
-  });
+  const filteredRequests = useMemo(() => {
+    let list = requests.filter(req => {
+      // Tab filter
+      const matchesTab = activeTab === 'all' || req.status === activeTab;
+      if (!matchesTab) return false;
+
+      // Text search
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q || (
+        (req.citizen_name    || '').toLowerCase().includes(q) ||
+        (req.citizen_email   || '').toLowerCase().includes(q) ||
+        (req.declared_barangay || '').toLowerCase().includes(q) ||
+        (req.id_type         || '').toLowerCase().includes(q)
+      );
+      if (!matchesSearch) return false;
+
+      // Minimum AI Confidence slider filter
+      const confidence = req.ai_result?.confidence_score !== null && req.ai_result?.confidence_score !== undefined
+        ? req.ai_result.confidence_score * 100
+        : null;
+
+      if (minConfidence > 0) {
+        if (confidence === null || confidence < minConfidence) return false;
+      }
+
+      // Risk Preset Filter
+      if (flagFilter === 'high_trust') {
+        if (confidence === null || confidence < 80) return false;
+      } else if (flagFilter === 'low_trust') {
+        if (confidence === null || confidence >= 60) return false;
+      } else if (flagFilter === 'flagged') {
+        if ((req.ai_result?.flags?.length ?? 0) === 0) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'lowest_ai') {
+        const scoreA = a.ai_result?.confidence_score ?? 1.1; // nulls go last
+        const scoreB = b.ai_result?.confidence_score ?? 1.1;
+        return scoreA - scoreB;
+      }
+      if (sortBy === 'highest_ai') {
+        const scoreA = a.ai_result?.confidence_score ?? -1;
+        const scoreB = b.ai_result?.confidence_score ?? -1;
+        return scoreB - scoreA;
+      }
+      // Newest first default
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return list;
+  }, [requests, activeTab, searchQuery, minConfidence, flagFilter, sortBy]);
 
   const tabCounts = useMemo(() => ({
     pending:  requests.filter(r => r.status === 'pending').length,
@@ -296,14 +361,12 @@ export default function VerificationsPage() {
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-  // ── Confidence label ──────────────────────────────────────────────────────
-
   const confidenceLabel = (score: number | null) => {
     if (score === null) return null;
-    if (score >= 0.80) return { text: 'High confidence', color: 'text-green-600 dark:text-green-400',  bg: 'bg-green-500/10',  icon: '🟢' };
-    if (score >= 0.60) return { text: 'Medium — review carefully', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-500/10', icon: '🟡' };
-    if (score >= 0.40) return { text: 'Low — scrutinize closely',  color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10', icon: '🟠' };
-    return { text: 'Very low — likely mismatch', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: '🔴' };
+    if (score >= 0.80) return { text: 'High confidence', color: 'text-green-600 dark:text-green-400',  bg: 'bg-green-500/10' };
+    if (score >= 0.60) return { text: 'Medium — review carefully', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-500/10' };
+    if (score >= 0.40) return { text: 'Low — scrutinize closely',  color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10' };
+    return { text: 'Very low — likely mismatch', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' };
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -329,17 +392,123 @@ export default function VerificationsPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <Card noBorder padding="sm" className="mb-6">
-        <div className="relative">
-          <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search by name, email, barangay, or ID type..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
-          />
+      {/* ── AI CONFIDENCE METER & FILTER TOOLBAR ── */}
+      <Card noBorder padding="sm" className="mb-6 space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          
+          {/* Text Search */}
+          <div className="relative flex-1 min-w-[220px]">
+            <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search by name, email, barangay, or ID type..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          {/* Interactive AI Match Confidence Slider */}
+          <div className="flex items-center gap-3 bg-surface border border-theme px-3 py-1.5 rounded-md min-w-[240px]">
+            <ShieldTick variant="Bold" className="w-4 h-4 text-accent shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center text-xs font-medium mb-0.5">
+                <span className="text-text-muted text-[11px]">Min AI Match:</span>
+                <span className="text-accent font-mono font-bold text-xs">{minConfidence}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={minConfidence}
+                onChange={e => setMinConfidence(Number(e.target.value))}
+                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-accent"
+                style={{
+                  background: `linear-gradient(to right, var(--accent) ${minConfidence}%, rgba(255, 255, 255, 0.15) ${minConfidence}%)`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Sort className="w-4 h-4 text-text-muted shrink-0" />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortOption)}
+              className="px-3 py-2 bg-surface border border-theme rounded-md text-xs font-semibold text-text-primary focus:outline-none focus:border-accent"
+            >
+              <option value="newest">Sort: Newest First</option>
+              <option value="lowest_ai">Sort: Lowest AI Match First</option>
+              <option value="highest_ai">Sort: Highest AI Match First</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Quick Filter Preset Chips */}
+        <div className="pt-2 border-t border-theme flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-text-muted font-medium mr-1 flex items-center gap-1">
+              <FilterSearch className="w-3.5 h-3.5" /> Filter:
+            </span>
+            
+            <button
+              onClick={() => { setFlagFilter('all'); setMinConfidence(0); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                flagFilter === 'all' && minConfidence === 0
+                  ? 'bg-text-primary text-bg font-semibold'
+                  : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
+              }`}
+            >
+              All Submissions
+            </button>
+
+            <button
+              onClick={() => { setFlagFilter('high_trust'); setMinConfidence(80); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                flagFilter === 'high_trust'
+                  ? 'bg-green-600 text-white font-semibold'
+                  : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+              High Match (≥80%)
+            </button>
+
+            <button
+              onClick={() => { setFlagFilter('low_trust'); setMinConfidence(0); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                flagFilter === 'low_trust'
+                  ? 'bg-orange-500 text-white font-semibold'
+                  : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+              Low Match (&lt;60%)
+            </button>
+
+            <button
+              onClick={() => { setFlagFilter('flagged'); setMinConfidence(0); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                flagFilter === 'flagged'
+                  ? 'bg-red-600 text-white font-semibold'
+                  : 'bg-surface border border-theme text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <Danger className="w-3.5 h-3.5 shrink-0" />
+              AI Risk Flagged
+            </button>
+          </div>
+
+          {minConfidence > 0 || flagFilter !== 'all' || searchQuery ? (
+            <button
+              onClick={() => { setMinConfidence(0); setFlagFilter('all'); setSearchQuery(''); }}
+              className="text-xs text-accent hover:underline font-medium"
+            >
+              Reset Filters
+            </button>
+          ) : null}
         </div>
       </Card>
 
@@ -350,85 +519,108 @@ export default function VerificationsPage() {
         <Card noBorder><div className="text-center py-8 text-red-500 text-sm">{loadError}</div></Card>
       ) : (
         <div className="space-y-4">
-          {filteredRequests.map(req => (
-            <Card noBorder key={req.id}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
-                    <User variant="Bold" className="w-5 h-5 text-text-muted" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
-                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                      <Sms className="w-3 h-3" />
-                      {req.citizen_email || 'No email'}
-                    </div>
-                  </div>
-                </div>
-                {statusBadge(req.status)}
-              </div>
+          {filteredRequests.map(req => {
+            const aiScore = req.ai_result?.confidence_score !== null && req.ai_result?.confidence_score !== undefined
+              ? Math.round(req.ai_result.confidence_score * 100)
+              : null;
+            const flags = req.ai_result?.flags || [];
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
-                <div className="flex items-center gap-2 text-text-muted">
-                  <DocumentText className="w-4 h-4 flex-shrink-0" />
-                  <div>
-                    <p className="text-text-faint text-xs">ID Type</p>
-                    <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-text-muted">
-                  <Location className="w-4 h-4 flex-shrink-0" />
-                  <div>
-                    <p className="text-text-faint text-xs">Address</p>
-                    <p className="text-text-primary font-medium text-xs leading-tight line-clamp-2">{req.declared_barangay || 'N/A'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-text-muted">
-                  <Clock variant="Bold" className="w-4 h-4 flex-shrink-0" />
-                  <div>
-                    <p className="text-text-faint text-xs">Submitted</p>
-                    <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
-                  </div>
-                </div>
-                {req.rejection_reason && (
-                  <div className="flex items-center gap-2">
-                    <Danger className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+            return (
+              <Card noBorder key={req.id}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
+                      <User variant="Bold" className="w-5 h-5 text-text-muted" />
+                    </div>
                     <div>
-                      <p className="text-text-faint text-xs">Rejection</p>
-                      <p className="text-red-600 dark:text-red-400 font-medium text-xs">{req.rejection_reason}</p>
+                      <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
+                      <div className="flex items-center gap-2 text-sm text-text-muted">
+                        <Sms className="w-3 h-3" />
+                        {req.citizen_email || 'No email'}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+                  
+                  <div className="flex items-center gap-3">
+                    {/* Live AI Match Score Pill on Card */}
+                    {aiScore !== null && (
+                      <div className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 border ${
+                        aiScore >= 80 ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                        aiScore >= 60 ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' :
+                        'bg-red-500/10 text-red-600 border-red-500/20'
+                      }`}>
+                        <ShieldTick variant="Bold" className="w-3.5 h-3.5" />
+                        AI Match: {aiScore}%
+                      </div>
+                    )}
+                    {statusBadge(req.status)}
+                  </div>
+                </div>
 
-              <div className="flex gap-3 pt-3 border-t border-theme">
-                {req.status === 'pending' ? (
-                  <>
-                    <Button variant="primary" onClick={() => handleViewDetails(req)}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
+                  <div className="flex items-center gap-2 text-text-muted">
+                    <DocumentText className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <p className="text-text-faint text-xs">ID Type</p>
+                      <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-text-muted">
+                    <Location className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <p className="text-text-faint text-xs">Address</p>
+                      <p className="text-text-primary font-medium text-xs leading-tight line-clamp-2">{req.declared_barangay || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-text-muted">
+                    <Clock variant="Bold" className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <p className="text-text-faint text-xs">Submitted</p>
+                      <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
+                    </div>
+                  </div>
+                  {flags.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Danger className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                      <div>
+                        <p className="text-text-faint text-xs">AI Risk Flags</p>
+                        <p className="text-red-600 dark:text-red-400 font-medium text-xs truncate max-w-[140px]" title={flags.join(', ')}>
+                          {flags.join(', ').replace(/_/g, ' ')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-3 border-t border-theme">
+                  {req.status === 'pending' ? (
+                    <>
+                      <Button variant="primary" onClick={() => handleViewDetails(req)}>
+                        <Eye variant="Bold" className="w-4 h-4 mr-1" />
+                        Review &amp; Decide
+                      </Button>
+                      <Button variant="danger" onClick={() => { setSelectedRequest(req); setShowRejectModal(true); }}>
+                        <CloseCircle className="w-4 h-4 mr-1" />
+                        Reject
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="ghost" onClick={() => handleViewDetails(req)}>
                       <Eye variant="Bold" className="w-4 h-4 mr-1" />
-                      Review &amp; Decide
+                      View Details
                     </Button>
-                    <Button variant="danger" onClick={() => { setSelectedRequest(req); setShowRejectModal(true); }}>
-                      <CloseCircle className="w-4 h-4 mr-1" />
-                      Reject
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" onClick={() => handleViewDetails(req)}>
-                    <Eye variant="Bold" className="w-4 h-4 mr-1" />
-                    View Details
-                  </Button>
-                )}
-              </div>
-            </Card>
-          ))}
+                  )}
+                </div>
+              </Card>
+            );
+          })}
 
           {filteredRequests.length === 0 && (
             <Card noBorder>
               <div className="text-center py-8 text-text-muted">
                 <Personalcard className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No verification requests found</p>
-                {activeTab === 'pending' && <p className="text-sm mt-1">All caught up! No pending requests.</p>}
+                <p className="font-semibold text-text-primary">No matching verification requests found</p>
+                <p className="text-xs text-text-muted mt-1">Try adjusting your Minimum AI Confidence slider or filters.</p>
               </div>
             </Card>
           )}
@@ -577,7 +769,6 @@ export default function VerificationsPage() {
                       const label = confidenceLabel(aiResult.confidence_score);
                       return label ? (
                         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${label.bg}`}>
-                          <span className="text-sm">{label.icon}</span>
                           <span className={`text-xs font-medium ${label.color}`}>{label.text}</span>
                         </div>
                       ) : null;

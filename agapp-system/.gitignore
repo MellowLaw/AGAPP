@@ -54,5 +54,7 @@ temp/
 # TypeScript build cache (regenerated on every build)
 *.tsbuildinfo
 
-# Expo device cache (machine-specific, auto-generated)
+# Expo device cache and native folders (machine-specific, auto-generated)
 .expo/
+android/
+ios/

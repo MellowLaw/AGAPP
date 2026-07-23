@@ -59,11 +59,15 @@ type FaqEntry = { question: string; answer: string; source: string; keywords: st
 // should only ever touch `citizen-ids`, never any other bucket).
 function isOwnStorageUrl(photoUrl: string, bucket?: string): boolean {
   try {
+    if (!photoUrl || typeof photoUrl !== 'string') return false;
     const base = new URL(process.env.SUPABASE_URL || '').origin;
     const seg = bucket ? `${bucket}/` : '';
     return (
       photoUrl.startsWith(`${base}/storage/v1/object/public/${seg}`) ||
-      photoUrl.startsWith(`${base}/storage/v1/object/sign/${seg}`)
+      photoUrl.startsWith(`${base}/storage/v1/object/sign/${seg}`) ||
+      photoUrl.startsWith(`${base}/storage/v1/object/signed/${seg}`) ||
+      photoUrl.startsWith(`${base}/storage/v1/object/authenticated/${seg}`) ||
+      (photoUrl.startsWith(base) && photoUrl.includes('/storage/v1/object/') && (!bucket || photoUrl.includes(`/${bucket}/`)))
     );
   } catch {
     return true;

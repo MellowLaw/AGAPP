@@ -173,6 +173,7 @@ export function ForumScreen({ navigation, route }: any) {
   const [replyTarget, setReplyTarget] = useState<any | null>(null);
   const [showPresetsInChat, setShowPresetsInChat] = useState(false);
   const verified = isVerified(profile);
+  const isRestricted = profile?.moderation_status === 'restricted';
   
   const commentScrollViewRef = useRef<ScrollView>(null);
 
@@ -348,6 +349,10 @@ export function ForumScreen({ navigation, route }: any) {
   };
 
   const handleCreatePost = async () => {
+    if (isRestricted) {
+      showToast('Your account is restricted from posting in the forum.', 'error');
+      return;
+    }
     if (!newTitle.trim() || !newContent.trim() || !profile || !selectedLgu) return;
     setLoading(true);
 
@@ -399,6 +404,10 @@ export function ForumScreen({ navigation, route }: any) {
   };
 
   const handleCreateComment = async (customText?: string) => {
+    if (isRestricted) {
+      showToast('Your account is restricted from commenting in the forum.', 'error');
+      return;
+    }
     const textToSend = customText ?? newComment;
     if (!textToSend.trim() || !profile || !selectedPost) return;
     if (!verified) {
@@ -508,8 +517,16 @@ export function ForumScreen({ navigation, route }: any) {
       return;
     }
 
+    const currentlyLiked = likedPostIds.includes(postId);
+    // Restricted users can't add new likes (the DB guard blocks it too) — show a
+    // clear message instead of a silent revert. Removing an existing like is fine.
+    if (!currentlyLiked && isRestricted) {
+      showToast('Your account is restricted from interacting in the forum.', 'error');
+      return;
+    }
+
     try {
-      if (likedPostIds.includes(postId)) {
+      if (currentlyLiked) {
         const { error } = await supabase
           .from('forum_post_likes')
           .delete()
@@ -1250,6 +1267,30 @@ export function ForumScreen({ navigation, route }: any) {
             />
           }
         >
+          {isRestricted && (
+            <View style={{
+              marginBottom: 16,
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: isDarkMode ? 'rgba(251, 191, 36, 0.12)' : '#FEF3C7',
+              borderWidth: 1,
+              borderColor: '#F59E0B',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+            }}>
+              <Danger size={24} color="#B45309" variant="Bold" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
+                  Account Restricted
+                </Text>
+                <Text style={{ color: '#B45309', fontFamily: 'Inter-Medium', fontSize: 12, lineHeight: 16, marginTop: 2 }}>
+                  Your account is restricted from posting or commenting in the forum.
+                  {profile?.moderation_reason ? ` Reason: ${profile.moderation_reason}` : ''}
+                </Text>
+              </View>
+            </View>
+          )}
           {/* 1. Trending Threads (Horizontal small cards - only in "For you", empty search, and "All" tag filter) */}
           {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
             <View style={{ marginBottom: 24 }}>
@@ -1545,6 +1586,10 @@ export function ForumScreen({ navigation, route }: any) {
           onPress={() => {
             if (!session) {
               navigation.navigate('Login', { initialMode: 'register' });
+              return;
+            }
+            if (isRestricted) {
+              showToast('Your account is restricted from posting in the forum.', 'error');
               return;
             }
             if (!verified) {

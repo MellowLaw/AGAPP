@@ -23,6 +23,7 @@
     "dotenv": "^16.4.5",
     "expo-server-sdk": "^6.1.0",
     "jpeg-js": "^0.4.4",
+    "pg": "^8.22.0",
     "pngjs": "^7.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

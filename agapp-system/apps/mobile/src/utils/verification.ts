@@ -25,20 +25,25 @@ export const ID_TYPES = [
  */
 export const BARANGAYS: Record<string, string[]> = {
   'liliw-laguna': [
-    'Poblacion I', 'Poblacion II', 'Poblacion III', 'Poblacion IV',
-    'Analiw', 'Bagtak', 'Buboy', 'Bunga', 'Calumpang', 'Ibabang Calumpang',
-    'Ilayang Bulo', 'Ilayang San Roque', 'Layugan', 'Luksuhin Ilaya',
-    'Malalayat', 'Moog', 'Niing', 'Novaliches', 'Olla', 'San Antonio',
-    'San Antonio I', 'San Isidro', 'San Jose', 'San Juan I', 'San Juan II',
-    'San Roque I', 'Santa Lucia', 'Santo Tomas', 'Turbina',
+    'Bagong Anyo (Pob.)', 'Bayate', 'Bongkol', 'Bubukal', 'Cabuyew', 'Calumpang',
+    'Culoy', 'Dagatan', 'Daniw', 'Dita', 'Ibabang Palina', 'Ibabang San Roque',
+    'Ibabang Sungi', 'Ibabang Taykin', 'Ilayang Palina', 'Ilayang San Roque',
+    'Ilayang Sungi', 'Ilayang Taykin', 'Kanlurang Bukal', 'Laguan', 'Luquin',
+    'Malabo-Kalantukan', 'Masikap (Pob.)', 'Maslun (Pob.)', 'Mojon', 'Novaliches',
+    'Oples', 'Pag-Asa (Pob.)', 'Palayan', 'Rizal (Pob.)', 'San Isidro',
+    'Silangang Bukal', 'Tuy-Baanan',
   ],
   'nagcarlan-laguna': [
-    'Poblacion I', 'Poblacion II', 'Poblacion III', 'Poblacion IV',
-    'Bae', 'Balimbing', 'Banilad', 'Banos', 'Buboy', 'Buenavista',
-    'Bukal', 'Cabuyew', 'Calumpang', 'Kanluran Calumpang', 'Silangan Calumpang',
-    'Casile', 'Ibabang Nasigbit', 'Ilayang Nasigbit', 'Manaol', 'Marcelo',
-    'Malaiba', 'Municion', 'Palayan', 'Banago', 'Balayong', 'Barkadahan',
-    'Talahib', 'Taytay', 'Tipacan', 'Wakat',
+    'Abo', 'Alibungbungan', 'Alumbrado', 'Balayong', 'Balimbing', 'Balinacon',
+    'Bambang', 'Banago', 'Banca-banca', 'Bangcuro', 'Banilad', 'Bayaquitos',
+    'Buboy', 'Buenavista', 'Buhanginan', 'Bukal', 'Bunga', 'Cabuyew',
+    'Calumpang', 'Kanluran Kabubuhayan', 'Kanluran Lazaan', 'Labangan', 'Lagulo',
+    'Lawaguin', 'Maiit', 'Malaya', 'Malinao', 'Manaol', 'Maravilla',
+    'Nagcalbang', 'Oples', 'Palayan', 'Palina', 'Poblacion I (Pob.)',
+    'Poblacion II (Pob.)', 'Poblacion III (Pob.)', 'Sabang', 'San Francisco',
+    'Santa Lucia', 'Sibulan', 'Silangan Ilaya', 'Silangan Kabubuhayan',
+    'Silangan Lazaan', 'Silangan Napapatid', 'Sinipian', 'Sulsuguin',
+    'Talahib', 'Talangan', 'Taytay', 'Tipacan', 'Wakat', 'Yukos',
   ],
 };
 

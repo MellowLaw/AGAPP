@@ -31,6 +31,11 @@ export class PushService implements OnModuleInit {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
         const newNotification = payload.new;
         if (!newNotification || !newNotification.user_id) return;
+        // Advisory rows are pushed as ONE batched Expo send by Channel 2 (an
+        // advisory hits every citizen at once — batching is far fewer HTTP
+        // calls than one send per row). The rows still exist here for the
+        // in-app list; we just don't double-push them.
+        if (newNotification.type === 'advisory') return;
 
         try {
           const { data: user, error } = await this.supabase
@@ -64,8 +69,16 @@ export class PushService implements OnModuleInit {
       })
       .subscribe();
 
-    // --- Channel 2: advisory publishes → broadcast OS push to ALL LGU citizens ---
-    this.logger.log('Initializing advisory broadcast push listener on news_announcements table...');
+    // --- Channel 2: advisory publishes → in-app rows + ONE batched OS push ---
+    // When an LGU publishes an advisory we (a) INSERT a notifications row per
+    // active citizen so it appears in each citizen's in-app list and is
+    // tappable, and (b) send ONE chunked Expo push to all of their tokens at
+    // once (Expo batches up to 100 recipients per HTTP call — far fewer calls
+    // than one send per citizen). Channel 1 deliberately SKIPS advisory rows so
+    // they aren't double-pushed. Both the row payload and the push data carry
+    // { advisory_id } so a tap deep-links to the article (see the citizen app's
+    // resolveNotificationTarget / App.tsx push-tap router).
+    this.logger.log('Initializing advisory notification listener on news_announcements table...');
 
     this.supabase
       .channel('advisory-broadcast-channel')
@@ -73,7 +86,10 @@ export class PushService implements OnModuleInit {
         const row = payload.new as any;
         const oldRow = payload.old as any;
 
-        // Only fire when type = advisory and status just became "published"
+        // Only fire when type = advisory and status just became "published".
+        // (Requires news_announcements REPLICA IDENTITY FULL so oldRow.status is
+        // present on UPDATE — see supabase/schema.sql; otherwise this would
+        // re-fire on every edit/view of a published advisory.)
         const isAdvisory = row?.type === 'advisory';
         const justPublished =
           row?.status === 'published' &&
@@ -81,20 +97,20 @@ export class PushService implements OnModuleInit {
 
         if (!isAdvisory || !justPublished) return;
 
-        this.logger.log(`Advisory published: "${row.title}" — broadcasting push to all citizens of LGU ${row.lgu_id}`);
+        this.logger.log(`Advisory published: "${row.title}" — notifying citizens of LGU ${row.lgu_id}`);
 
         try {
-          // Fetch all active citizens with a push token for this LGU
+          // Active citizens of this LGU, with token + push preference for the
+          // batched send.
           const { data: citizens, error } = await this.supabase
             .from('users')
-            .select('expo_push_token, notification_preferences')
+            .select('id, expo_push_token, notification_preferences')
             .eq('role', 'CITIZEN')
             .eq('lgu_id', row.lgu_id)
-            .eq('is_active', true)
-            .not('expo_push_token', 'is', null);
+            .eq('is_active', true);
 
           if (error || !citizens || citizens.length === 0) {
-            this.logger.warn(`No citizens with push tokens found for LGU ${row.lgu_id}`);
+            this.logger.warn(`No active citizens found for LGU ${row.lgu_id}`);
             return;
           }
 
@@ -108,29 +124,45 @@ export class PushService implements OnModuleInit {
             .trim()
             .slice(0, 180);
 
+          const title = `⚠️ Advisory: ${row.title}`;
+          const body = plainBody || 'New advisory from your LGU.';
+
+          // (a) In-app rows for every citizen (Channel 1 skips pushing these).
+          const notificationRows = citizens.map((c) => ({
+            user_id: c.id,
+            lgu_id: row.lgu_id,
+            type: 'advisory',
+            title,
+            body,
+            payload: { advisory_id: row.id },
+            is_read: false,
+          }));
+          const { error: insErr } = await this.supabase.from('notifications').insert(notificationRows);
+          if (insErr) {
+            this.logger.error(`Failed to insert advisory notifications: ${insErr.message}`);
+            // don't return — still attempt the push below
+          }
+
+          // (b) One batched push to all valid, opted-in tokens.
           const messages: ExpoPushMessage[] = citizens
-            .filter(c => {
-              if (!Expo.isExpoPushToken(c.expo_push_token)) return false;
-              if (c.notification_preferences?.push === false) return false;
-              return true;
-            })
-            .map(c => ({
+            .filter((c) => Expo.isExpoPushToken(c.expo_push_token) && c.notification_preferences?.push !== false)
+            .map((c) => ({
               to: c.expo_push_token,
               sound: 'default' as const,
-              title: `⚠️ Advisory: ${row.title}`,
-              body: plainBody || 'New advisory from your LGU.',
+              title,
+              body,
               data: { type: 'advisory', advisory_id: row.id },
             }));
 
           if (messages.length === 0) {
-            this.logger.warn('No valid tokens to broadcast advisory push to.');
+            this.logger.warn(`Advisory "${row.title}": no valid opted-in tokens to push.`);
             return;
           }
 
           await this.sendChunked(messages);
-          this.logger.log(`Advisory push broadcast sent to ${messages.length} citizens.`);
+          this.logger.log(`Advisory "${row.title}": ${notificationRows.length} in-app notice(s), batched push to ${messages.length} token(s).`);
         } catch (e) {
-          this.logger.error(`Failed to broadcast advisory push: ${e}`);
+          this.logger.error(`Failed to process advisory: ${e}`);
         }
       })
       .subscribe();

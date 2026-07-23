@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll, InfoCircle } from 'iconsax-react';
+import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll, InfoCircle, People } from 'iconsax-react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
@@ -44,6 +44,7 @@ const LGU_ADMIN_NAV: NavItem[] = [
   { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum' },
   { label: 'Facilities', href: '/lgu/facilities', icon: Location },
   { label: 'Citizen Guide', href: '/lgu/citizen-guide', icon: InfoCircle },
+  { label: 'Citizens & Moderation', href: '/lgu/citizens', icon: People, section: 'citizens' },
   { label: 'Verifications', href: '/lgu/verifications', icon: Personalcard, section: 'verifications' },
   { label: 'Settings', href: '/lgu/settings', icon: Setting2 },
 ];
@@ -71,7 +72,7 @@ function NavLink({ item, active, href, count }: { item: NavItem; active: boolean
   return (
     <Link href={href} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <motion.div
-        className="relative flex items-center gap-6 pl-6 pr-4 py-3 text-[15px]"
+        className="relative flex items-center gap-6 pl-6 pr-4 py-2.5 text-[15px]"
         animate={{ scale: active ? 1.01 : 1 }}
         whileTap={{ scale: 0.98 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
@@ -151,23 +152,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   return (
     <aside className="group w-[72px] hover:w-[512px] transition-all duration-300 ease-in-out h-screen bg-gradient-to-r from-[#f6f4f1] via-[#f6f4f1]/95 via-[#f6f4f1]/75 to-transparent dark:from-[#292929] dark:via-[#292929]/95 dark:via-[#292929]/75 dark:to-transparent flex flex-col fixed left-0 top-0 z-40 overflow-hidden">
       {/* Logo */}
-      <div className="flex flex-col justify-center pl-6 pr-4 py-5 border-b border-transparent group-hover:border-theme/50 transition-colors">
+      <div className="flex flex-col justify-center pl-6 pr-4 py-5 border-b border-transparent group-hover:border-theme/50 transition-colors shrink-0">
         <AgappLogo size={44} textClassName="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap" />
         <p className="text-xs font-serif italic text-accent mt-1.5 ml-[1px] pl-[52px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
           {ROLE_LABEL[role]}
         </p>
       </div>
 
-      {/* LGU Name (if applicable) */}
-      {(role === 'lgu-admin' || role === 'lgu-personnel') && (lguName || params?.get('lguName')) && (
-        <div className="pl-[76px] pr-4 py-3 bg-transparent group-hover:bg-surface-alt/50 transition-colors whitespace-nowrap overflow-hidden opacity-0 group-hover:opacity-100 duration-300">
-          <p className="text-[10px] font-mono text-text-faint uppercase tracking-widest">Municipality</p>
-          <p className="text-sm font-medium text-text-primary truncate">{lguName || params?.get('lguName') || ''}</p>
-        </div>
-      )}
-
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto min-h-0 sidebar-nav-scroll">
         {navItems.map((item) => {
           const active = isActive(item.href);
           const href = (role === 'lgu-admin' || role === 'lgu-personnel') && lguParam
@@ -179,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
       </nav>
 
       {/* User Section */}
-      <div className="p-3 mt-auto border-t border-transparent group-hover:border-theme/50 transition-colors">
+      <div className="p-3 mt-auto border-t border-transparent group-hover:border-theme/50 transition-colors shrink-0">
         <div className="flex items-center gap-2 pl-6 py-2">
           <div className="w-8 h-8 shrink-0 rounded-full bg-accent-soft flex items-center justify-center">
             <span className="text-xs font-bold text-accent">{initials(userProfile?.name || '?')}</span>

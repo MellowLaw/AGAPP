@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-export type NavSection = 'reports' | 'services' | 'forum' | 'verifications';
+export type NavSection = 'reports' | 'services' | 'forum' | 'verifications' | 'citizens';
 export type AdminRole = 'lgu-admin' | 'super-admin' | 'lgu-personnel';
 
 const SECTION_TABLE: Record<NavSection, string> = {
@@ -12,13 +12,14 @@ const SECTION_TABLE: Record<NavSection, string> = {
   services: 'service_requests',
   forum: 'forum_posts',
   verifications: 'verification_requests',
+  citizens: 'citizen_appeals',
 };
 
 // Which nav badges apply per role — mirrors the nav items Sidebar.tsx renders
 // for each role. Super admin has no per-LGU badges in v1 (cross-LGU rollup is
 // deferred — see Docs/Planning/Plan-Admin-Notifications.md).
 export const ROLE_SECTIONS: Record<AdminRole, NavSection[]> = {
-  'lgu-admin': ['reports', 'services', 'forum', 'verifications'],
+  'lgu-admin': ['reports', 'services', 'forum', 'verifications', 'citizens'],
   'lgu-personnel': ['reports', 'services'],
   'super-admin': [],
 };
@@ -32,6 +33,7 @@ const PATH_SECTIONS: [string, NavSection][] = [
   ['/personnel/dashboard', 'services'],
   ['/lgu/forum', 'forum'],
   ['/lgu/verifications', 'verifications'],
+  ['/lgu/citizens', 'citizens'],
 ];
 
 function sectionForPath(pathname: string): NavSection | undefined {

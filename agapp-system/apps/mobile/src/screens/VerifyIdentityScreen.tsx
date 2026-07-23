@@ -28,12 +28,13 @@ import {
 
 // ── Module-level PSGC cache ─────────────────────────────────────────────────
 // Persists across remounts so the API is only called once per session.
-// Provinces and cities are keyed by their parent code.
+// Provinces, cities, and barangays are keyed by their parent code.
 const _psgcCache: {
   regions?: any[];
   provinces: Record<string, any[]>;
   cities:    Record<string, any[]>;
-} = { provinces: {}, cities: {} };
+  barangays: Record<string, any[]>;
+} = { provinces: {}, cities: {}, barangays: {} };
 
 // ── AI analysis helper ──────────────────────────────────────────────────────
 // Best-effort — never throws, always returns null on any failure.
@@ -64,7 +65,11 @@ async function runAiAnalysis(
     const tid = setTimeout(() => controller.abort(), 35000);
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-    const res = await fetch(`${apiUrl}/verification/analyze`, {
+
+    const baseUrl = apiUrl.replace(/\/+$/, '');
+    const endpoint = baseUrl.endsWith('/api') ? `${baseUrl}/verification/analyze` : `${baseUrl}/api/verification/analyze`;
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({ idPhotoSignedUrl: idUrl, selfieSignedUrl: selfieUrl }),
@@ -79,50 +84,6 @@ async function runAiAnalysis(
     return await res.json();
   } catch (err: any) {
     console.error('[runAiAnalysis] Fetch failed:', err?.message || err);
-    return null;
-  }
-}
-
-// ── OCR prefill helper ──────────────────────────────────────────────────────
-// Tries to extract a clean street address from raw OCR text.
-// Returns the best candidate or the trimmed first 200 chars as fallback.
-function parseOcrStreetAddress(text: string): string {
-  // Look for "Brgy." or "Barangay" as a delimiter — take what's before it
-  const brgyIdx = text.search(/\b(brgy\.?|barangay)\b/i);
-  if (brgyIdx > 5) {
-    const before = text.substring(0, brgyIdx).replace(/\n/g, ' ').trim();
-    if (before.length >= 4 && before.length <= 120) return before;
-  }
-  // Look for a house/lot number pattern at the start
-  const houseMatch = text.match(/^(\d+[\w\s,.-]{4,100})/m);
-  if (houseMatch) {
-    const candidate = houseMatch[0].replace(/\n/g, ' ').trim();
-    if (candidate.length <= 120) return candidate;
-  }
-  // Fallback: first 200 chars cleaned up
-  return text.replace(/\n+/g, ', ').trim().substring(0, 200);
-}
-
-// ── OCR signed-URL extract ──────────────────────────────────────────────────
-async function extractIdText(photoUrl: string, accessToken?: string | null): Promise<string | null> {
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (!apiUrl) return null;
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-    const response = await fetch(`${apiUrl}/verification/extract-id-text`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ photoUrl }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return typeof data?.text === 'string' ? data.text : null;
-  } catch {
     return null;
   }
 }
@@ -159,8 +120,6 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idFrontPath, setIdFrontPath] = useState<string | null>(null);
   const [processingIdFront, setProcessingIdFront] = useState(false);
-  const [ocrText, setOcrText] = useState<string | null>(null);
-  const [ocrNoteDismissed, setOcrNoteDismissed] = useState(false);
 
   // Selfie
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
@@ -210,13 +169,60 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const [pickerOpen, setPickerOpen] = useState<null | 'idType' | 'region' | 'province' | 'city' | 'barangay'>(null);
   const [searchText, setSearchText] = useState('');
   const [resolvedLgu, setResolvedLgu] = useState<any>(null);
+  const [showAiWarningModal, setShowAiWarningModal] = useState(false);
+
+  const getAiWarningDetails = (result: any) => {
+    if (!result) return null;
+    const flags: string[] = result.flags || [];
+    const faceScore: number | null = result.faceScore;
+
+    const hasNoFaceId = flags.some((f: string) => f.toUpperCase().includes('ID') && f.toUpperCase().includes('FACE'));
+    const hasNoFaceSelfie = flags.some((f: string) => f.toUpperCase().includes('SELFIE') && f.toUpperCase().includes('FACE'));
+    const isNoFaceGeneral = flags.some((f: string) => f.toUpperCase() === 'NO_FACE_DETECTED' || f.toUpperCase() === 'NO_FACES_DETECTED');
+    const isLowMatch = faceScore !== null && faceScore < 0.40;
+
+    if (hasNoFaceId || hasNoFaceSelfie || isNoFaceGeneral || isLowMatch) {
+      let title = 'Face Verification Alert';
+      let message = 'Our automated identity pre-check detected an issue with your photos.';
+      let category: 'no_face_id' | 'no_face_selfie' | 'no_face_both' | 'low_match' = 'low_match';
+
+      if ((hasNoFaceId && hasNoFaceSelfie) || isNoFaceGeneral) {
+        category = 'no_face_both';
+        title = 'No Face Detected';
+        message = 'We could not detect a clear face on your ID photo or selfie. Please ensure both photos are well-lit and unblurred.';
+      } else if (hasNoFaceId) {
+        category = 'no_face_id';
+        title = 'No Face Detected on ID Card';
+        message = 'We could not detect a face photo on your ID card. Please retake your ID photo in a brightly lit room without glare.';
+      } else if (hasNoFaceSelfie) {
+        category = 'no_face_selfie';
+        title = 'No Face Detected on Selfie';
+        message = 'We could not detect your face clearly on your selfie. Please face the camera directly without heavy shadows.';
+      } else if (isLowMatch) {
+        category = 'low_match';
+        title = 'Low Face Match Confidence';
+        message = `The face on your selfie matched ${Math.round((faceScore ?? 0) * 100)}% with your ID photo. Your LGU admin will manually inspect this, or you can retake a clearer selfie.`;
+      }
+
+      return { title, message, category, flags, faceScore, isSevere: hasNoFaceId || hasNoFaceSelfie || isNoFaceGeneral };
+    }
+    return null;
+  };
 
   useEffect(() => {
+    const applyLguBarangays = (lgu: any) => {
+      setResolvedLgu(lgu);
+      const list = (lgu?.barangays && Array.isArray(lgu.barangays) && lgu.barangays.length > 0)
+        ? lgu.barangays
+        : (lgu?.id && BARANGAYS[lgu.id] ? BARANGAYS[lgu.id] : DEFAULT_BARANGAYS);
+      setBarangaysList(list.map((b: any) => ({ name: typeof b === 'string' ? b : (b.name || String(b)) })));
+    };
+
     if (selectedLgu) {
-      setResolvedLgu(selectedLgu);
+      applyLguBarangays(selectedLgu);
     } else if (profile?.lgu_id) {
       supabase.from('lgus').select('*').eq('id', profile.lgu_id).single().then(({ data }) => {
-        if (data) setResolvedLgu(data);
+        if (data) applyLguBarangays(data);
       });
     }
   }, [selectedLgu, profile]);
@@ -224,6 +230,9 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const status = getVerificationStatus(profile);
   const lguId  = resolvedLgu?.id || selectedLgu?.id || profile?.lgu_id;
   const lguName = (resolvedLgu?.name || selectedLgu?.name || 'your municipality').replace('Municipality of ', '');
+
+  const inputBg = T.card;
+  const inputBorder = T.border;
 
   // Load regions on mount (with session-level caching to avoid repeated API calls)
   useEffect(() => {
@@ -306,15 +315,41 @@ export function VerifyIdentityScreen({ navigation }: any) {
     setLoadingCities(false);
   };
 
-  // When a city is selected, load the LGU's local barangay roster instead of
-  // fetching from PSGC — this ensures only barangays within the citizen's
-  // registered municipality are selectable, and removes PSGC dependency
-  // for the barangay step entirely.
-  const handleSelectCity = (code: string, name: string) => {
+  // When a city is selected from the PSGC dropdown, fetch the official PSGC barangays
+  // for THAT specific city directly from the PSGC API.
+  const handleSelectCity = async (code: string, name: string) => {
     setCityCode(code); setCityName(name);
     setBarangay('');
-    const localList = lguId && BARANGAYS[lguId] ? BARANGAYS[lguId] : DEFAULT_BARANGAYS;
-    setBarangaysList(localList.map(b => ({ name: b })));
+
+    // 1. Dynamic PSGC API lookup for the selected city/municipality (100% accurate for the chosen city)
+    try {
+      const cacheKey = `brgy_${code}`;
+      if (_psgcCache.barangays[cacheKey]) {
+        setBarangaysList(_psgcCache.barangays[cacheKey]);
+        return;
+      }
+      const res = await fetch(`https://psgc.gitlab.io/api/cities-municipalities/${code}/barangays/`);
+      if (res.ok) {
+        const data = await res.json();
+        data.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        const formatted = data.map((b: any) => ({ name: b.name }));
+        _psgcCache.barangays[cacheKey] = formatted;
+        setBarangaysList(formatted);
+        if (formatted.length > 0) return;
+      }
+    } catch (e) {
+      console.warn('[handleSelectCity] PSGC barangay fetch error:', e);
+    }
+
+    // 2. Fallback to Supabase LGU DB record if PSGC API is unavailable
+    const dbBarangays = resolvedLgu?.barangays || selectedLgu?.barangays;
+    if (dbBarangays && Array.isArray(dbBarangays) && dbBarangays.length > 0) {
+      setBarangaysList(dbBarangays.map(b => ({ name: typeof b === 'string' ? b : (b.name || String(b)) })));
+      return;
+    }
+
+    // 3. Default fallback
+    setBarangaysList(DEFAULT_BARANGAYS.map(b => ({ name: b })));
   };
 
   // ── Storage helpers ─────────────────────────────────────────────────────
@@ -330,21 +365,27 @@ export function VerifyIdentityScreen({ navigation }: any) {
     return path;
   };
 
-  const getSignedUrl = async (path: string): Promise<string | null> => {
-    try {
-      const { data } = await supabase.storage.from('citizen-ids').createSignedUrl(path, 300);
-      return data?.signedUrl || null;
-    } catch { return null; }
-  };
+  const triggerAiCheck = (idPath: string, selfieP: string) => {
+    if (!idPath || !selfieP) return;
+    setAiAnalyzing(true);
+    setAiResult(null);
+    setShowAiWarningModal(false);
 
-  // ── OCR prefill ─────────────────────────────────────────────────────────
-  const prefillFromOcr = (text: string) => {
-    // 1. Extract a 4-digit zip code
-    const zipMatch = text.match(/\b\d{4}\b/);
-    if (zipMatch && !zipCode.trim()) setZipCode(zipMatch[0]);
-
-    // 2. Extract a clean street address
-    if (!streetAddress.trim()) setStreetAddress(parseOcrStreetAddress(text));
+    runAiAnalysis(
+      idPath, selfieP,
+      session?.access_token ?? null,
+      supabase,
+      process.env.EXPO_PUBLIC_API_URL,
+    )
+      .then(result => {
+        setAiResult(result);
+        setAiAnalyzing(false);
+        const warning = getAiWarningDetails(result);
+        if (warning) {
+          setShowAiWarningModal(true);
+        }
+      })
+      .catch(() => { setAiAnalyzing(false); });
   };
 
   // ── Guided-capture completion handlers ─────────────────────────────────
@@ -362,10 +403,9 @@ export function VerifyIdentityScreen({ navigation }: any) {
       setIdFrontUri(uri);
       setIdFrontPath(path);
 
-      const signedUrl = await getSignedUrl(path);
-      if (signedUrl) {
-        const text = await extractIdText(signedUrl, session?.access_token);
-        if (text) { setOcrText(text); setOcrNoteDismissed(false); prefillFromOcr(text); }
+      // Re-trigger AI analysis if selfie is already captured
+      if (selfiePath) {
+        triggerAiCheck(path, selfiePath);
       }
     } catch (err: any) {
       showToast(`Could not upload your ID photo: ${err?.message || 'please try again.'}`, 'error');
@@ -388,18 +428,9 @@ export function VerifyIdentityScreen({ navigation }: any) {
       const path = await uploadPrivate(uri, 'selfie');
       setSelfiePath(path);
 
-      // Kick off AI analysis in background (best-effort, never blocks the flow)
+      // Re-trigger AI analysis if ID photo is already captured
       if (idFrontPath) {
-        setAiAnalyzing(true);
-        setAiResult(null);
-        runAiAnalysis(
-          idFrontPath, path,
-          session?.access_token ?? null,
-          supabase,
-          process.env.EXPO_PUBLIC_API_URL,
-        )
-          .then(result => { setAiResult(result); setAiAnalyzing(false); })
-          .catch(()   => { setAiAnalyzing(false); });
+        triggerAiCheck(idFrontPath, path);
       }
     } catch (err: any) {
       showToast(`Could not upload your selfie: ${err?.message || 'please try again.'}`, 'error');
@@ -414,6 +445,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
     setSelfiePath(null);
     setAiResult(null);
     setAiAnalyzing(false);
+    setShowAiWarningModal(false);
     setActiveCapture('selfie');
   };
 
@@ -437,6 +469,12 @@ export function VerifyIdentityScreen({ navigation }: any) {
       return;
     }
 
+    const aiWarning = getAiWarningDetails(aiResult);
+    if (aiWarning && aiWarning.isSevere && !showAiWarningModal) {
+      setShowAiWarningModal(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const fullAddress = [
@@ -457,7 +495,10 @@ export function VerifyIdentityScreen({ navigation }: any) {
       });
       if (reqError) throw reqError;
 
-      // Store AI result if available (best-effort, never blocks)
+      // Store AI result if available (best-effort, never blocks). Note: a
+      // supabase query builder is a thenable, not a real Promise — it has no
+      // .catch(), so swallow errors via then(onOk, onErr) instead (a bare
+      // .catch here throws "catch is not a function" at runtime).
       if (requestId && aiResult) {
         supabase.from('verification_ai_results').insert({
           request_id:       requestId,
@@ -467,7 +508,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
           flags:            aiResult.flags ?? [],
           processing_ms:    aiResult.processingMs,
           raw_json:         aiResult,
-        }).catch(() => {});
+        }).then(() => {}, () => {});
       }
 
       await refreshProfile();
@@ -643,10 +684,13 @@ export function VerifyIdentityScreen({ navigation }: any) {
   else if (pickerOpen === 'region')   pickerData = regions.map(r    => ({ key: r.code, label: r.regionName ? `${r.regionName} (${r.name})` : r.name }));
   else if (pickerOpen === 'province') pickerData = provinces.map(p  => ({ key: p.code, label: p.name }));
   else if (pickerOpen === 'city')     pickerData = cities.map(c     => ({ key: c.code, label: c.name }));
-  else if (pickerOpen === 'barangay') pickerData = barangaysList.map(b => ({ key: b.name, label: b.name }));
+  else if (pickerOpen === 'barangay') pickerData = barangaysList.map(b => {
+    const val = typeof b === 'string' ? b : (b?.name || String(b || ''));
+    return { key: val, label: val };
+  });
 
   const filteredPickerData = pickerData.filter(item =>
-    item.label.toLowerCase().includes(searchText.toLowerCase())
+    (item.label || '').toLowerCase().includes(searchText.toLowerCase())
   );
 
   // ── Main verification form ──────────────────────────────────────────────
@@ -702,7 +746,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
               <View>
                 <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ID TYPE</Text>
                 <TouchableOpacity
-                  style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                  style={[styles.dropdownBtn, { borderColor: inputBorder, backgroundColor: inputBg }]}
                   onPress={() => setPickerOpen('idType')}
                   activeOpacity={0.8}
                 >
@@ -745,18 +789,6 @@ export function VerifyIdentityScreen({ navigation }: any) {
                 </Text>
               </View>
 
-              {!!ocrText && !ocrNoteDismissed && (
-                <View style={[styles.notice, { backgroundColor: T.cardAlt, borderColor: T.border }]}>
-                  <InfoCircle size={20} color={T.textMuted} variant="Bold" />
-                  <Text style={[styles.noticeText, { color: T.textMuted, fontFamily: 'Inter-Medium' }]}>
-                    We scanned your ID — please review and correct the address below.
-                  </Text>
-                  <TouchableOpacity onPress={() => setOcrNoteDismissed(true)}>
-                    <CloseSquare size={18} color={T.textMuted} variant="Bold" />
-                  </TouchableOpacity>
-                </View>
-              )}
-
               {/* LGU prefill card */}
               <View>
                 <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>VERIFYING MUNICIPALITY</Text>
@@ -790,7 +822,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
                   <View>
                     <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>REGION</Text>
                     <TouchableOpacity
-                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                      style={[styles.dropdownBtn, { borderColor: inputBorder, backgroundColor: inputBg }]}
                       onPress={() => { setSearchText(''); setPickerOpen('region'); }}
                       activeOpacity={0.8}
                     >
@@ -807,7 +839,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
                     <View>
                       <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>PROVINCE</Text>
                       <TouchableOpacity
-                        style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt, opacity: !regionName ? 0.5 : 1 }]}
+                        style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: !regionName ? T.cardAlt : inputBg, opacity: !regionName ? 0.6 : 1 }]}
                         disabled={!regionName}
                         onPress={() => { setSearchText(''); setPickerOpen('province'); }}
                         activeOpacity={0.8}
@@ -825,7 +857,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
                   <View>
                     <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>CITY / MUNICIPALITY</Text>
                     <TouchableOpacity
-                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt, opacity: ((provinces.length > 0 && !provinceName) || !regionName) ? 0.5 : 1 }]}
+                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: ((provinces.length > 0 && !provinceName) || !regionName) ? T.cardAlt : inputBg, opacity: ((provinces.length > 0 && !provinceName) || !regionName) ? 0.6 : 1 }]}
                       disabled={(provinces.length > 0 && !provinceName) || !regionName}
                       onPress={() => { setSearchText(''); setPickerOpen('city'); }}
                       activeOpacity={0.8}
@@ -842,8 +874,8 @@ export function VerifyIdentityScreen({ navigation }: any) {
                   <View>
                     <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>YOUR BARANGAY IN {lguName.toUpperCase()}</Text>
                     <TouchableOpacity
-                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: T.cardAlt, opacity: (!cityName && barangaysList.length === 0) ? 0.5 : 1 }]}
-                      disabled={!cityName && barangaysList.length === 0}
+                      style={[styles.dropdownBtn, { borderColor: T.border, backgroundColor: barangaysList.length === 0 ? T.cardAlt : inputBg, opacity: barangaysList.length === 0 ? 0.6 : 1 }]}
+                      disabled={barangaysList.length === 0}
                       onPress={() => { setSearchText(''); setPickerOpen('barangay'); }}
                       activeOpacity={0.8}
                     >
@@ -865,7 +897,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
                     <View key={label}>
                       <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>{label}</Text>
                       <TextInput
-                        style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                        style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium' }]}
                         value={value}
                         onChangeText={onChange}
                         placeholder={placeholder}
@@ -880,17 +912,18 @@ export function VerifyIdentityScreen({ navigation }: any) {
               <View>
                 <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>STREET ADDRESS / HOUSE NO.</Text>
                 <TextInput
-                  style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                  style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium' }]}
                   value={streetAddress}
                   onChangeText={setStreetAddress}
                   placeholder="e.g. 123 Rizal St"
                   placeholderTextColor={T.textMuted}
+                  maxLength={120}
                 />
               </View>
               <View>
                 <Text style={{ fontSize: 11, fontFamily: 'Octarine-Bold', color: T.textMuted, marginBottom: 6 }}>ZIP CODE</Text>
                 <TextInput
-                  style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium' }]}
+                  style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium' }]}
                   value={zipCode}
                   onChangeText={setZipCode}
                   placeholder="e.g. 4004"
@@ -977,6 +1010,19 @@ export function VerifyIdentityScreen({ navigation }: any) {
                           ))}
                         </View>
                       )}
+                      {getAiWarningDetails(aiResult)?.isSevere && (
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                          onPress={() => setShowAiWarningModal(true)}
+                          activeOpacity={0.8}
+                        >
+                          <Warning2 size={20} color="#DC2626" variant="Bold" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontFamily: 'Octarine-Bold', color: '#991B1B', fontSize: 12 }}>{getAiWarningDetails(aiResult)?.title}</Text>
+                            <Text style={{ fontFamily: 'Inter-Medium', color: '#B91C1C', fontSize: 11, marginTop: 2 }}>Tap here to review photo retake options.</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
                       <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 11, lineHeight: 15 }}>
                         This is an automated pre-check. Your LGU administrator reviews all submissions.
                       </Text>
@@ -1040,6 +1086,73 @@ export function VerifyIdentityScreen({ navigation }: any) {
           )}
         </View>
 
+        {/* AI Pre-check Alert Pop-up Modal */}
+        {aiResult && (
+          <Modal visible={showAiWarningModal} transparent animationType="fade" onRequestClose={() => setShowAiWarningModal(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+              <View style={{ width: '100%', backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 24, padding: 24, alignItems: 'center', gap: 16 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center' }}>
+                  <Warning2 size={36} color="#DC2626" variant="Bold" />
+                </View>
+
+                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 20, textAlign: 'center' }}>
+                  {getAiWarningDetails(aiResult)?.title || 'Face Check Alert'}
+                </Text>
+
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+                  {getAiWarningDetails(aiResult)?.message}
+                </Text>
+
+                {aiResult.flags && aiResult.flags.length > 0 && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+                    {aiResult.flags.map((f: string) => (
+                      <View key={f} style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ color: '#DC2626', fontFamily: 'Octarine-Bold', fontSize: 11 }}>{f.replace(/_/g, ' ')}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <View style={{ width: '100%', gap: 10, marginTop: 8 }}>
+                  {(getAiWarningDetails(aiResult)?.category === 'no_face_id' || getAiWarningDetails(aiResult)?.category === 'no_face_both') && (
+                    <TouchableOpacity
+                      style={{ height: 48, borderRadius: 999, backgroundColor: T.text, justifyContent: 'center', alignItems: 'center' }}
+                      onPress={() => {
+                        setShowAiWarningModal(false);
+                        setIdFrontUri(null);
+                        setIdFrontPath(null);
+                        setStep(0);
+                        setActiveCapture('id_front');
+                      }}
+                    >
+                      <Text style={{ color: T.bg, fontFamily: 'Octarine-Bold', fontSize: 14 }}>Retake ID Photo</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {(getAiWarningDetails(aiResult)?.category === 'no_face_selfie' || getAiWarningDetails(aiResult)?.category === 'no_face_both' || getAiWarningDetails(aiResult)?.category === 'low_match') && (
+                    <TouchableOpacity
+                      style={{ height: 48, borderRadius: 999, backgroundColor: (getAiWarningDetails(aiResult)?.category === 'no_face_id' ? T.cardAlt : T.text), borderWidth: 1, borderColor: T.border, justifyContent: 'center', alignItems: 'center' }}
+                      onPress={() => {
+                        setShowAiWarningModal(false);
+                        resetSelfieAndRestart();
+                      }}
+                    >
+                      <Text style={{ color: (getAiWarningDetails(aiResult)?.category === 'no_face_id' ? T.text : T.bg), fontFamily: 'Octarine-Bold', fontSize: 14 }}>Retake Selfie Photo</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={{ height: 44, justifyContent: 'center', alignItems: 'center', marginTop: 2 }}
+                    onPress={() => setShowAiWarningModal(false)}
+                  >
+                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13 }}>Dismiss & Review</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+
         {/* Picker Modal */}
         <Modal visible={pickerOpen !== null} transparent animationType="slide" onRequestClose={() => setPickerOpen(null)}>
           <View style={styles.pickerOverlay}>
@@ -1059,7 +1172,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
               {pickerOpen !== 'idType' && (
                 <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
                   <TextInput
-                    style={[styles.textInput, { borderColor: T.border, backgroundColor: T.cardAlt, color: T.text, fontFamily: 'Inter-Medium', height: 44 }]}
+                    style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium', height: 44 }]}
                     placeholder="Search..."
                     placeholderTextColor={T.textMuted}
                     value={searchText}

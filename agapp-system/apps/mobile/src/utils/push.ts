@@ -2,7 +2,16 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient || Constants?.appOwnership === 'expo';
+// Detect Expo Go robustly. Since SDK 53, Expo Go removed remote-push support,
+// and merely importing expo-notifications there triggers a red-box warning via
+// its auto-registration side effect. We must therefore NEVER require the module
+// in Expo Go. Check the enum, the raw 'storeClient' string (in case the enum
+// import doesn't resolve), and the legacy appOwnership flag — belt and braces.
+const execEnv = Constants?.executionEnvironment as string | undefined;
+const isExpoGo =
+  execEnv === ExecutionEnvironment.StoreClient ||
+  execEnv === 'storeClient' ||
+  Constants?.appOwnership === 'expo';
 
 export const getNotificationsModule = () => {
   if (Platform.OS === 'web') return null;
@@ -32,6 +41,9 @@ export function resolveNotificationTarget(type: string, payload: any): Notificat
   if (type === 'verification_approved' || type === 'verification_rejected') {
     return { screen: 'VerifyIdentity' };
   }
+  if (type === 'advisory' && p.advisory_id) {
+    return { screen: 'NewsDetail', params: { newsId: p.advisory_id } };
+  }
   return { screen: 'Notifications' };
 }
 
@@ -41,7 +53,8 @@ export function isNotificationNavigable(type: string, payload: any): boolean {
     (type === 'report_status' && !!p.report_id) ||
     (type === 'service_status' && !!p.request_id) ||
     type === 'verification_approved' ||
-    type === 'verification_rejected'
+    type === 'verification_rejected' ||
+    (type === 'advisory' && !!p.advisory_id)
   );
 }
 

@@ -39,7 +39,18 @@ function PushNotificationRouter() {
     if (!Notifications) return; // web / Expo Go — push isn't available there anyway
 
     const handleResponse = async (response: any) => {
-      const notificationId = response?.notification?.request?.content?.data?.notificationId;
+      const data = response?.notification?.request?.content?.data || {};
+
+      // Advisory broadcasts are sent as one batched push with the target in the
+      // data payload directly (no per-user notifications row referenced), so
+      // route from the payload without a DB lookup.
+      if (!data.notificationId && data.type === 'advisory' && data.advisory_id) {
+        const target = resolveNotificationTarget('advisory', { advisory_id: data.advisory_id });
+        queueOrApplyNavigation(target, authReadyRef.current);
+        return;
+      }
+
+      const notificationId = data.notificationId;
       if (!notificationId) return;
 
       // One round trip: mark read and fetch type/payload together.

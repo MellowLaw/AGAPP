@@ -16,11 +16,14 @@
 -- ============================================================
 
 -- 1. SEED LGU DATA
-INSERT INTO lgus (id, name, logo, banner_url, primary_color, secondary_color, latitude, longitude, boundary_geojson, is_active, onboarding_fee_paid, feature_flags)
+INSERT INTO lgus (id, name, region, province, barangays, logo, banner_url, primary_color, secondary_color, latitude, longitude, boundary_geojson, is_active, onboarding_fee_paid, feature_flags)
 VALUES
   (
     'liliw-laguna',
     'Municipality of Liliw',
+    'Region IV-A - CALABARZON',
+    'Laguna',
+    ARRAY['Bagong Anyo (Pob.)', 'Bayate', 'Bongkol', 'Bubukal', 'Cabuyew', 'Calumpang', 'Culoy', 'Dagatan', 'Daniw', 'Dita', 'Ibabang Palina', 'Ibabang San Roque', 'Ibabang Sungi', 'Ibabang Taykin', 'Ilayang Palina', 'Ilayang San Roque', 'Ilayang Sungi', 'Ilayang Taykin', 'Kanlurang Bukal', 'Laguan', 'Luquin', 'Malabo-Kalantukan', 'Masikap (Pob.)', 'Maslun (Pob.)', 'Mojon', 'Novaliches', 'Oples', 'Pag-Asa (Pob.)', 'Palayan', 'Rizal (Pob.)', 'San Isidro', 'Silangang Bukal', 'Tuy-Baanan'],
     'https://placehold.co/100x100/A2B59F/1A1A1A?text=LILIW',
     'https://placehold.co/800x200/A2B59F/1A1A1A?text=Welcome+to+Liliw',
     '#F2E863',
@@ -35,6 +38,9 @@ VALUES
   (
     'nagcarlan-laguna',
     'Municipality of Nagcarlan',
+    'Region IV-A - CALABARZON',
+    'Laguna',
+    ARRAY['Abo', 'Alibungbungan', 'Alumbrado', 'Balayong', 'Balimbing', 'Balinacon', 'Bambang', 'Banago', 'Banca-banca', 'Bangcuro', 'Banilad', 'Bayaquitos', 'Buboy', 'Buenavista', 'Buhanginan', 'Bukal', 'Bunga', 'Cabuyew', 'Calumpang', 'Kanluran Kabubuhayan', 'Kanluran Lazaan', 'Labangan', 'Lagulo', 'Lawaguin', 'Maiit', 'Malaya', 'Malinao', 'Manaol', 'Maravilla', 'Nagcalbang', 'Oples', 'Palayan', 'Palina', 'Poblacion I (Pob.)', 'Poblacion II (Pob.)', 'Poblacion III (Pob.)', 'Sabang', 'San Francisco', 'Santa Lucia', 'Sibulan', 'Silangan Ilaya', 'Silangan Kabubuhayan', 'Silangan Lazaan', 'Silangan Napapatid', 'Sinipian', 'Sulsuguin', 'Talahib', 'Talangan', 'Taytay', 'Tipacan', 'Wakat', 'Yukos'],
     'https://placehold.co/100x100/9FADB5/1A1A1A?text=NAGC',
     'https://placehold.co/800x200/9FADB5/1A1A1A?text=Welcome+to+Nagcarlan',
     '#9FADB5',

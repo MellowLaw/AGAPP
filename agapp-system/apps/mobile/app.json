@@ -30,6 +30,11 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "361933a2-34bb-4332-b307-211c2c4abaf1"
+      }
     }
   }
 }
