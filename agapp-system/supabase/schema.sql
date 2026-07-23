@@ -1216,9 +1216,30 @@ CREATE POLICY "Allow guests to read approved posts" ON forum_posts FOR SELECT US
 CREATE POLICY "Allow guests to read approved comments" ON forum_comments FOR SELECT USING (
   is_approved = true AND auth.uid() IS NULL
 );
-CREATE POLICY "Allow guests to read user profiles" ON users FOR SELECT USING (
-  auth.uid() IS NULL
-);
+
+-- Guests need a forum author's avatar (the author's NAME is already public via
+-- forum_posts.citizen_name). Do NOT grant a blanket "auth.uid() IS NULL" read of
+-- users — that exposed the whole table (email, phone, push token, role, etc.) to
+-- anyone with the anon key (fixed 2026-07-23). Two layers instead:
+--   1. Column-level: anon may physically read only id, name, avatar_url.
+--   2. Row-level: anon may read a user row only if that user is a public forum
+--      author. The check goes through a SECURITY DEFINER helper so evaluating
+--      forum_posts/forum_comments RLS does not recurse back into users.
+REVOKE SELECT ON users FROM anon;
+GRANT SELECT (id, name, avatar_url) ON users TO anon;
+
+CREATE OR REPLACE FUNCTION is_public_forum_author(p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM forum_posts    fp WHERE fp.citizen_id = p_user_id AND fp.is_approved)
+      OR EXISTS (SELECT 1 FROM forum_comments fc WHERE fc.citizen_id = p_user_id AND fc.is_approved);
+$$;
+REVOKE EXECUTE ON FUNCTION is_public_forum_author(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION is_public_forum_author(uuid) TO anon, authenticated;
+
+CREATE POLICY "Guests can read forum author profiles" ON users
+  FOR SELECT TO anon
+  USING ( is_public_forum_author(users.id) );
 
 -- 10.3 Policies for Forum Post Likes
 ALTER TABLE forum_post_likes ENABLE ROW LEVEL SECURITY;

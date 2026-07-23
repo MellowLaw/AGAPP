@@ -4,6 +4,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { SupabaseService } from './supabase.service';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { IsString, IsNotEmpty, IsOptional, IsArray, MaxLength, ArrayMaxSize } from 'class-validator';
+import { analyzeFaces } from './verification/face-analysis.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // This file used to hold seven controllers (auth, lgus, reports CRUD, services,
@@ -142,8 +143,8 @@ export class ReportController {
 }
 
 // 1.5 ID VERIFICATION — server-side OCR + AI face-comparison endpoints.
-// See Docs/Planning/Plan-ID-Verification-Redesign.md and
-// apps/ai-sidecar/README.md.
+// See Docs/Planning/Plan-ID-Verification-Redesign.md. Face comparison runs
+// in-process (./verification/face-analysis.service.ts) — no external sidecar.
 @Controller('api/verification')
 export class VerificationController {
   // ── OCR: extract text from a captured ID photo ─────────────────────────
@@ -194,14 +195,17 @@ export class VerificationController {
     }
   }
 
-  // ── AI Analysis: face comparison via Python sidecar ────────────────────
+  // ── AI Analysis: in-process face comparison (no external sidecar) ──────
   // Called by the mobile app after both photos are uploaded (before the
-  // Review step). Forwards both signed URLs to the Python FastAPI sidecar
-  // (apps/ai-sidecar/main.py) which runs DeepFace ArcFace comparison.
+  // Review step). Runs face comparison IN-PROCESS using @vladmandic/face-api
+  // on @tensorflow/tfjs-node (see ./verification/face-analysis.service.ts) —
+  // replaced the old Python FastAPI sidecar (apps/ai-sidecar, InsightFace
+  // ArcFace) on 2026-07-23; the sidecar is deleted, there is no longer any
+  // external process or AI_SIDECAR_URL involved.
   //
   // Security: both URLs are validated to be signed citizen-ids URLs before
-  // forwarding. On any failure (sidecar down, timeout, bad response), returns
-  // safe nulls — never blocks a submission.
+  // use. On any failure (model load failure, download failure, no face
+  // detected, etc.), returns safe nulls — never blocks a submission.
   @Post('analyze')
   @UseGuards(SupabaseAuthGuard)
   // AI inference is compute-intensive; tighter rate limit than OCR.
@@ -216,37 +220,11 @@ export class VerificationController {
       return NOT_ANALYZED;
     }
 
-    const sidecarUrl = (process.env.AI_SIDECAR_URL || 'http://localhost:8001').replace(/\/$/, '');
-
     try {
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 35000); // 35 s — sidecar can be slow on first run
-      const res = await fetch(`${sidecarUrl}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_photo_url: idPhotoSignedUrl, selfie_url: selfieSignedUrl }),
-        signal: controller.signal,
-      });
-      clearTimeout(tid);
-
-      if (!res.ok) throw new Error(`Sidecar returned HTTP ${res.status}`);
-
-      const data: any = await res.json();
-      return {
-        faceScore:       typeof data.face_score       === 'number' ? data.face_score       : null,
-        confidenceScore: typeof data.confidence_score === 'number' ? data.confidence_score : null,
-        phash:           typeof data.phash            === 'string' ? data.phash            : null,
-        flags:           Array.isArray(data.flags)                 ? data.flags            : [],
-        processingMs:    typeof data.processing_ms   === 'number' ? data.processing_ms    : null,
-      };
+      return await analyzeFaces(idPhotoSignedUrl, selfieSignedUrl);
     } catch (err) {
-      const msg = (err as any).message || String(err);
-      if (msg.includes('aborted') || msg.includes('abort')) {
-        console.warn('[VerificationController] AI sidecar timed out (35 s) — returning nulls');
-      } else {
-        console.error('[VerificationController] AI sidecar error:', msg);
-      }
-      return NOT_ANALYZED; // never block submission on a sidecar failure
+      console.error('[VerificationController] In-process face analysis error:', (err as any).message);
+      return NOT_ANALYZED; // never block submission on an analysis failure
     }
   }
 }
