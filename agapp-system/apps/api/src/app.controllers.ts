@@ -141,17 +141,15 @@ export class ReportController {
   }
 }
 
-// 1.5 ID VERIFICATION — OCR text extraction (autofills the residency address
-// from a captured ID photo). See Docs/Planning/Plan-ID-Verification-Redesign.md.
-// (Liveness-check endpoint was removed 2026-07-17 — the two-shot "blink twice"
-// selfie flow was dropped for a single selfie capture; see that plan's
-// "Simplified 2026-07-17" section.)
+// 1.5 ID VERIFICATION — server-side OCR + AI face-comparison endpoints.
+// See Docs/Planning/Plan-ID-Verification-Redesign.md and
+// apps/ai-sidecar/README.md.
 @Controller('api/verification')
 export class VerificationController {
-  // Best-effort OCR over a captured ID photo, used by the mobile app to
-  // pre-fill the residency address fields (which stay fully editable — this
-  // never auto-submits unreviewed text). Hosted, not on-device: keeps the app
-  // on plain Expo Go (no custom dev-client migration for an OCR native module).
+  // ── OCR: extract text from a captured ID photo ─────────────────────────
+  // Best-effort; used by the mobile app to pre-fill the residency address
+  // fields (which stay fully editable — this never auto-submits unreviewed
+  // text). Hosted, not on-device: keeps the app on plain Expo Go.
   @Post('extract-id-text')
   @UseGuards(SupabaseAuthGuard)
   // Each call is a billed OCR.space request.
@@ -176,11 +174,8 @@ export class VerificationController {
     }
 
     try {
-      // OCR.space's URL-based endpoint: GET/POST with the image URL + apikey.
-      // OCREngine=2 + scale=true are generally more accurate for printed
-      // documents/small text than the default engine — verify against
-      // OCR.space's current docs if extraction quality looks off, their API
-      // has changed shape before.
+      // OCR.space's URL-based endpoint. OCREngine=2 + scale=true are generally
+      // more accurate for printed documents / small text.
       const url = `https://api.ocr.space/parse/imageurl?apikey=${encodeURIComponent(apiKey)}&url=${encodeURIComponent(photoUrl)}&OCREngine=2&scale=true`;
       const res = await fetch(url, { method: 'GET' });
       if (!res.ok) throw new Error(`OCR.space returned HTTP ${res.status}`);
@@ -199,6 +194,61 @@ export class VerificationController {
     }
   }
 
+  // ── AI Analysis: face comparison via Python sidecar ────────────────────
+  // Called by the mobile app after both photos are uploaded (before the
+  // Review step). Forwards both signed URLs to the Python FastAPI sidecar
+  // (apps/ai-sidecar/main.py) which runs DeepFace ArcFace comparison.
+  //
+  // Security: both URLs are validated to be signed citizen-ids URLs before
+  // forwarding. On any failure (sidecar down, timeout, bad response), returns
+  // safe nulls — never blocks a submission.
+  @Post('analyze')
+  @UseGuards(SupabaseAuthGuard)
+  // AI inference is compute-intensive; tighter rate limit than OCR.
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async analyzeVerification(@Body() body: { idPhotoSignedUrl?: string; selfieSignedUrl?: string }) {
+    const NOT_ANALYZED = { faceScore: null, confidenceScore: null, phash: null, flags: [], processingMs: null };
+    const { idPhotoSignedUrl, selfieSignedUrl } = body || {};
+    if (!idPhotoSignedUrl || !selfieSignedUrl) return NOT_ANALYZED;
+
+    if (!isOwnStorageUrl(idPhotoSignedUrl, 'citizen-ids') || !isOwnStorageUrl(selfieSignedUrl, 'citizen-ids')) {
+      console.warn('[VerificationController] analyze rejected URL(s) outside citizen-ids storage');
+      return NOT_ANALYZED;
+    }
+
+    const sidecarUrl = (process.env.AI_SIDECAR_URL || 'http://localhost:8001').replace(/\/$/, '');
+
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 35000); // 35 s — sidecar can be slow on first run
+      const res = await fetch(`${sidecarUrl}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_photo_url: idPhotoSignedUrl, selfie_url: selfieSignedUrl }),
+        signal: controller.signal,
+      });
+      clearTimeout(tid);
+
+      if (!res.ok) throw new Error(`Sidecar returned HTTP ${res.status}`);
+
+      const data: any = await res.json();
+      return {
+        faceScore:       typeof data.face_score       === 'number' ? data.face_score       : null,
+        confidenceScore: typeof data.confidence_score === 'number' ? data.confidence_score : null,
+        phash:           typeof data.phash            === 'string' ? data.phash            : null,
+        flags:           Array.isArray(data.flags)                 ? data.flags            : [],
+        processingMs:    typeof data.processing_ms   === 'number' ? data.processing_ms    : null,
+      };
+    } catch (err) {
+      const msg = (err as any).message || String(err);
+      if (msg.includes('aborted') || msg.includes('abort')) {
+        console.warn('[VerificationController] AI sidecar timed out (35 s) — returning nulls');
+      } else {
+        console.error('[VerificationController] AI sidecar error:', msg);
+      }
+      return NOT_ANALYZED; // never block submission on a sidecar failure
+    }
+  }
 }
 
 function scoreFaq(query: string, keywords: string[]): number {

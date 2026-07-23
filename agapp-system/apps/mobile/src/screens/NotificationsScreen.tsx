@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
@@ -138,6 +138,56 @@ export function NotificationsScreen({ navigation }: any) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+          {/* Test Notification Trigger Banner */}
+          {Notifications && (
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  const existingStatus = await Notifications.getPermissionsAsync();
+                  let granted = existingStatus.granted;
+                  if (!existingStatus.granted) {
+                    const status = await Notifications.requestPermissionsAsync();
+                    granted = status.granted;
+                  }
+                  if (!granted) {
+                    Alert.alert('Permission Denied', 'Please enable notification permissions in your device settings.');
+                    return;
+                  }
+
+                  await Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: '🔔 AGAPP Test Notification',
+                      body: 'Testing local notification in Expo Go! Tap to open.',
+                      data: { type: 'notifications' },
+                    },
+                    trigger: null,
+                  });
+                } catch (err: any) {
+                  console.error('Test notification failed:', err);
+                }
+              }}
+              activeOpacity={0.75}
+              style={{
+                backgroundColor: T.card,
+                borderWidth: 1,
+                borderColor: T.accent,
+                borderStyle: 'dashed',
+                borderRadius: 16,
+                padding: 14,
+                marginBottom: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 8,
+              }}
+            >
+              <Notification size={18} color={T.accent} variant="Bold" />
+              <Text style={{ color: T.accent, fontFamily: 'Octarine-Bold', fontSize: 13 }}>
+                Trigger Local Test Notification
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {notifications.length === 0 ? (
             <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
               <Image

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -162,7 +162,7 @@ function AuthGate({ label, navigation }: { label: string; navigation: any }) {
         }}>
           Get the Full Experience!
         </Text>
-        
+
         <Text style={{
           color: T.textMuted,
           fontSize: 14,
@@ -224,7 +224,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const routeCount = state.routes.length;
 
   const currentRoute = state.routes[state.index];
-  const isSubScreenActive = 
+  const isSubScreenActive =
     (currentRoute.state && currentRoute.state.index !== undefined && currentRoute.state.index > 0) ||
     currentRoute.params?.isSubScreen === true;
   const showFloater = (state.index === 0 || state.index === 1 || state.index === 2) && !isSubScreenActive;
@@ -318,8 +318,8 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
           options.tabBarLabel !== undefined
             ? options.tabBarLabel
             : options.title !== undefined
-            ? options.title
-            : route.name;
+              ? options.title
+              : route.name;
 
         const isFocused = state.index === index;
 
@@ -351,11 +351,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         else if (route.name === 'Profile') IconComponent = User;
 
         const ROUTE_LABELS: Record<string, string> = {
-          Home:        'Home',
+          Home: 'Home',
           ServicesTab: 'Services',
-          ReportsTab:  'Reports',
-          Forum:       'Forum',
-          Profile:     'Profile',
+          ReportsTab: 'Reports',
+          Forum: 'Forum',
+          Profile: 'Profile',
         };
         const displayLabel = ROUTE_LABELS[route.name] ?? route.name;
 
@@ -427,7 +427,6 @@ export function AppNavigator() {
 
   const [onboardingLoaded, setOnboardingLoaded] = React.useState(false);
   const [hasSeenOnboarding, setHasSeenOnboarding] = React.useState(false);
-  const [showSplash, setShowSplash] = React.useState(true);
 
   React.useEffect(() => {
     const checkOnboarding = async () => {
@@ -435,14 +434,11 @@ export function AppNavigator() {
         const val = await AsyncStorage.getItem('hasSeenOnboarding');
         if (val === 'true') {
           setHasSeenOnboarding(true);
-          // SplashGreetingScreen will control its own fade-out and trigger onFinish
         } else {
           setHasSeenOnboarding(false);
-          setShowSplash(false);
         }
       } catch {
         setHasSeenOnboarding(true);
-        setShowSplash(false);
       } finally {
         setOnboardingLoaded(true);
       }
@@ -450,8 +446,12 @@ export function AppNavigator() {
     checkOnboarding();
   }, []);
 
-  if (isLoading || !onboardingLoaded || (showSplash && hasSeenOnboarding)) {
-    return <SplashGreetingScreen onFinish={() => setShowSplash(false)} />;
+  if (isLoading || !onboardingLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={T.accent} />
+      </View>
+    );
   }
 
   return (
@@ -483,6 +483,7 @@ export function AppNavigator() {
             <Stack.Screen name="Assistant">
               {({ navigation }) => <AuthGate label="use the assistant" navigation={navigation} />}
             </Stack.Screen>
+            <Stack.Screen name="SplashGreeting" component={SplashGreetingScreen} />
           </>
         ) : !selectedLgu ? (
           <Stack.Screen name="LguSelect" component={LguSelectScreen} />
@@ -499,6 +500,7 @@ export function AppNavigator() {
             <Stack.Screen name="CitizenGuide" component={CitizenGuideScreen} />
             <Stack.Screen name="Assistant" component={ChatbotScreen} />
             <Stack.Screen name="LogoutConfirm" component={LogoutConfirmScreen} />
+            <Stack.Screen name="SplashGreeting" component={SplashGreetingScreen} />
           </>
         )}
       </Stack.Navigator>

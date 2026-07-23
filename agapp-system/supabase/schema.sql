@@ -34,6 +34,10 @@ CREATE TABLE lgus (
     is_active boolean DEFAULT true,
     onboarding_fee_paid boolean DEFAULT false,
     feature_flags jsonb DEFAULT '{"chatbot": true, "potholeDetection": true, "forum": true}'::jsonb,
+    facebook_url text,
+    youtube_url text,
+    twitter_url text,
+    website_url text,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -434,6 +438,13 @@ CREATE TABLE forum_comments (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 6.5 COMMUNITY FORUM POST LIKES
+CREATE TABLE forum_post_likes (
+    post_id uuid REFERENCES forum_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
+
 -- Staff notification bell: forum content flagged by check_forum_profanity()
 -- (see trg_moderate_forum / trg_moderate_forum_comment below, which run
 -- BEFORE these AFTER triggers and set flagged_keywords on the same row).
@@ -508,7 +519,12 @@ CREATE TABLE news_announcements (
     published_at timestamp with time zone,
     attachments jsonb DEFAULT '[]'::jsonb NOT NULL,
     views integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    is_public boolean DEFAULT true NOT NULL,
+    is_featured boolean DEFAULT false NOT NULL,
+    type text DEFAULT 'news' NOT NULL CONSTRAINT news_announcements_type_check CHECK (type IN ('news', 'announcement', 'advisory')),
+    duration_hours integer,
+    expires_at timestamp with time zone
 );
 
 CREATE INDEX news_announcements_lgu_status_idx ON news_announcements(lgu_id, status);
@@ -1192,3 +1208,27 @@ CREATE POLICY "Allow super admin full control to citizen_guides"
       WHERE u.id = auth.uid() AND u.role = 'SUPER_ADMIN'
     )
   );
+
+-- 10.2 Policies for Guests (unauthenticated users)
+CREATE POLICY "Allow guests to read approved posts" ON forum_posts FOR SELECT USING (
+  is_approved = true AND auth.uid() IS NULL
+);
+CREATE POLICY "Allow guests to read approved comments" ON forum_comments FOR SELECT USING (
+  is_approved = true AND auth.uid() IS NULL
+);
+CREATE POLICY "Allow guests to read user profiles" ON users FOR SELECT USING (
+  auth.uid() IS NULL
+);
+
+-- 10.3 Policies for Forum Post Likes
+ALTER TABLE forum_post_likes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read of likes" ON forum_post_likes FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated users to toggle likes" ON forum_post_likes FOR ALL USING (auth.uid() = user_id);
+
+-- 15. REALTIME PUBLICATION SETUP
+-- Realtime needs tables in the supabase_realtime publication to broadcast changes.
+-- Note: If running locally or on a fresh project, the publication is auto-created.
+ALTER PUBLICATION supabase_realtime ADD TABLE forum_posts;
+ALTER PUBLICATION supabase_realtime ADD TABLE forum_comments;
+ALTER PUBLICATION supabase_realtime ADD TABLE forum_post_likes;
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;

@@ -6,11 +6,16 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { TextArea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import { Personalcard, User, Clock, TickSquare, CloseCircle, Eye, SearchNormal1, Danger, Sms, Location, DocumentText, Camera } from 'iconsax-react';
+import {
+  Personalcard, User, Clock, TickSquare, CloseCircle, Eye,
+  SearchNormal1, Danger, Sms, Location, DocumentText, Camera,
+  InfoCircle, ShieldTick, Warning2,
+} from 'iconsax-react';
+
+// ── Types ─────────────────────────────────────────────────────────────────
 
 type TabKey = 'pending' | 'approved' | 'rejected' | 'all';
 
@@ -27,29 +32,96 @@ interface VerificationRequest {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
-  // joined from users table
   citizen_name?: string;
   citizen_email?: string;
 }
 
+interface AiResult {
+  id: string;
+  face_score: number | null;
+  confidence_score: number | null;
+  flags: string[];
+  processing_ms: number | null;
+}
+
+// ── Preset rejection reasons ───────────────────────────────────────────────
+
+const REJECT_PRESETS = [
+  'ID photo is blurry or unreadable',
+  'Face in selfie does not match ID photo',
+  'Declared barangay is outside this municipality',
+  'ID type not accepted for this service',
+  'Suspected duplicate or reused photo',
+  'Other (specify below)',
+];
+
+// ── Score helpers ─────────────────────────────────────────────────────────
+
+function scoreColor(score: number | null): string {
+  if (score === null) return 'text-gray-400';
+  if (score >= 0.80)  return 'text-green-600 dark:text-green-400';
+  if (score >= 0.60)  return 'text-yellow-600 dark:text-yellow-400';
+  if (score >= 0.40)  return 'text-orange-600 dark:text-orange-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
+function scoreBarColor(score: number | null): string {
+  if (score === null) return 'bg-gray-300 dark:bg-gray-600';
+  if (score >= 0.80)  return 'bg-green-500';
+  if (score >= 0.60)  return 'bg-yellow-500';
+  if (score >= 0.40)  return 'bg-orange-500';
+  return 'bg-red-500';
+}
+
+function ScoreBar({ label, score }: { label: string; score: number | null }) {
+  const pct = score !== null ? Math.round(score * 100) : null;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-text-muted">{label}</span>
+        <span className={`text-xs font-bold tabular-nums ${scoreColor(score)}`}>
+          {pct !== null ? `${pct}%` : 'N/A'}
+        </span>
+      </div>
+      <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
+        <div
+          className={`h-1.5 rounded-full transition-all duration-500 ${scoreBarColor(score)}`}
+          style={{ width: `${(score ?? 0) * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────
+
 export default function VerificationsPage() {
-  const [requests, setRequests] = useState<VerificationRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<TabKey>('pending');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [requests, setRequests]           = useState<VerificationRequest[]>([]);
+  const [activeTab, setActiveTab]         = useState<TabKey>('pending');
+  const [searchQuery, setSearchQuery]     = useState('');
   const [selectedRequest, setSelectedRequest] = useState<VerificationRequest | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [idImageUrl, setIdImageUrl] = useState<string | null>(null);
-  const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(false);
+  const [rejectReason, setRejectReason]   = useState('');
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [customReason, setCustomReason]   = useState('');
+
+  const [idImageUrl, setIdImageUrl]       = useState<string | null>(null);
+  const [selfieUrl, setSelfieUrl]         = useState<string | null>(null);
+  const [imageLoading, setImageLoading]   = useState(false);
+  const [aiResult, setAiResult]           = useState<AiResult | null>(null);
+  const [aiLoading, setAiLoading]         = useState(false);
+
   const [actionLoading, setActionLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [loadError, setLoadError]         = useState<string | null>(null);
+
   const { showToast, ToastContainer } = useToast();
   const params = useSearchParams();
 
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
   const lguId = useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
+
+  // ── Data fetching ────────────────────────────────────────────────────────
 
   const fetchRequests = React.useCallback(async () => {
     setLoading(true);
@@ -63,28 +135,20 @@ export default function VerificationsPage() {
 
       if (error) throw error;
 
-      // Fetch all citizen names in a single query (avoids an N+1 round-trip
-      // per request), then map them back onto the requests.
       const rows = data || [];
-      const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
+      const userIds = Array.from(new Set(rows.map(r => r.user_id)));
       const usersById = new Map<string, { name: string | null; email: string | null }>();
       if (userIds.length > 0) {
         const { data: users } = await supabase
           .from('users')
           .select('id, name, email')
           .in('id', userIds);
-        for (const u of users || []) {
-          usersById.set(u.id, { name: u.name, email: u.email });
-        }
+        for (const u of users || []) usersById.set(u.id, { name: u.name, email: u.email });
       }
 
-      const enriched: VerificationRequest[] = rows.map((req) => {
+      const enriched: VerificationRequest[] = rows.map(req => {
         const u = usersById.get(req.user_id);
-        return {
-          ...req,
-          citizen_name: u?.name || 'Unknown Citizen',
-          citizen_email: u?.email || '',
-        };
+        return { ...req, citizen_name: u?.name || 'Unknown Citizen', citizen_email: u?.email || '' };
       });
       setRequests(enriched);
     } catch (err: any) {
@@ -95,9 +159,7 @@ export default function VerificationsPage() {
     }
   }, [lguId]);
 
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
+  useEffect(() => { fetchRequests(); }, [fetchRequests]);
 
   const loadSignedImages = async (req: VerificationRequest) => {
     setImageLoading(true);
@@ -108,40 +170,52 @@ export default function VerificationsPage() {
       ]);
       setIdImageUrl(idRes.data?.signedUrl || null);
       setSelfieUrl(selfieRes.data?.signedUrl || null);
-    } catch (err) {
-      console.error('Failed to load images:', err);
-    } finally {
-      setImageLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setImageLoading(false); }
+  };
+
+  const loadAiResult = async (req: VerificationRequest) => {
+    setAiLoading(true);
+    setAiResult(null);
+    try {
+      const { data } = await supabase
+        .from('verification_ai_results')
+        .select('*')
+        .eq('request_id', req.id)
+        .maybeSingle();
+      setAiResult(data || null);
+    } catch { /* silent */ }
+    finally { setAiLoading(false); }
   };
 
   const handleViewDetails = (req: VerificationRequest) => {
     setSelectedRequest(req);
     setIdImageUrl(null);
     setSelfieUrl(null);
+    setAiResult(null);
     loadSignedImages(req);
+    loadAiResult(req);
   };
 
   const handleCloseModal = () => {
     setSelectedRequest(null);
     setIdImageUrl(null);
     setSelfieUrl(null);
+    setAiResult(null);
     setShowRejectModal(false);
     setRejectReason('');
+    setSelectedPreset(null);
+    setCustomReason('');
   };
 
-  // Best-effort: once a decision is recorded, the actual ID/selfie photos are
-  // no longer needed (PII under RA 10173) — purge them from storage. Never
-  // blocks the approve/reject flow if the delete itself fails.
+  // Best-effort PII purge after a decision is made
   const purgeVerificationPhotos = async (req: VerificationRequest) => {
     const paths = [req.id_document_path, req.selfie_path].filter(Boolean);
     if (paths.length === 0) return;
-    try {
-      await supabase.storage.from('citizen-ids').remove(paths);
-    } catch (err) {
-      console.error('Failed to purge verification photos:', err);
-    }
+    try { await supabase.storage.from('citizen-ids').remove(paths); } catch { /* silent */ }
   };
+
+  // ── Actions ──────────────────────────────────────────────────────────────
 
   const handleApprove = async () => {
     if (!selectedRequest) return;
@@ -166,8 +240,9 @@ export default function VerificationsPage() {
 
   const handleReject = async () => {
     if (!selectedRequest) return;
-    if (!rejectReason.trim()) {
-      showToast('Please provide a rejection reason.', 'error');
+    const finalReason = (selectedPreset === 'Other (specify below)' ? customReason.trim() : selectedPreset) || customReason.trim();
+    if (!finalReason) {
+      showToast('Please select or enter a rejection reason.', 'error');
       return;
     }
     setActionLoading(true);
@@ -175,7 +250,7 @@ export default function VerificationsPage() {
       const { error } = await supabase.rpc('verify_citizen', {
         p_request_id: selectedRequest.id,
         p_action: 'reject',
-        p_reason: rejectReason.trim(),
+        p_reason: finalReason,
       });
       if (error) throw error;
       await purgeVerificationPhotos(selectedRequest);
@@ -189,47 +264,56 @@ export default function VerificationsPage() {
     }
   };
 
+  // ── Filtering ─────────────────────────────────────────────────────────────
+
   const filteredRequests = requests.filter(req => {
-    const matchesTab = activeTab === 'all' || req.status === activeTab;
+    const matchesTab    = activeTab === 'all' || req.status === activeTab;
     const matchesSearch =
-      (req.citizen_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.citizen_email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (req.citizen_name    || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (req.citizen_email   || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (req.declared_barangay || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.id_type || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (req.id_type         || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
   const tabCounts = useMemo(() => ({
-    pending: requests.filter(r => r.status === 'pending').length,
+    pending:  requests.filter(r => r.status === 'pending').length,
     approved: requests.filter(r => r.status === 'approved').length,
     rejected: requests.filter(r => r.status === 'rejected').length,
-    all: requests.length,
+    all:      requests.length,
   }), [requests]);
 
   const statusBadge = (status: string) => {
     const map: Record<string, { variant: 'warning' | 'success' | 'error' | 'default'; label: string }> = {
-      pending: { variant: 'warning', label: 'Pending Review' },
+      pending:  { variant: 'warning', label: 'Pending Review' },
       approved: { variant: 'success', label: 'Approved' },
-      rejected: { variant: 'error', label: 'Rejected' },
+      rejected: { variant: 'error',   label: 'Rejected' },
     };
     const { variant, label } = map[status] || { variant: 'default' as const, label: status };
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleString('en-PH', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  // ── Confidence label ──────────────────────────────────────────────────────
+
+  const confidenceLabel = (score: number | null) => {
+    if (score === null) return null;
+    if (score >= 0.80) return { text: 'High confidence', color: 'text-green-600 dark:text-green-400',  bg: 'bg-green-500/10',  icon: '🟢' };
+    if (score >= 0.60) return { text: 'Medium — review carefully', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-500/10', icon: '🟡' };
+    if (score >= 0.40) return { text: 'Low — scrutinize closely',  color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10', icon: '🟠' };
+    return { text: 'Very low — likely mismatch', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: '🔴' };
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <DashboardLayout role="lgu-admin" title="Citizen Verifications">
       <ToastContainer />
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 mb-6">
+      {/* Tabs */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
         {(['pending', 'approved', 'rejected', 'all'] as TabKey[]).map(tab => (
           <button
             key={tab}
@@ -253,127 +337,129 @@ export default function VerificationsPage() {
             type="text"
             placeholder="Search by name, email, barangay, or ID type..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
           />
         </div>
       </Card>
 
-      {/* Requests List */}
-      <div className="space-y-4">
-        {filteredRequests.map((req) => (
-          <Card noBorder key={req.id}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
-                  <User variant="Bold" className="w-5 h-5 text-text-muted" />
-                </div>
-                <div>
-                  <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
-                  <div className="flex items-center gap-2 text-sm text-text-muted">
-                    <Sms className="w-3 h-3" />
-                    {req.citizen_email || 'No email'}
+      {/* Request cards */}
+      {loading ? (
+        <Card noBorder><div className="text-center py-8 text-text-muted text-sm">Loading requests…</div></Card>
+      ) : loadError ? (
+        <Card noBorder><div className="text-center py-8 text-red-500 text-sm">{loadError}</div></Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredRequests.map(req => (
+            <Card noBorder key={req.id}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
+                    <User variant="Bold" className="w-5 h-5 text-text-muted" />
                   </div>
-                </div>
-              </div>
-              {statusBadge(req.status)}
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
-              <div className="flex items-center gap-2 text-text-muted">
-                <DocumentText className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <p className="text-text-faint text-xs">ID Type</p>
-                  <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-text-muted">
-                <Location className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <p className="text-text-faint text-xs">Barangay</p>
-                  <p className="text-text-primary font-medium">{req.declared_barangay || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-text-muted">
-                <Clock variant="Bold" className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <p className="text-text-faint text-xs">Submitted</p>
-                  <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
-                </div>
-              </div>
-              {req.rejection_reason && (
-                <div className="flex items-center gap-2">
-                  <Danger className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
                   <div>
-                    <p className="text-text-faint text-xs">Rejection Reason</p>
-                    <p className="text-red-600 dark:text-red-400 font-medium text-xs">{req.rejection_reason}</p>
+                    <p className="font-medium text-text-primary">{req.citizen_name || 'Unknown Citizen'}</p>
+                    <div className="flex items-center gap-2 text-sm text-text-muted">
+                      <Sms className="w-3 h-3" />
+                      {req.citizen_email || 'No email'}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {req.status === 'pending' && (
-              <div className="flex gap-3 pt-3 border-t border-theme">
-                <Button variant="primary" onClick={() => handleViewDetails(req)}>
-                  <Eye variant="Bold" className="w-4 h-4 mr-1" />
-                  Review &amp; Approve
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    setSelectedRequest(req);
-                    setShowRejectModal(true);
-                  }}
-                >
-                  <CloseCircle className="w-4 h-4 mr-1" />
-                  Reject
-                </Button>
+                {statusBadge(req.status)}
               </div>
-            )}
 
-            {(req.status === 'approved' || req.status === 'rejected') && (
-              <div className="flex gap-3 pt-3 border-t border-theme">
-                <Button variant="ghost" onClick={() => handleViewDetails(req)}>
-                  <Eye variant="Bold" className="w-4 h-4 mr-1" />
-                  View Documents
-                </Button>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
+                <div className="flex items-center gap-2 text-text-muted">
+                  <DocumentText className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-text-faint text-xs">ID Type</p>
+                    <p className="text-text-primary font-medium">{req.id_type || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-text-muted">
+                  <Location className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-text-faint text-xs">Address</p>
+                    <p className="text-text-primary font-medium text-xs leading-tight line-clamp-2">{req.declared_barangay || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-text-muted">
+                  <Clock variant="Bold" className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p className="text-text-faint text-xs">Submitted</p>
+                    <p className="text-text-primary font-medium">{formatDate(req.created_at)}</p>
+                  </div>
+                </div>
+                {req.rejection_reason && (
+                  <div className="flex items-center gap-2">
+                    <Danger className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-text-faint text-xs">Rejection</p>
+                      <p className="text-red-600 dark:text-red-400 font-medium text-xs">{req.rejection_reason}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </Card>
-        ))}
 
-        {filteredRequests.length === 0 && (
-          <Card noBorder>
-            <div className="text-center py-8 text-text-muted">
-              <Personalcard className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No verification requests found</p>
-              {activeTab === 'pending' && (
-                <p className="text-sm mt-1">All caught up! No pending requests.</p>
-              )}
-            </div>
-          </Card>
-        )}
-      </div>
+              <div className="flex gap-3 pt-3 border-t border-theme">
+                {req.status === 'pending' ? (
+                  <>
+                    <Button variant="primary" onClick={() => handleViewDetails(req)}>
+                      <Eye variant="Bold" className="w-4 h-4 mr-1" />
+                      Review &amp; Decide
+                    </Button>
+                    <Button variant="danger" onClick={() => { setSelectedRequest(req); setShowRejectModal(true); }}>
+                      <CloseCircle className="w-4 h-4 mr-1" />
+                      Reject
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" onClick={() => handleViewDetails(req)}>
+                    <Eye variant="Bold" className="w-4 h-4 mr-1" />
+                    View Details
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
+
+          {filteredRequests.length === 0 && (
+            <Card noBorder>
+              <div className="text-center py-8 text-text-muted">
+                <Personalcard className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No verification requests found</p>
+                {activeTab === 'pending' && <p className="text-sm mt-1">All caught up! No pending requests.</p>}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* ── Review / Detail Modal ── */}
       {selectedRequest && !showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-text-primary">
+
+              {/* Modal header */}
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                  <ShieldTick variant="Bold" className="w-5 h-5 text-accent" />
                   Review Verification
                 </h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="text-text-muted hover:text-text-primary transition-colors"
-                >
-                  ✕
-                </button>
+                <button onClick={handleCloseModal} className="text-text-muted hover:text-text-primary transition-colors text-xl leading-none">✕</button>
               </div>
 
-              {/* Citizen Info */}
-              <div className="mb-6">
+              {/* RA 10173 banner */}
+              <div className="flex items-start gap-3 p-3 mb-5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <Warning2 variant="Bold" className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                  You are viewing sensitive personal data (government-issued ID and biometric selfie) collected under RA 10173 (Data Privacy Act). Handle with strict confidentiality. Photos are deleted from storage immediately upon your decision.
+                </p>
+              </div>
+
+              {/* Citizen info */}
+              <div className="mb-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-surface-alt rounded-full flex items-center justify-center">
                     <User variant="Bold" className="w-6 h-6 text-text-muted" />
@@ -386,80 +472,148 @@ export default function VerificationsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-text-faint">ID Type</p>
+                    <p className="text-text-faint text-xs mb-0.5">ID Type</p>
                     <p className="font-medium text-text-primary">{selectedRequest.id_type}</p>
                   </div>
                   <div>
-                    <p className="text-text-faint">Declared Barangay</p>
-                    <p className="font-medium text-text-primary">{selectedRequest.declared_barangay}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-faint">Submitted</p>
+                    <p className="text-text-faint text-xs mb-0.5">Submitted</p>
                     <p className="font-medium text-text-primary">{formatDate(selectedRequest.created_at)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-text-faint text-xs mb-0.5">Declared Address</p>
+                    <p className="font-medium text-text-primary text-sm leading-relaxed">{selectedRequest.declared_barangay}</p>
                   </div>
                   {selectedRequest.reviewed_at && (
                     <div>
-                      <p className="text-text-faint">Reviewed</p>
+                      <p className="text-text-faint text-xs mb-0.5">Reviewed At</p>
                       <p className="font-medium text-text-primary">{formatDate(selectedRequest.reviewed_at)}</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* ID Document Image */}
-              <div className="mb-6">
-                <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                  <DocumentText className="w-4 h-4" />
-                  Government ID
-                </p>
-                {imageLoading ? (
-                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-text-muted">Loading secure image...</p>
+              {/* ── Side-by-side photos ── */}
+              <div className="mb-5">
+                <p className="text-sm font-semibold text-text-primary mb-3">Documents</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* ID photo */}
+                  <div>
+                    <p className="text-xs text-text-faint mb-2 flex items-center gap-1">
+                      <DocumentText className="w-3 h-3" />
+                      Government ID
+                    </p>
+                    {imageLoading ? (
+                      <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-text-muted">Loading…</p>
+                      </div>
+                    ) : idImageUrl ? (
+                      <img
+                        src={idImageUrl}
+                        alt="Government ID"
+                        className="w-full h-44 object-contain rounded-lg border border-theme bg-surface-alt cursor-zoom-in"
+                        onClick={() => window.open(idImageUrl, '_blank')}
+                        title="Click to open full size"
+                      />
+                    ) : selectedRequest.status !== 'pending' ? (
+                      <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-text-muted text-center px-4">Deleted after verification</p>
+                      </div>
+                    ) : (
+                      <div className="h-44 bg-red-500/10 rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-red-500">Failed to load</p>
+                      </div>
+                    )}
                   </div>
-                ) : idImageUrl ? (
-                  <img
-                    src={idImageUrl}
-                    alt="Government ID"
-                    className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
-                  />
-                ) : selectedRequest.status !== 'pending' ? (
-                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-text-muted">Photo deleted after verification</p>
+
+                  {/* Selfie */}
+                  <div>
+                    <p className="text-xs text-text-faint mb-2 flex items-center gap-1">
+                      <Camera variant="Bold" className="w-3 h-3" />
+                      Selfie
+                    </p>
+                    {imageLoading ? (
+                      <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-text-muted">Loading…</p>
+                      </div>
+                    ) : selfieUrl ? (
+                      <img
+                        src={selfieUrl}
+                        alt="Selfie"
+                        className="w-full h-44 object-contain rounded-lg border border-theme bg-surface-alt cursor-zoom-in"
+                        onClick={() => window.open(selfieUrl, '_blank')}
+                        title="Click to open full size"
+                      />
+                    ) : selectedRequest.status !== 'pending' ? (
+                      <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-text-muted text-center px-4">Deleted after verification</p>
+                      </div>
+                    ) : (
+                      <div className="h-44 bg-red-500/10 rounded-lg flex items-center justify-center">
+                        <p className="text-xs text-red-500">Failed to load</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>
-                  </div>
-                )}
+                </div>
               </div>
 
-              {/* Selfie with ID */}
-              <div className="mb-6">
-                <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                  <Camera variant="Bold" className="w-4 h-4" />
-                  Selfie with ID
-                </p>
-                {imageLoading ? (
-                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-text-muted">Loading secure image...</p>
+              {/* ── AI Confidence Score widget ── */}
+              <div className="mb-5 p-4 rounded-xl border border-theme bg-surface-alt">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldTick variant="Bold" className="w-4 h-4 text-text-muted" />
+                  <p className="text-sm font-semibold text-text-primary">Automated Identity Check</p>
+                  {aiLoading && <span className="text-xs text-text-muted ml-auto">Analyzing…</span>}
+                </div>
+
+                {aiLoading ? (
+                  <div className="h-12 flex items-center justify-center">
+                    <p className="text-xs text-text-muted">Loading AI results…</p>
                   </div>
-                ) : selfieUrl ? (
-                  <img
-                    src={selfieUrl}
-                    alt="Selfie with ID"
-                    className="w-full max-h-72 object-contain rounded-lg border border-theme bg-surface-alt"
-                  />
-                ) : selectedRequest.status !== 'pending' ? (
-                  <div className="h-48 bg-surface-alt rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-text-muted">Photo deleted after verification</p>
+                ) : aiResult ? (
+                  <div className="space-y-3">
+                    <ScoreBar label="Face match"        score={aiResult.face_score} />
+                    <ScoreBar label="Overall confidence" score={aiResult.confidence_score} />
+
+                    {(() => {
+                      const label = confidenceLabel(aiResult.confidence_score);
+                      return label ? (
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${label.bg}`}>
+                          <span className="text-sm">{label.icon}</span>
+                          <span className={`text-xs font-medium ${label.color}`}>{label.text}</span>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {(aiResult.flags?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-xs text-text-faint mb-1.5">Flags</p>
+                        <div className="flex flex-wrap gap-2">
+                          {aiResult.flags.map(f => (
+                            <span key={f} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400">
+                              <Danger className="w-3 h-3" />
+                              {f.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {aiResult.processing_ms && (
+                      <p className="text-xs text-text-faint">Processed in {aiResult.processing_ms.toLocaleString()} ms</p>
+                    )}
                   </div>
                 ) : (
-                  <div className="h-48 bg-red-500/10 rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-red-600 dark:text-red-400">Failed to load image</p>
+                  <div className="flex items-start gap-2 text-text-muted">
+                    <InfoCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs">No AI analysis available for this submission.</p>
                   </div>
                 )}
+
+                <p className="text-xs text-text-faint mt-3 pt-3 border-t border-theme leading-relaxed">
+                  ⚠️ AI scores are decision-support tools only. <strong>Your judgment as the LGU administrator governs the final decision.</strong>
+                </p>
               </div>
 
+              {/* Rejection reason display */}
               {selectedRequest.rejection_reason && (
                 <div className="p-3 bg-red-500/10 rounded-lg mb-4">
                   <p className="text-sm font-medium text-red-600 dark:text-red-400">Rejection Reason:</p>
@@ -467,22 +621,14 @@ export default function VerificationsPage() {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Action buttons */}
               {selectedRequest.status === 'pending' && (
                 <div className="flex gap-3 pt-4 border-t border-theme">
-                  <Button
-                    variant="primary"
-                    onClick={handleApprove}
-                    isLoading={actionLoading}
-                  >
+                  <Button variant="primary" onClick={handleApprove} isLoading={actionLoading}>
                     <TickSquare className="w-4 h-4 mr-1" />
-                    Approve Verification
+                    Approve
                   </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => setShowRejectModal(true)}
-                    disabled={actionLoading}
-                  >
+                  <Button variant="danger" onClick={() => setShowRejectModal(true)} disabled={actionLoading}>
                     <CloseCircle className="w-4 h-4 mr-1" />
                     Reject
                   </Button>
@@ -493,35 +639,64 @@ export default function VerificationsPage() {
         </div>
       )}
 
-      {/* ── Reject Reason Modal ── */}
+      {/* ── Reject Modal ── */}
       {selectedRequest && showRejectModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="bg-surface rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-bold text-text-primary mb-2">Reject Verification</h3>
-            <p className="text-sm text-text-muted mb-4">
-              Rejecting verification for <strong>{selectedRequest.citizen_name}</strong>.
-              Please provide a reason so the citizen can understand what to correct.
-            </p>
-            <TextArea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g. The ID photo is blurry, or the barangay does not match the ID address..."
-              rows={4}
-              className="mb-4"
-            />
-            <div className="flex gap-3">
-              <Button
-                variant="danger"
-                onClick={handleReject}
-                isLoading={actionLoading}
-                disabled={!rejectReason.trim()}
-              >
-                <CloseCircle className="w-4 h-4 mr-1" />
-                Confirm Rejection
-              </Button>
-              <Button variant="secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }}>
-                Cancel
-              </Button>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-text-primary mb-1">Reject Verification</h3>
+              <p className="text-sm text-text-muted mb-5">
+                Rejecting for <strong>{selectedRequest.citizen_name}</strong>. The reason will be shown to the citizen so they know what to fix.
+              </p>
+
+              {/* Preset chips */}
+              <p className="text-xs font-semibold text-text-faint uppercase tracking-wide mb-3">Select a reason</p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {REJECT_PRESETS.map(preset => (
+                  <button
+                    key={preset}
+                    onClick={() => { setSelectedPreset(preset); if (preset !== 'Other (specify below)') setCustomReason(''); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      selectedPreset === preset
+                        ? 'bg-text-primary text-bg border-transparent'
+                        : 'bg-surface border-theme text-text-muted hover:border-text-muted'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom text area (shown when "Other" is selected or always as extra context) */}
+              {(selectedPreset === 'Other (specify below)' || !selectedPreset) && (
+                <div className="mb-4">
+                  <p className="text-xs text-text-faint mb-1.5">
+                    {selectedPreset === 'Other (specify below)' ? 'Specify reason:' : 'Or type a custom reason:'}
+                  </p>
+                  <textarea
+                    value={customReason}
+                    onChange={e => setCustomReason(e.target.value)}
+                    placeholder="e.g. The ID photo is cut off at the edges..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-surface border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent resize-none"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  variant="danger"
+                  onClick={handleReject}
+                  isLoading={actionLoading}
+                  disabled={!selectedPreset && !customReason.trim()}
+                >
+                  <CloseCircle className="w-4 h-4 mr-1" />
+                  Confirm Rejection
+                </Button>
+                <Button variant="secondary" onClick={() => { setShowRejectModal(false); setSelectedPreset(null); setCustomReason(''); }}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>
