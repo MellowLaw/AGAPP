@@ -19,7 +19,7 @@ export function NewsScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [allNews, setAllNews] = useState<any[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [activeSegment, setActiveSegment] = useState<'latest' | 'archived'>('latest');
+  const [activeSegment, setActiveSegment] = useState<'news' | 'advisories' | 'archived'>('news');
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
@@ -74,47 +74,68 @@ export function NewsScreen({ navigation }: any) {
     setRefreshing(false);
   }, [activeLgu?.id, session, profile?.id]);
 
-  // Filter news based on search text and segment
-  const filteredNews = allNews.filter(n => {
-    const matchesSearch = 
-      n.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchText.toLowerCase());
+  // Filter and group news based on search text, segment, and item type
+  const searchFiltered = allNews.filter(n => 
+    n.title.toLowerCase().includes(searchText.toLowerCase()) ||
+    n.content.toLowerCase().includes(searchText.toLowerCase())
+  );
 
-    const isArchived = n.status === 'archived';
-    
-    // Check expiration
-    const isExpired = n.expires_at ? new Date(n.expires_at).getTime() < Date.now() : false;
-    if (isExpired) return false;
+  let featuredNews: any[] = [];
+  let latestNews: any[] = [];
 
-    if (activeSegment === 'archived') {
-      // In archived tab: show archived news that are set to public
-      return matchesSearch && isArchived && (n.is_public ?? true);
-    } else {
-      // In latest tab: show published news
-      return matchesSearch && n.status === 'published';
-    }
-  });
+  if (activeSegment === 'archived') {
+    // Archived segment: show archived/expired items (news, announcements, advisories)
+    const archivedItems = searchFiltered.filter(n => {
+      const isExpired = n.expires_at ? new Date(n.expires_at).getTime() < Date.now() : false;
+      return (n.status === 'archived' || isExpired) && (n.is_public ?? true);
+    });
 
-  // Sort: Advisories -> Announcements -> News, then sorted by date
-  const sortedFilteredNews = [...filteredNews].sort((a: any, b: any) => {
-    const typePriority = (type: string) => {
-      if (type === 'advisory') return 3;
-      if (type === 'announcement') return 2;
-      return 1;
-    };
-    
-    const priorityA = typePriority(a.type);
-    const priorityB = typePriority(b.type);
-    
-    if (priorityA !== priorityB) {
-      return priorityB - priorityA;
-    }
-    return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
-  });
+    // Sort by date (descending)
+    latestNews = [...archivedItems].sort((a, b) => 
+      new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime()
+    );
+  } else {
+    // Latest segment:
+    // 1. Get active published announcements and advisories (not expired)
+    const activeAnnouncementsAndAdvisories = searchFiltered.filter(n => {
+      const isExpired = n.expires_at ? new Date(n.expires_at).getTime() < Date.now() : false;
+      return (n.type === 'announcement' || n.type === 'advisory') && n.status === 'published' && !isExpired;
+    });
 
-  // Featured news (the first 3 items in the sorted list when on 'latest' segment)
-  const featuredNews = activeSegment === 'latest' ? sortedFilteredNews.slice(0, 3) : [];
-  const latestNews = activeSegment === 'latest' ? sortedFilteredNews.slice(3) : sortedFilteredNews;
+    // Sort active announcements: Advisories first, then Announcements, then date
+    const sortedActiveAnnouncements = [...activeAnnouncementsAndAdvisories].sort((a, b) => {
+      const typePriority = (type: string) => (type === 'advisory' ? 2 : 1);
+      const priorityA = typePriority(a.type);
+      const priorityB = typePriority(b.type);
+      if (priorityA !== priorityB) return priorityB - priorityA;
+      return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
+    });
+
+    // 2. Get active published news
+    const publishedNews = searchFiltered.filter(n => {
+      const isExpired = n.expires_at ? new Date(n.expires_at).getTime() < Date.now() : false;
+      return n.type === 'news' && n.status === 'published' && !isExpired;
+    });
+
+    // Sort news by date
+    const sortedPublishedNews = [...publishedNews].sort((a, b) => 
+      new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime()
+    );
+
+    // 3. Featured updates (carousel): items marked is_featured first, then normal priority
+    const combined = [...sortedActiveAnnouncements, ...sortedPublishedNews];
+    const sortedFeatured = [...combined].sort((a, b) => {
+      if (a.is_featured !== b.is_featured) {
+        return a.is_featured ? -1 : 1;
+      }
+      return 0;
+    });
+    featuredNews = sortedFeatured.slice(0, 3);
+
+    // 4. Latest News (vertical list): ONLY news (type === 'news') and exclude any that are already in featuredNews
+    const featuredIds = new Set(featuredNews.map(f => f.id));
+    latestNews = sortedPublishedNews.filter(n => !featuredIds.has(n.id));
+  }
 
   const renderNewsImage = (item: any) => {
     const imageAttachment = Array.isArray(item.attachments)
@@ -213,56 +234,83 @@ export function NewsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Segmented Chips Control (Latest vs Archived) */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 16 }}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveSegment('latest')}
-            style={{
-              paddingHorizontal: 18,
-              paddingVertical: 8,
-              borderRadius: 20,
-              backgroundColor: activeSegment === 'latest' ? T.accentSoft : T.card,
-              borderWidth: 1,
-              borderColor: activeSegment === 'latest' ? T.accent : T.border,
-            }}
+        {/* Segmented Chips Control (News vs Advisories & Announcements vs Archived) */}
+        <View style={{ marginBottom: 16 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
           >
-            <Text style={{
-              fontFamily: 'Octarine-Bold',
-              fontSize: 13,
-              color: activeSegment === 'latest' ? T.onAccentSoft : T.text,
-            }}>
-              Latest News
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveSegment('news')}
+              style={{
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor: activeSegment === 'news' ? T.accentSoft : T.card,
+                borderWidth: 1,
+                borderColor: activeSegment === 'news' ? T.accent : T.border,
+              }}
+            >
+              <Text style={{
+                fontFamily: 'Octarine-Bold',
+                fontSize: 13,
+                color: activeSegment === 'news' ? T.onAccentSoft : T.text,
+              }}>
+                Latest News
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveSegment('archived')}
-            style={{
-              paddingHorizontal: 18,
-              paddingVertical: 8,
-              borderRadius: 20,
-              backgroundColor: activeSegment === 'archived' ? T.accentSoft : T.card,
-              borderWidth: 1,
-              borderColor: activeSegment === 'archived' ? T.accent : T.border,
-            }}
-          >
-            <Text style={{
-              fontFamily: 'Octarine-Bold',
-              fontSize: 13,
-              color: activeSegment === 'archived' ? T.onAccentSoft : T.text,
-            }}>
-              Archives
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveSegment('advisories')}
+              style={{
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor: activeSegment === 'advisories' ? T.accentSoft : T.card,
+                borderWidth: 1,
+                borderColor: activeSegment === 'advisories' ? T.accent : T.border,
+              }}
+            >
+              <Text style={{
+                fontFamily: 'Octarine-Bold',
+                fontSize: 13,
+                color: activeSegment === 'advisories' ? T.onAccentSoft : T.text,
+              }}>
+                Advisories & Announcements
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveSegment('archived')}
+              style={{
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor: activeSegment === 'archived' ? T.accentSoft : T.card,
+                borderWidth: 1,
+                borderColor: activeSegment === 'archived' ? T.accent : T.border,
+              }}
+            >
+              <Text style={{
+                fontFamily: 'Octarine-Bold',
+                fontSize: 13,
+                color: activeSegment === 'archived' ? T.onAccentSoft : T.text,
+              }}>
+                Archives
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {loading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color={T.text} />
           </View>
-        ) : filteredNews.length === 0 ? (
+        ) : (featuredNews.length === 0 && latestNews.length === 0) ? (
           <ScrollView
             contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}
             refreshControl={
@@ -295,8 +343,8 @@ export function NewsScreen({ navigation }: any) {
               />
             }
           >
-            {/* Horizontal Featured News Carousel (ONLY on Latest Segment and when matching news exist) */}
-            {activeSegment === 'latest' && featuredNews.length > 0 && (
+            {/* Horizontal Featured News Carousel (ONLY on Latest News tab when matching news exist) */}
+            {activeSegment === 'news' && featuredNews.length > 0 && (
               <View style={{ marginBottom: 24 }}>
                 <Text style={{
                   fontFamily: 'Octarine-Bold',
@@ -341,6 +389,19 @@ export function NewsScreen({ navigation }: any) {
                           padding: 12,
                         }}
                       >
+                        {/* Category Badge */}
+                        <View style={{
+                          alignSelf: 'flex-start',
+                          backgroundColor: item.type === 'advisory' ? '#EF4444' : item.type === 'announcement' ? T.accent : 'rgba(0,0,0,0.5)',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          marginBottom: 4,
+                        }}>
+                          <Text style={{ fontSize: 8, fontFamily: 'Octarine-Bold', color: '#FFFFFF', textTransform: 'uppercase' }}>
+                            {item.type}
+                          </Text>
+                        </View>
                         <Text
                           style={{
                             fontFamily: 'Octarine-Bold',
@@ -370,11 +431,11 @@ export function NewsScreen({ navigation }: any) {
                 textTransform: 'uppercase',
                 letterSpacing: 1
               }}>
-                {activeSegment === 'latest' ? 'Latest News' : 'Archived News'}
+                {activeSegment === 'news' ? 'Latest News' : activeSegment === 'advisories' ? 'Advisories & Announcements' : 'Archived News'}
               </Text>
 
               {/* Render first item as a Large visual card if on latest segment */}
-              {activeSegment === 'latest' && latestNews.length > 0 && (
+              {activeSegment === 'news' && latestNews.length > 0 && (
                 (() => {
                   const firstItem = latestNews[0];
                   return (
@@ -406,6 +467,19 @@ export function NewsScreen({ navigation }: any) {
                           padding: 20,
                         }}
                       >
+                        {/* Category Badge */}
+                        <View style={{
+                          alignSelf: 'flex-start',
+                          backgroundColor: firstItem.type === 'advisory' ? '#EF4444' : firstItem.type === 'announcement' ? T.accent : 'rgba(0,0,0,0.5)',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          marginBottom: 6,
+                        }}>
+                          <Text style={{ fontSize: 9, fontFamily: 'Octarine-Bold', color: '#FFFFFF', textTransform: 'uppercase' }}>
+                            {firstItem.type}
+                          </Text>
+                        </View>
                         <Text
                           style={{
                             fontFamily: 'Octarine-Bold',
@@ -433,7 +507,7 @@ export function NewsScreen({ navigation }: any) {
               )}
 
               {/* Render subsequent items in a clean grid/list */}
-              {(activeSegment === 'latest' ? latestNews.slice(1) : latestNews).map((item) => (
+              {(activeSegment === 'news' ? latestNews.slice(1) : latestNews).map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   activeOpacity={0.8}
@@ -461,6 +535,19 @@ export function NewsScreen({ navigation }: any) {
                     resizeMode="cover"
                   />
                   <View style={{ flex: 1, justifyContent: 'center' }}>
+                    {/* Category Badge */}
+                    <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                      <View style={{
+                        backgroundColor: item.type === 'advisory' ? '#EF4444' : item.type === 'announcement' ? T.accent : T.textMuted,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'Octarine-Bold', color: '#FFFFFF', textTransform: 'uppercase' }}>
+                          {item.type}
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={{
                       fontFamily: 'Octarine-Bold',
                       fontSize: 14,

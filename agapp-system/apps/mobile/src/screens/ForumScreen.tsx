@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -147,6 +147,13 @@ export function ForumScreen({ navigation, route }: any) {
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchPosts();
+    setRefreshing(false);
+  }, []);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -254,7 +261,7 @@ export function ForumScreen({ navigation, route }: any) {
     try {
       let query = supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, citizen:users!citizen_id(avatar_url, name)), forum_post_likes(user_id)')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, citizen_id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name)), forum_post_likes(user_id)')
         .eq('lgu_id', lgu.id);
 
       if (profile) {
@@ -274,26 +281,21 @@ export function ForumScreen({ navigation, route }: any) {
           const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
           const postLikes = p.forum_post_likes || [];
 
-          // Collect unique replier avatars
+          // Collect unique replier avatars — dedupe strictly by citizen_id, most
+          // recent commenter first. Falls back to a neutral placeholder (not
+          // stock photos) when the user has no profile photo uploaded.
+          const DEFAULT_AVATAR = 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
+          const seenIds = new Set<string>();
           const replierAvatars: string[] = [];
-          approvedComments.forEach((c: any) => {
-            const avatar = c.citizen?.avatar_url;
-            if (avatar && !replierAvatars.includes(avatar)) {
-              replierAvatars.push(avatar);
-            }
-          });
-
-          // Pre-populate with beautiful curated avatars if comments exist
-          if (approvedComments.length > 0) {
-            const presets = [
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80',
-              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80',
-              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop&q=80',
-            ];
-            while (replierAvatars.length < Math.min(3, approvedComments.length)) {
-              const fallback = presets[replierAvatars.length % presets.length];
-              replierAvatars.push(fallback);
-            }
+          const sortedComments = [...approvedComments].sort(
+            (a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+          );
+          for (const c of sortedComments) {
+            if (replierAvatars.length >= 3) break;
+            const uid = c.citizen_id ?? c.citizen?.id;
+            if (!uid || seenIds.has(uid)) continue;
+            seenIds.add(uid);
+            replierAvatars.push(c.citizen?.avatar_url || DEFAULT_AVATAR);
           }
 
           return {
@@ -788,13 +790,10 @@ export function ForumScreen({ navigation, route }: any) {
             {/* Original Post */}
             <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, alignItems: 'flex-start', gap: 12 }}>
               <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: avatarOPBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                {selectedPost.citizen?.avatar_url ? (
-                  <Image source={{ uri: selectedPost.citizen.avatar_url }} style={{ width: 42, height: 42 }} />
-                ) : (
-                  <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 16 }}>
-                    {selectedPost.citizen_name.charAt(0).toUpperCase()}
-                  </Text>
-                )}
+                <Image
+                  source={{ uri: selectedPost.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png' }}
+                  style={{ width: 42, height: 42 }}
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -866,13 +865,10 @@ export function ForumScreen({ navigation, route }: any) {
                         }}
                       >
                         <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: commentAvatarBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                          {c.citizen?.avatar_url ? (
-                            <Image source={{ uri: c.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
-                          ) : (
-                            <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                              {c.citizen_name.charAt(0).toUpperCase()}
-                            </Text>
-                          )}
+                          <Image
+                            source={{ uri: c.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png' }}
+                            style={{ width: 36, height: 36 }}
+                          />
                         </View>
 
                         <View style={{ flex: 1 }}>
@@ -1242,7 +1238,18 @@ export function ForumScreen({ navigation, route }: any) {
         </View>
 
         {/* Threads ScrollView Container */}
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[T.accent]}
+              tintColor={T.accent}
+            />
+          }
+        >
           {/* 1. Trending Threads (Horizontal small cards - only in "For you", empty search, and "All" tag filter) */}
           {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
             <View style={{ marginBottom: 24 }}>
@@ -1358,13 +1365,10 @@ export function ForumScreen({ navigation, route }: any) {
                           marginRight: 8,
                           overflow: 'hidden',
                         }}>
-                          {thread.citizen?.avatar_url ? (
-                            <Image source={{ uri: thread.citizen.avatar_url }} style={{ width: 28, height: 28 }} />
-                          ) : (
-                            <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 11 }}>
-                              {thread.citizen_name.charAt(0).toUpperCase()}
-                            </Text>
-                          )}
+                          <Image
+                            source={{ uri: thread.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png' }}
+                            style={{ width: 28, height: 28 }}
+                          />
                         </View>
                         <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 13, color: T.text, marginRight: 4 }} numberOfLines={1}>
                           {thread.citizen_name}
@@ -1418,13 +1422,10 @@ export function ForumScreen({ navigation, route }: any) {
                     {/* Author row */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center', marginRight: 10, overflow: 'hidden' }}>
-                        {post.citizen?.avatar_url ? (
-                          <Image source={{ uri: post.citizen.avatar_url }} style={{ width: 36, height: 36 }} />
-                        ) : (
-                          <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                            {post.citizen_name.charAt(0).toUpperCase()}
-                          </Text>
-                        )}
+                        <Image
+                          source={{ uri: post.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png' }}
+                          style={{ width: 36, height: 36 }}
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text }}>

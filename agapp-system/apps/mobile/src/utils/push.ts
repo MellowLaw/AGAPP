@@ -5,7 +5,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient || Constants?.appOwnership === 'expo';
 
 export const getNotificationsModule = () => {
-  if (isExpoGo) return null;
+  if (Platform.OS === 'web') return null;
   try {
     return require('expo-notifications');
   } catch (e) {
@@ -46,8 +46,7 @@ export function isNotificationNavigable(type: string, payload: any): boolean {
 }
 
 export async function registerForPushNotificationsAsync() {
-  if (Platform.OS === 'web' || isExpoGo || !Notifications) {
-    console.log('Skipping push notifications registration (web or expo go).');
+  if (Platform.OS === 'web' || !Notifications) {
     return;
   }
 
@@ -61,7 +60,7 @@ export async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (Device.isDevice) {
+  if (Device.isDevice || isExpoGo) {
     const existingStatus = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus.granted;
     if (!existingStatus.granted) {
@@ -73,9 +72,10 @@ export async function registerForPushNotificationsAsync() {
       return;
     }
     try {
-      token = (await Notifications.getExpoPushTokenAsync()).data;
+      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     } catch (e) {
-      console.warn("Could not get push token. Note: Expo Go does not support push notifications in SDK 53+.");
+      console.warn("Could not get push token. Note: In Expo Go, push tokens require a projectId configured in app.json.");
     }
   }
 

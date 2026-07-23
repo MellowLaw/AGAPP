@@ -344,10 +344,11 @@ export function ProfileScreen({ navigation }: any) {
             }}>
               {avatarUploading ? (
                 <ActivityIndicator color="#FFFCF5" />
-              ) : profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={{ width: 80, height: 80 }} />
               ) : (
-                <Text style={{ fontSize: 26, fontFamily: 'Octarine-Bold', color: '#FFFCF5' }}>{initials}</Text>
+                <Image
+                  source={{ uri: profile?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png' }}
+                  style={{ width: 80, height: 80 }}
+                />
               )}
             </View>
             <View style={{

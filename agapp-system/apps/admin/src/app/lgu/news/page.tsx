@@ -26,6 +26,7 @@ interface AnnouncementItem {
   durationHours: number | null;
   expiresAt?: string;
   isPublic: boolean;
+  isFeatured: boolean;
   publishedAt?: string;
   scheduledFor?: string;
   publishedAtRaw?: string | null;
@@ -59,6 +60,7 @@ const mapAnnouncementRowToItem = (row: any): AnnouncementItem => {
     durationHours: row.duration_hours ?? null,
     expiresAt: row.expires_at ? new Date(row.expires_at).toLocaleString() : undefined,
     isPublic: row.is_public ?? true,
+    isFeatured: row.is_featured ?? false,
     publishedAt: row.published_at ? new Date(row.published_at).toLocaleString() : undefined,
     scheduledFor: row.scheduled_for ? new Date(row.scheduled_for).toLocaleString() : undefined,
     publishedAtRaw: row.published_at ?? null,
@@ -75,11 +77,89 @@ export default function NewsPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [isFeatured, setIsFeatured] = useState(false);
   const [formType, setFormType] = useState<'news' | 'announcement' | 'advisory'>('news');
   const [durationHours, setDurationHours] = useState<string>('manual');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editorTab, setEditorTab] = useState<'edit' | 'preview'>('edit');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertMarkdown = (before: string, after: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const selectedText = text.substring(start, end);
+
+    const replacement = before + (selectedText || '') + after;
+    const newContent = text.substring(0, start) + replacement + text.substring(end);
+    
+    setContent(newContent);
+    
+    // Put focus back to textarea
+    setTimeout(() => {
+      textarea.focus();
+      const selectionStart = start + before.length;
+      const selectionEnd = selectionStart + (selectedText || '').length;
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    }, 0);
+  };
+
+  const renderInlineFormats = (text: string) => {
+    const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-bold text-text-primary">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={index} className="italic text-text-primary">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+  };
+
+  const renderMarkdown = (text: string) => {
+    if (!text) return <p className="text-text-muted italic">No content to preview.</p>;
+
+    return text.split('\n').map((line, idx) => {
+      if (line.startsWith('# ')) {
+        return <h1 key={idx} className="text-2xl font-bold text-text-primary mt-4 mb-2 border-b border-theme pb-1">{line.substring(2)}</h1>;
+      }
+      if (line.startsWith('## ')) {
+        return <h2 key={idx} className="text-xl font-bold text-text-primary mt-3 mb-2">{line.substring(3)}</h2>;
+      }
+      if (line.startsWith('### ')) {
+        return <h3 key={idx} className="text-lg font-bold text-text-primary mt-3 mb-1">{line.substring(4)}</h3>;
+      }
+      if (line.startsWith('> ')) {
+        return <blockquote key={idx} className="border-l-4 border-accent pl-4 italic my-2 text-text-muted">{line.substring(2)}</blockquote>;
+      }
+      if (line.trim().startsWith('- ')) {
+        return <li key={idx} className="list-disc ml-6 my-1 text-text-primary">{renderInlineFormats(line.trim().substring(2))}</li>;
+      }
+      if (line.trim().startsWith('* ')) {
+        return <li key={idx} className="list-disc ml-6 my-1 text-text-primary">{renderInlineFormats(line.trim().substring(2))}</li>;
+      }
+      const numMatch = line.trim().match(/^(\d+)\.\s(.*)/);
+      if (numMatch) {
+        return <li key={idx} className="list-decimal ml-6 my-1 text-text-primary">{renderInlineFormats(numMatch[2])}</li>;
+      }
+      if (!line.trim()) {
+        return <div key={idx} className="h-4" />;
+      }
+      return (
+        <p key={idx} className="text-text-primary leading-relaxed mb-3 text-justify">
+          {renderInlineFormats(line)}
+        </p>
+      );
+    });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -95,7 +175,7 @@ export default function NewsPage() {
       const fileName = `${currentUserId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       
       const { data, error } = await supabase.storage
-        .from('service_attachments')
+        .from('service-attachments')
         .upload(fileName, file);
 
       if (error) {
@@ -105,7 +185,7 @@ export default function NewsPage() {
       }
 
       const { data: urlData } = supabase.storage
-        .from('service_attachments')
+        .from('service-attachments')
         .getPublicUrl(fileName);
 
       uploadedUrls.push({
@@ -204,6 +284,7 @@ export default function NewsPage() {
           content,
           status: 'published',
           is_public: isPublic,
+          is_featured: isFeatured,
           type: formType,
           duration_hours: durationHoursVal,
           expires_at: expiresAtVal,
@@ -234,6 +315,7 @@ export default function NewsPage() {
           content,
           status: 'published',
           is_public: isPublic,
+          is_featured: isFeatured,
           type: formType,
           duration_hours: durationHoursVal,
           expires_at: expiresAtVal,
@@ -259,6 +341,7 @@ export default function NewsPage() {
     setTitle('');
     setContent('');
     setIsPublic(true);
+    setIsFeatured(false);
     setFormType('news');
     setDurationHours('manual');
     setAttachments([]);
@@ -302,6 +385,7 @@ export default function NewsPage() {
           content,
           status: 'scheduled',
           is_public: isPublic,
+          is_featured: isFeatured,
           type: formType,
           duration_hours: durationHoursVal,
           expires_at: expiresAtVal,
@@ -332,6 +416,7 @@ export default function NewsPage() {
           content,
           status: 'scheduled',
           is_public: isPublic,
+          is_featured: isFeatured,
           type: formType,
           duration_hours: durationHoursVal,
           expires_at: expiresAtVal,
@@ -358,6 +443,7 @@ export default function NewsPage() {
     setTitle('');
     setContent('');
     setIsPublic(true);
+    setIsFeatured(false);
     setFormType('news');
     setDurationHours('manual');
     setAttachments([]);
@@ -373,6 +459,7 @@ export default function NewsPage() {
     setTitle(announcement.title);
     setContent(announcement.content);
     setIsPublic(announcement.isPublic);
+    setIsFeatured(announcement.isFeatured || false);
     setFormType(announcement.type || 'news');
     setDurationHours(announcement.durationHours ? announcement.durationHours.toString() : 'manual');
     setExistingAttachments(Array.isArray(announcement.attachmentsRaw) ? announcement.attachmentsRaw : []);
@@ -417,6 +504,7 @@ export default function NewsPage() {
     setTitle('');
     setContent('');
     setIsPublic(true);
+    setIsFeatured(false);
     setFormType('news');
     setDurationHours('manual');
     setAttachments([]);
@@ -462,11 +550,71 @@ export default function NewsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Create Form */}
           <Card>
+            {/* Warning / Explanation Banners to prevent confusion */}
+            {formType === 'advisory' && (
+              <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/50 flex items-start gap-3">
+                <span className="text-red-500 text-lg mt-0.5">⚠️</span>
+                <div>
+                  <h3 className="font-bold text-red-600 dark:text-red-400">CRITICAL: Creating LGU Advisory</h3>
+                  <p className="text-xs text-red-600/80 dark:text-red-300/80 mt-0.5 leading-relaxed">
+                    Advisories are for emergency warnings, road closures, severe weather, health alerts, or local crises. Citizens will see this with a red status badge on the mobile app's Advisories quick action.
+                  </p>
+                </div>
+              </div>
+            )}
+            {formType === 'announcement' && (
+              <div className="mb-6 p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/50 flex items-start gap-3">
+                <span className="text-indigo-500 text-lg mt-0.5">📢</span>
+                <div>
+                  <h3 className="font-bold text-indigo-600 dark:text-indigo-400">Creating LGU Announcement</h3>
+                  <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
+                    Announcements are for municipal programs, community town halls, holiday notices, and job openings. Citizens will see this in their Community tab.
+                  </p>
+                </div>
+              </div>
+            )}
+            {formType === 'news' && (
+              <div className="mb-6 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/50 flex items-start gap-3">
+                <span className="text-emerald-500 text-lg mt-0.5">📰</span>
+                <div>
+                  <h3 className="font-bold text-emerald-600 dark:text-emerald-400">Creating Public News Article</h3>
+                  <p className="text-xs text-emerald-600/80 dark:text-emerald-300/80 mt-0.5 leading-relaxed">
+                    News reports are for municipal accomplishments, development updates, and general information. Citizens will see this in their Latest News list.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <h2 className="text-lg font-semibold text-text-primary mb-6">
-              Create {formType === 'advisory' ? 'Advisory' : formType === 'announcement' ? 'Announcement' : 'News'}
+              {editingAnnouncement ? 'Edit' : 'Create'} {formType === 'advisory' ? 'Advisory' : formType === 'announcement' ? 'Announcement' : 'News'}
             </h2>
             
             <div className="space-y-4">
+              {/* Type Switcher Selector inside form */}
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Change Article Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['news', 'announcement', 'advisory'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFormType(type)}
+                      className={`py-2 px-3 text-xs font-bold border transition-all uppercase tracking-wider ${
+                        formType === type
+                          ? type === 'advisory'
+                            ? 'bg-red-500 text-white border-red-500 shadow-sm'
+                            : type === 'announcement'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-surface border-theme text-text-primary hover:bg-surface-alt'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Input
                 label="Title"
                 placeholder="Enter announcement title"
@@ -474,13 +622,86 @@ export default function NewsPage() {
                 onChange={(e) => setTitle(e.target.value)}
               />
 
-              <TextArea
-                label="Content"
-                placeholder="Write your announcement here..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={8}
-              />
+              <div className="space-y-1.5">
+                <label className="block text-sm text-text-muted">Content</label>
+                <div className="border border-theme rounded-md overflow-hidden bg-surface">
+                  {/* Toolbar */}
+                  <div className="flex items-center gap-1 p-2 bg-surface-alt border-b border-theme flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('**', '**')}
+                      className="px-2.5 py-1 hover:bg-surface border border-theme rounded text-sm font-bold text-text-primary hover:text-accent transition-colors"
+                      title="Bold"
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('*', '*')}
+                      className="px-2.5 py-1 hover:bg-surface border border-theme rounded text-sm italic text-text-primary hover:text-accent transition-colors"
+                      title="Italic"
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('# ')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs font-semibold text-text-primary hover:text-accent transition-colors"
+                      title="Heading 1"
+                    >
+                      H1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('## ')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs font-semibold text-text-primary hover:text-accent transition-colors"
+                      title="Heading 2"
+                    >
+                      H2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('- ')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs text-text-primary hover:text-accent transition-colors font-medium"
+                      title="Bullet List"
+                    >
+                      List
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('1. ')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs text-text-primary hover:text-accent transition-colors font-medium"
+                      title="Numbered List"
+                    >
+                      1. List
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('> ')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs text-text-primary hover:text-accent transition-colors font-medium"
+                      title="Quote"
+                    >
+                      Quote
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertMarkdown('\n\n')}
+                      className="px-2 py-1 hover:bg-surface border border-theme rounded text-xs text-text-primary hover:text-accent transition-colors font-medium"
+                      title="Line Break / Space"
+                    >
+                      Break
+                    </button>
+                  </div>
+                  <textarea
+                    ref={textareaRef}
+                    placeholder="Write content here. Markdown syntax is supported (e.g. **bold**, *italic*, # Headings, - Lists). Use the toolbar or write manually."
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    rows={12}
+                    className="w-full px-3 py-2 bg-surface text-text-primary placeholder-text-faint focus:outline-none resize-none font-sans text-sm leading-relaxed"
+                  />
+                </div>
+              </div>
 
               {/* Public/Private Toggle Option */}
               <div className="flex items-center gap-3 py-2">
@@ -493,6 +714,20 @@ export default function NewsPage() {
                 />
                 <label htmlFor="isPublicCheckbox" className="text-sm font-medium text-text-primary select-none cursor-pointer">
                   Visible to Citizens (Make Public)
+                </label>
+              </div>
+
+              {/* Feature on Homepage Toggle Option */}
+              <div className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id="isFeaturedCheckbox"
+                  checked={isFeatured}
+                  onChange={(e) => setIsFeatured(e.target.checked)}
+                  className="w-4 h-4 rounded border-theme text-primary focus:ring-primary"
+                />
+                <label htmlFor="isFeaturedCheckbox" className="text-sm font-medium text-text-primary select-none cursor-pointer flex items-center gap-1.5">
+                  ⭐ Feature on Homepage Carousel
                 </label>
               </div>
 
@@ -614,13 +849,13 @@ export default function NewsPage() {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="mb-4">
-                    <h4 className="font-semibold text-text-primary text-sm mb-2">
+                    <h4 className="font-semibold text-text-primary text-sm mb-2 border-b border-theme pb-1">
                       {title || 'Announcement Title'}
                     </h4>
-                    <p className="text-xs text-text-muted mb-2">
-                      {content || 'Announcement content will appear here...'}
-                    </p>
-                    <p className="text-xs text-[#2563eb]">Read more</p>
+                    <div className="text-xs text-text-muted mb-2">
+                      {renderMarkdown(content || 'Announcement content will appear here...')}
+                    </div>
+                    <p className="text-xs text-[#2563eb] mt-2">Read more</p>
                   </div>
                 </div>
               </div>
@@ -653,6 +888,11 @@ export default function NewsPage() {
                     <Badge variant={announcement.type === 'advisory' ? 'error' : announcement.type === 'announcement' ? 'info' : 'default'}>
                       {announcement.type === 'advisory' ? 'Advisory' : announcement.type === 'announcement' ? 'Announcement' : 'News'}
                     </Badge>
+                    {announcement.isFeatured && (
+                      <Badge variant="warning">
+                        ⭐ Featured
+                      </Badge>
+                    )}
                   </div>
                   
                   <p className="text-text-muted text-sm mb-3 line-clamp-2">{announcement.content}</p>

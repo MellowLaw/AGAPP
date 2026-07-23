@@ -310,6 +310,11 @@ export function HomeScreen({ navigation }: any) {
         });
 
         const sorted = [...unexpired].sort((a: any, b: any) => {
+          // 1. Prioritize is_featured first
+          if (a.is_featured !== b.is_featured) {
+            return a.is_featured ? -1 : 1;
+          }
+          // 2. Prioritize type (advisory > announcement > news)
           const typePriority = (type: string) => {
             if (type === 'advisory') return 3;
             if (type === 'announcement') return 2;
@@ -320,6 +325,7 @@ export function HomeScreen({ navigation }: any) {
           if (priorityA !== priorityB) {
             return priorityB - priorityA;
           }
+          // 3. Newest first
           return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
         });
 
@@ -329,10 +335,11 @@ export function HomeScreen({ navigation }: any) {
       // 2. Fetch trending threads
       const { data: forumData } = await supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name))')
+        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, citizen_id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name))')
         .eq('lgu_id', activeLgu.id)
         .eq('is_approved', true)
-        .limit(10);
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (forumData) {
         const mapped = forumData.map((p: any) => {
@@ -340,17 +347,16 @@ export function HomeScreen({ navigation }: any) {
             .filter((c: any) => c.is_approved)
             .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           
+          const DEFAULT_AVATAR = 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
           const replierAvatars: string[] = [];
           const seenCitizenIds = new Set<string>();
 
           approvedComments.forEach((c: any) => {
             if (replierAvatars.length >= 3) return;
-            const citizenId = c.citizen_id || c.citizen?.id || c.citizen_name;
-            if (citizenId && !seenCitizenIds.has(citizenId)) {
-              seenCitizenIds.add(citizenId);
-              const avatar = c.citizen?.avatar_url || 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
-              replierAvatars.push(avatar);
-            }
+            const citizenId = c.citizen_id || c.citizen?.id;
+            if (!citizenId || seenCitizenIds.has(citizenId)) return;
+            seenCitizenIds.add(citizenId);
+            replierAvatars.push(c.citizen?.avatar_url || DEFAULT_AVATAR);
           });
 
           return {
@@ -360,7 +366,13 @@ export function HomeScreen({ navigation }: any) {
           };
         });
 
-        const sorted = mapped.sort((a, b) => b.commentsCount - a.commentsCount);
+        const sorted = mapped.sort((a, b) => {
+          if (b.commentsCount !== a.commentsCount) {
+            return b.commentsCount - a.commentsCount;
+          }
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
         if (sorted.length > 0) {
           setTrendingThread(sorted[0]);
         } else {
@@ -406,6 +418,24 @@ export function HomeScreen({ navigation }: any) {
   useEffect(() => {
     onRefresh();
   }, [activeLgu.id, profile, onRefresh]);
+
+  // One-time Splash Greeting logic for new sign-ins/registrations
+  useEffect(() => {
+    const checkGreetingFlag = async () => {
+      if (!profile?.id) return;
+      try {
+        // Use a global flag so that once anyone on the device has seen it, it never appears again on reopening.
+        const flag = await AsyncStorage.getItem('hasSeenGreeting_global');
+        if (!flag) {
+          await AsyncStorage.setItem('hasSeenGreeting_global', 'true');
+          navigation.navigate('SplashGreeting');
+        }
+      } catch (err) {
+        console.warn('[HomeScreen] Failed checking greeting flag:', err);
+      }
+    };
+    checkGreetingFlag();
+  }, [profile?.id]);
 
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';
 
@@ -716,16 +746,26 @@ export function HomeScreen({ navigation }: any) {
               </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 36 }}>
+                <Text 
+                  numberOfLines={1} 
+                  adjustsFontSizeToFit 
+                  minimumFontScale={0.65}
+                  style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 36 }}
+                >
                   {getGreeting()}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 }}>
-                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 34 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 2, flexWrap: 'nowrap' }}>
+                  <Text 
+                    numberOfLines={1} 
+                    adjustsFontSizeToFit 
+                    minimumFontScale={0.65}
+                    style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 32, lineHeight: 34, flexShrink: 1 }}
+                  >
                     {firstName}!
                   </Text>
                   <Image
                     source={require('../../assets/brand/mascot.png')}
-                    style={{ width: 56, height: 28, marginLeft: 8, marginBottom: 3 }}
+                    style={{ width: 56, height: 28, marginLeft: 8, marginBottom: 3, flexShrink: 0 }}
                     resizeMode="contain"
                   />
                 </View>
@@ -983,19 +1023,33 @@ export function HomeScreen({ navigation }: any) {
                   paddingHorizontal: 20,
                   paddingBottom: 16,
                   flexDirection: 'row',
-                  alignItems: 'center',
+                  alignItems: 'flex-end',
                   justifyContent: 'space-between',
                   gap: 12,
                 }}>
-                  <Text style={{
-                    fontFamily: 'Octarine-Bold',
-                    fontSize: 18,
-                    color: T.text,
-                    lineHeight: 22,
-                    flex: 1,
-                  }} numberOfLines={2}>
-                    {news[carouselIndex].title}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    {/* Category Badge */}
+                    <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                      <View style={{
+                        backgroundColor: news[carouselIndex].type === 'advisory' ? '#EF4444' : news[carouselIndex].type === 'announcement' ? T.accent : 'rgba(0,0,0,0.5)',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}>
+                        <Text style={{ fontSize: 8, fontFamily: 'Octarine-Bold', color: '#FFFFFF', textTransform: 'uppercase' }}>
+                          {news[carouselIndex].type}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{
+                      fontFamily: 'Octarine-Bold',
+                      fontSize: 18,
+                      color: T.text,
+                      lineHeight: 22,
+                    }} numberOfLines={2}>
+                      {news[carouselIndex].title}
+                    </Text>
+                  </View>
 
                   <TouchableOpacity
                     onPress={() => {
@@ -1082,7 +1136,34 @@ export function HomeScreen({ navigation }: any) {
                   {/* Description with blend cover & button */}
                   <View style={{ position: 'relative' }}>
                     <Text style={{ fontSize: 14, fontFamily: 'Inter-Medium', color: T.text, lineHeight: 20, paddingBottom: 64 }} numberOfLines={4}>
-                      {n.body || n.content}
+                      {(() => {
+                        let text = n.body || n.content || '';
+                        // Strip header markers and bullet dash prefixes for clean snippet display
+                        text = text
+                          .replace(/^#+\s+/gm, '')
+                          .replace(/^-\s+/gm, '')
+                          .replace(/^\*\s+/gm, '');
+
+                        const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+                        const parts = text.split(regex);
+                        return parts.map((part: string, index: number) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return (
+                              <Text key={index} style={{ fontFamily: 'Inter-Bold', fontWeight: 'bold' }}>
+                                {part.slice(2, -2)}
+                              </Text>
+                            );
+                          }
+                          if (part.startsWith('*') && part.endsWith('*')) {
+                            return (
+                              <Text key={index} style={{ fontStyle: 'italic' }}>
+                                {part.slice(1, -1)}
+                              </Text>
+                            );
+                          }
+                          return part;
+                        });
+                      })()}
                     </Text>
                     
                     {/* Blend gradient overlay at the bottom fading out text (blends with T.card) */}
@@ -1832,7 +1913,33 @@ export function HomeScreen({ navigation }: any) {
                           {item.title}
                         </Text>
                         <Text style={{ fontFamily: 'Inter-Medium', fontSize: 13, color: T.textMuted, marginTop: 4, lineHeight: 18 }} numberOfLines={2}>
-                          {item.body || item.content}
+                          {(() => {
+                            let text = item.body || item.content || '';
+                            text = text
+                              .replace(/^#+\s+/gm, '')
+                              .replace(/^-\s+/gm, '')
+                              .replace(/^\*\s+/gm, '');
+
+                            const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+                            const parts = text.split(regex);
+                            return parts.map((part: string, index: number) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return (
+                                  <Text key={index} style={{ fontFamily: 'Inter-Bold', fontWeight: 'bold' }}>
+                                    {part.slice(2, -2)}
+                                  </Text>
+                                );
+                              }
+                              if (part.startsWith('*') && part.endsWith('*')) {
+                                return (
+                                  <Text key={index} style={{ fontStyle: 'italic' }}>
+                                    {part.slice(1, -1)}
+                                  </Text>
+                                );
+                              }
+                              return part;
+                            });
+                          })()}
                         </Text>
                         <Text style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: T.textMuted, marginTop: 8 }}>
                           {new Date(item.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}

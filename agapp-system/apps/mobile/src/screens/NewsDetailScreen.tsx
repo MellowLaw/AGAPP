@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
 import { PASTELS } from '../theme';
-import { ArrowLeft2, DocumentText, Danger } from 'iconsax-react-native';
+import { ArrowLeft2, DocumentText, Danger, ArrowRight2 } from 'iconsax-react-native';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 export function NewsDetailScreen({ route, navigation }: any) {
@@ -57,6 +57,35 @@ export function NewsDetailScreen({ route, navigation }: any) {
     : null;
   const imageUrl = imageAttachment?.url || news.banner_url || news.photo_url || null;
 
+  const getPillDetails = () => {
+    switch (news.type) {
+      case 'advisory':
+        return {
+          bg: '#fee2e2',
+          text: 'ADVISORY',
+          color: '#ef4444',
+          Icon: Danger,
+        };
+      case 'announcement':
+        return {
+          bg: '#e0e7ff',
+          text: 'ANNOUNCEMENT',
+          color: '#4f46e5',
+          Icon: DocumentText,
+        };
+      case 'news':
+      default:
+        return {
+          bg: '#ccfbf1',
+          text: 'NEWS',
+          color: '#0d9488',
+          Icon: DocumentText,
+        };
+    }
+  };
+
+  const pill = getPillDetails();
+
   return (
     <ScreenBackground>
       <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
@@ -72,8 +101,8 @@ export function NewsDetailScreen({ route, navigation }: any) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
               <ArrowLeft2 size={30} color={T.text} variant="Outline" />
             </TouchableOpacity>
-            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 20, marginLeft: 16 }}>
-              Announcement
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 20, marginLeft: 16, textTransform: 'capitalize' }}>
+              {news.type === 'news' ? 'News' : news.type === 'advisory' ? 'Advisory' : 'Announcement'}
             </Text>
           </View>
 
@@ -102,7 +131,7 @@ export function NewsDetailScreen({ route, navigation }: any) {
                   paddingHorizontal: 12,
                   paddingVertical: 4,
                   borderRadius: 12,
-                  backgroundColor: T.accentSoft,
+                  backgroundColor: pill.bg,
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
@@ -112,8 +141,8 @@ export function NewsDetailScreen({ route, navigation }: any) {
                   shadowOpacity: 0.2,
                   shadowRadius: 1.41,
                 }}>
-                  <DocumentText size={14} color="#292929" variant="Bold" />
-                  <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: '#292929' }}>ANNOUNCEMENT</Text>
+                  <pill.Icon size={14} color={pill.color} variant="Bold" />
+                  <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: pill.color }}>{pill.text}</Text>
                 </View>
               </View>
             ) : (
@@ -123,14 +152,14 @@ export function NewsDetailScreen({ route, navigation }: any) {
                 paddingHorizontal: 12,
                 paddingVertical: 4,
                 borderRadius: 12,
-                backgroundColor: T.accentSoft,
+                backgroundColor: pill.bg,
                 marginBottom: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
               }}>
-                <DocumentText size={14} color="#292929" variant="Bold" />
-                <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: '#292929' }}>ANNOUNCEMENT</Text>
+                <pill.Icon size={14} color={pill.color} variant="Bold" />
+                <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: pill.color }}>{pill.text}</Text>
               </View>
             )}
 
@@ -148,26 +177,130 @@ export function NewsDetailScreen({ route, navigation }: any) {
             <View style={{ height: 1, backgroundColor: T.border, opacity: 0.15, marginBottom: 20 }} />
 
             {/* Content body text */}
-            {(news.content || news.body || '').split('\n').map((paragraph: string, idx: number) => {
-              const trimmed = paragraph.trim();
-              if (!trimmed) return <View key={idx} style={{ height: 12 }} />;
+            {(news.content || news.body || '').split('\n').map((line: string, idx: number) => {
+              if (line === '') return <View key={idx} style={{ height: 12 }} />;
+              
+              const isH1 = line.startsWith('# ');
+              const isH2 = line.startsWith('## ');
+              const isBullet = line.trim().startsWith('- ') || line.trim().startsWith('* ');
+
+              let cleanLine = line;
+              let fontSize = 15;
+              let fontFamily = 'Inter-Medium';
+              let fontWeight: "normal" | "bold" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | undefined = 'normal';
+              let marginBottom = 12;
+              let marginLeft = 0;
+
+              if (isH1) {
+                cleanLine = line.substring(2);
+                fontSize = 22;
+                fontFamily = 'Octarine-Bold';
+                fontWeight = 'bold';
+                marginBottom = 16;
+              } else if (isH2) {
+                cleanLine = line.substring(3);
+                fontSize = 18;
+                fontFamily = 'Octarine-Bold';
+                fontWeight = 'bold';
+                marginBottom = 14;
+              } else if (isBullet) {
+                cleanLine = '•  ' + line.trim().substring(2);
+                marginLeft = 16;
+                marginBottom = 8;
+              }
+
+              // Helper function to render inline markdown formats (bold/italic)
+              const renderInline = (text: string) => {
+                const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+                const parts = text.split(regex);
+                return parts.map((part, index) => {
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    return (
+                      <Text key={index} style={{ fontFamily: 'Inter-Bold', fontWeight: 'bold' }}>
+                        {part.slice(2, -2)}
+                      </Text>
+                    );
+                  }
+                  if (part.startsWith('*') && part.endsWith('*')) {
+                    return (
+                      <Text key={index} style={{ fontStyle: 'italic' }}>
+                        {part.slice(1, -1)}
+                      </Text>
+                    );
+                  }
+                  return part;
+                });
+              };
+
               return (
                 <Text
                   key={idx}
                   style={{
                     color: T.text,
-                    fontFamily: 'Inter-Medium',
-                    fontSize: 15,
-                    lineHeight: 26,
-                    textAlign: 'justify',
-                    marginBottom: 12,
+                    fontFamily,
+                    fontSize,
+                    fontWeight,
+                    lineHeight: fontSize * 1.6,
+                    textAlign: isH1 || isH2 ? 'left' : 'justify',
+                    marginBottom,
+                    marginLeft,
                   }}
                   textBreakStrategy="highQuality"
                 >
-                  {trimmed}
+                  {renderInline(cleanLine)}
                 </Text>
               );
             })}
+
+            {/* Attachments Section */}
+            {Array.isArray(news.attachments) && news.attachments.filter((att: any) => !att.type?.startsWith('image/') && !/\.(jpg|jpeg|png|webp|gif)/i.test(att.url)).length > 0 && (
+              <View style={{ marginTop: 32 }}>
+                <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginBottom: 12 }}>
+                  Attachments
+                </Text>
+                {news.attachments
+                  .filter((att: any) => !att.type?.startsWith('image/') && !/\.(jpg|jpeg|png|webp|gif)/i.test(att.url))
+                  .map((att: any, idx: number) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={async () => {
+                        try {
+                          const supported = await Linking.canOpenURL(att.url);
+                          if (supported) {
+                            await Linking.openURL(att.url);
+                          } else {
+                            Alert.alert('Error', 'Cannot open this attachment URL.');
+                          }
+                        } catch (error) {
+                          console.error('Error opening URL:', error);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: T.card,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        borderRadius: 16,
+                        padding: 16,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <DocumentText size={24} color={T.accent} variant="Bold" style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontFamily: 'Inter-Bold', fontSize: 14, color: T.text }} numberOfLines={1}>
+                          {att.name || 'Attachment'}
+                        </Text>
+                        <Text style={{ fontFamily: 'Inter-Medium', fontSize: 11, color: T.textMuted, marginTop: 2 }}>
+                          {att.type === 'application/pdf' ? 'PDF Document' : 'File Attachment'}
+                        </Text>
+                      </View>
+                      <ArrowRight2 size={18} color={T.textMuted} variant="Outline" />
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
           </ScrollView>
         </View>
       </SafeAreaView>
