@@ -8,8 +8,17 @@ import { createServerClient } from '@supabase/ssr';
 // means a forged `role` value can never slip through either check alone.
 const CREATABLE_ROLES = ['LGU_ADMIN', 'LGU_PERSONNEL'] as const;
 
+// Mirror of v_allowed in the set_staff_modules() SQL function and of
+// ADMIN_MODULES in src/lib/modules.ts. Validated here too so a forged request
+// can't seed an unknown module string straight into the profile row (this path
+// inserts with the service-role key, which bypasses RLS).
+const ALLOWED_MODULES = [
+  'dashboard', 'reports', 'services', 'eservices-catalog', 'news',
+  'forum', 'facilities', 'citizen-guide', 'citizens', 'verifications',
+] as const;
+
 export async function POST(req: NextRequest) {
-  const { email, password, name, role, lguId } = await req.json();
+  const { email, password, name, role, lguId, modulePermissions } = await req.json();
 
   if (!email || !password || !name || !role || !lguId) {
     return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
@@ -17,6 +26,20 @@ export async function POST(req: NextRequest) {
 
   if (!CREATABLE_ROLES.includes(role)) {
     return NextResponse.json({ error: 'Invalid role for this endpoint.' }, { status: 400 });
+  }
+
+  // Admins implicitly hold every module, so a list is only meaningful for
+  // personnel — ignore whatever was sent for an LGU_ADMIN.
+  let modules: string[] = [];
+  if (role === 'LGU_PERSONNEL' && modulePermissions != null) {
+    if (!Array.isArray(modulePermissions)) {
+      return NextResponse.json({ error: 'modulePermissions must be an array.' }, { status: 400 });
+    }
+    const unknown = modulePermissions.filter((m: unknown) => !ALLOWED_MODULES.includes(m as any));
+    if (unknown.length) {
+      return NextResponse.json({ error: `Unknown module(s): ${unknown.join(', ')}` }, { status: 400 });
+    }
+    modules = Array.from(new Set(modulePermissions as string[]));
   }
 
   // ── Auth check — runs before anything reveals server config state ───────
@@ -88,6 +111,7 @@ export async function POST(req: NextRequest) {
     lgu_id: lguId,
     is_active: true,
     notification_preferences: { push: true, sms: true, email: true },
+    module_permissions: modules,
   });
 
   if (dbError) {

@@ -1635,3 +1635,420 @@ CREATE TRIGGER forum_post_likes_guard
   BEFORE INSERT ON forum_post_likes
   FOR EACH ROW EXECUTE FUNCTION public.guard_forum_like_insert();
 
+-- 17. PRIVILEGED users COLUMN GUARD  (see patch 11_fix_staff_column_escalation.sql)
+-- SECURITY: `role`, `lgu_id` and `is_active` had NO guard, while the policy
+-- "Users can update their own record" is USING (auth.uid() = id) with no column
+-- restriction and `authenticated` holds a table-level UPDATE grant. Any signed-in
+-- citizen could therefore PATCH their own row to role='LGU_ADMIN' and take over the
+-- admin panel for their municipality. Verified exploitable on 2026-07-25 (in a
+-- rolled-back transaction) before this guard was written.
+-- Only these three columns are inspected, so ordinary profile edits (name, email,
+-- avatar_url, notification_preferences, …) are untouched.
+CREATE OR REPLACE FUNCTION public.guard_staff_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER            -- reads users; DEFINER avoids RLS recursion
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_role text;
+  v_caller_lgu  text;
+BEGIN
+  IF current_setting('app.skip_staff_guard', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Absolute: no direct writes, by anyone, outside set_staff_modules().
+  -- Without this a personnel could PATCH their own module_permissions and
+  -- grant themselves every module.
+  IF NEW.module_permissions IS DISTINCT FROM OLD.module_permissions THEN
+    RAISE EXCEPTION 'Module permissions can only be changed through set_staff_modules().';
+  END IF;
+
+  -- Nothing privileged changed → ordinary profile edit.
+  IF NEW.role      IS NOT DISTINCT FROM OLD.role
+     AND NEW.lgu_id    IS NOT DISTINCT FROM OLD.lgu_id
+     AND NEW.is_active IS NOT DISTINCT FROM OLD.is_active
+  THEN
+    RETURN NEW;
+  END IF;
+
+  -- Service-role / seed / DB-side jobs have no JWT subject. anon can't reach
+  -- this path anyway (the self-update policy requires auth.uid() = id).
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT role, lgu_id INTO v_caller_role, v_caller_lgu
+  FROM users WHERE id = auth.uid();
+
+  IF v_caller_role = 'SUPER_ADMIN' THEN
+    RETURN NEW;
+  END IF;
+
+  -- A citizen choosing their municipality in the mobile app
+  -- (apps/mobile AuthContext.tsx setSelectedLgu): lgu_id may change,
+  -- role and is_active must not.
+  IF auth.uid() = OLD.id
+     AND OLD.role = 'CITIZEN'
+     AND NEW.role      IS NOT DISTINCT FROM OLD.role
+     AND NEW.is_active IS NOT DISTINCT FROM OLD.is_active
+  THEN
+    RETURN NEW;
+  END IF;
+
+  -- An LGU admin managing staff inside their own LGU (apps/admin
+  -- lgu/settings staff editor). Cannot move an account between LGUs, and
+  -- cannot pull a CITIZEN into a staff role — staff creation goes through
+  -- /api/create-staff (authenticated, role-allowlisted, service-role INSERT).
+  IF v_caller_role = 'LGU_ADMIN'
+     AND v_caller_lgu = OLD.lgu_id
+     AND NEW.lgu_id IS NOT DISTINCT FROM OLD.lgu_id
+     AND OLD.role IN ('LGU_ADMIN', 'LGU_PERSONNEL')
+     AND NEW.role IN ('LGU_ADMIN', 'LGU_PERSONNEL')
+  THEN
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'Account role, LGU and status can only be changed by an authorized administrator.';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS users_guard_staff_columns ON users;
+CREATE TRIGGER users_guard_staff_columns
+  BEFORE UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.guard_staff_columns();
+
+-- 18. PER-STAFF MODULE PERMISSIONS  (see patch 12_staff_module_permissions.sql)
+-- An LGU Admin picks which sections of the admin panel each LGU_PERSONNEL
+-- account can use. Enforced in the RLS policies below via staff_can(), not
+-- just hidden in the sidebar. text[] rather than jsonb: it's a list, not a
+-- key→value config, and `'reports' = ANY(...)` keeps the predicates readable.
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS module_permissions text[] NOT NULL DEFAULT '{}';
+
+-- Existing personnel keep exactly what they could reach before this feature
+-- (the old hardcoded personnel nav was My Queue + Issue Reports).
+UPDATE users
+   SET module_permissions = '{reports,services}'
+ WHERE role = 'LGU_PERSONNEL'
+   AND module_permissions = '{}';
+
+-- Used inside RLS policies. SECURITY DEFINER so reading `users` from a policy
+-- on/joined to `users` can't recurse — same pattern as get_current_user_role().
+-- Admins short-circuit to true, so adding `AND staff_can('x')` to an existing
+-- staff policy never changes admin behaviour.
+CREATE OR REPLACE FUNCTION public.staff_can(p_module text)
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM users u
+    WHERE u.id = auth.uid()
+      AND COALESCE(u.is_active, true)
+      AND (
+        u.role IN ('SUPER_ADMIN', 'LGU_ADMIN')
+        OR (u.role = 'LGU_PERSONNEL' AND p_module = ANY(u.module_permissions))
+      )
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.staff_can(text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.staff_can(text) TO authenticated;
+
+-- The only sanctioned writer of module_permissions (the guard above blocks
+-- every direct write).
+CREATE OR REPLACE FUNCTION public.set_staff_modules(
+  p_user_id uuid,
+  p_modules text[]
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_target  users%ROWTYPE;
+  v_caller  users%ROWTYPE;
+  v_allowed text[] := ARRAY[
+    'dashboard', 'reports', 'services', 'eservices-catalog', 'news',
+    'forum', 'facilities', 'citizen-guide', 'citizens', 'verifications'
+  ];
+  v_mod text;
+BEGIN
+  SELECT * INTO v_target FROM users WHERE id = p_user_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Staff account not found.';
+  END IF;
+
+  -- Admins implicitly hold every module; only personnel carry a list.
+  IF v_target.role <> 'LGU_PERSONNEL' THEN
+    RAISE EXCEPTION 'Module permissions apply only to LGU personnel accounts.';
+  END IF;
+
+  SELECT * INTO v_caller FROM users WHERE id = auth.uid();
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Caller account not found.';
+  END IF;
+
+  IF NOT (v_caller.role = 'SUPER_ADMIN'
+          OR (v_caller.role = 'LGU_ADMIN' AND v_caller.lgu_id = v_target.lgu_id)) THEN
+    RAISE EXCEPTION 'Not authorized to manage staff for this LGU.';
+  END IF;
+
+  FOREACH v_mod IN ARRAY COALESCE(p_modules, '{}'::text[]) LOOP
+    IF NOT (v_mod = ANY(v_allowed)) THEN
+      RAISE EXCEPTION 'Unknown module: %', v_mod;
+    END IF;
+  END LOOP;
+
+  PERFORM set_config('app.skip_staff_guard', 'on', true);
+
+  UPDATE users
+     SET module_permissions = COALESCE(p_modules, '{}'::text[])
+   WHERE id = p_user_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.set_staff_modules(uuid, text[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_staff_modules(uuid, text[]) TO authenticated;
+
+-- ============================================================
+-- 19. FINAL STAFF-POLICY STATE
+--     (patches 13_rls_module_gating.sql + 14_fix_guest_reads_users_subquery.sql)
+--
+--     These DROP/CREATE statements deliberately SUPERSEDE the earlier
+--     definitions of the same policies further up this file. They are kept
+--     here, after staff_can() exists, because they depend on it. Two changes
+--     are folded in together:
+--
+--     (a) MODULE GATING — `AND staff_can('<module>')` is appended to every
+--         policy that granted LGU_PERSONNEL access. staff_can() returns true
+--         for LGU_ADMIN/SUPER_ADMIN, so admin behaviour is unchanged; only
+--         personnel are narrowed to their granted modules. Without this the
+--         sidebar filtering would be cosmetic — a personnel could still read
+--         or write any of these tables with a direct REST call.
+--
+--     (b) NO RAW `users` SUBQUERIES IN GUEST-EVALUATED POLICIES — a policy
+--         referencing another table requires the caller to hold table-level
+--         SELECT on that table, even when the subquery can never match. Since
+--         anon only holds a column-level grant on `users` (id, name,
+--         avatar_url — see section 10.2), any `FROM users` subquery in a
+--         `TO public` policy made guest reads fail with 42501. The lookups go
+--         through the SECURITY DEFINER helpers get_current_user_role() /
+--         get_current_user_lgu() instead, which read `users` as their owner.
+-- ============================================================
+
+-- reports → 'reports'
+DROP POLICY IF EXISTS "Staff read reports in their LGU" ON reports;
+CREATE POLICY "Staff read reports in their LGU" ON reports
+  FOR SELECT USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = reports.lgu_id
+    AND staff_can('reports')
+  );
+
+DROP POLICY IF EXISTS "Allow LGU personnel to update reports under their LGU" ON reports;
+CREATE POLICY "Allow LGU personnel to update reports under their LGU" ON reports
+  FOR UPDATE USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = reports.lgu_id
+    AND staff_can('reports')
+  );
+
+-- service_requests → 'services'
+DROP POLICY IF EXISTS "Allow LGU admins/personnel to view and modify service requests" ON service_requests;
+CREATE POLICY "Allow LGU admins/personnel to view and modify service requests" ON service_requests
+  FOR ALL USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = service_requests.lgu_id
+    AND staff_can('services')
+  );
+
+-- news_announcements → 'news'
+DROP POLICY IF EXISTS "Allow LGU staff to manage announcements" ON news_announcements;
+CREATE POLICY "Allow LGU staff to manage announcements" ON news_announcements
+  FOR ALL USING (
+    get_current_user_role() IN ('LGU_ADMIN', 'LGU_PERSONNEL')
+    AND get_current_user_lgu() = news_announcements.lgu_id
+    AND staff_can('news')
+  );
+
+-- citizen_guides → 'citizen-guide'  (public SELECT policy untouched)
+DROP POLICY IF EXISTS "Allow staff to insert citizen_guides" ON citizen_guides;
+CREATE POLICY "Allow staff to insert citizen_guides" ON citizen_guides
+  FOR INSERT WITH CHECK (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = citizen_guides.lgu_id
+    AND staff_can('citizen-guide')
+  );
+
+DROP POLICY IF EXISTS "Allow staff to update citizen_guides" ON citizen_guides;
+CREATE POLICY "Allow staff to update citizen_guides" ON citizen_guides
+  FOR UPDATE
+  USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = citizen_guides.lgu_id
+    AND staff_can('citizen-guide')
+  )
+  WITH CHECK (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = citizen_guides.lgu_id
+    AND staff_can('citizen-guide')
+  );
+
+DROP POLICY IF EXISTS "Allow staff to delete citizen_guides" ON citizen_guides;
+CREATE POLICY "Allow staff to delete citizen_guides" ON citizen_guides
+  FOR DELETE USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = citizen_guides.lgu_id
+    AND staff_can('citizen-guide')
+  );
+
+-- offices → reference data for report assignment / service routing
+DROP POLICY IF EXISTS "Allow LGU staff to manage offices" ON offices;
+CREATE POLICY "Allow LGU staff to manage offices" ON offices
+  FOR ALL USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = offices.lgu_id
+    AND (staff_can('reports') OR staff_can('services'))
+  );
+
+-- audit_logs → 'dashboard'
+DROP POLICY IF EXISTS "LGU admins can read their LGU audit logs" ON audit_logs;
+CREATE POLICY "LGU admins can read their LGU audit logs" ON audit_logs
+  FOR SELECT USING (
+    get_current_user_role() = ANY (ARRAY['LGU_ADMIN'::text, 'LGU_PERSONNEL'::text])
+    AND get_current_user_lgu() = audit_logs.lgu_id
+    AND staff_can('dashboard')
+  );
+
+-- forum_posts / forum_comments — guest-evaluated, so helper-based only.
+-- Guests keep reading via the dedicated "Allow guests to read approved
+-- posts/comments" policies (both helpers return NULL for anon).
+DROP POLICY IF EXISTS "Read approved posts in my LGU" ON forum_posts;
+CREATE POLICY "Read approved posts in my LGU" ON forum_posts
+  FOR SELECT USING (
+    is_approved = true AND lgu_id = get_current_user_lgu()
+  );
+
+DROP POLICY IF EXISTS "Allow LGU Admins to review unapproved posts" ON forum_posts;
+CREATE POLICY "Allow LGU Admins to review unapproved posts" ON forum_posts
+  FOR SELECT USING (
+    get_current_user_role() = 'LGU_ADMIN'
+    AND get_current_user_lgu() = forum_posts.lgu_id
+  );
+
+DROP POLICY IF EXISTS "Allow LGU Admins to moderate posts" ON forum_posts;
+CREATE POLICY "Allow LGU Admins to moderate posts" ON forum_posts
+  FOR ALL USING (
+    get_current_user_role() = 'LGU_ADMIN'
+    AND get_current_user_lgu() = forum_posts.lgu_id
+  );
+
+DROP POLICY IF EXISTS "Read approved comments in my LGU" ON forum_comments;
+CREATE POLICY "Read approved comments in my LGU" ON forum_comments
+  FOR SELECT USING (
+    is_approved = true
+    AND EXISTS (
+      SELECT 1 FROM forum_posts p
+      WHERE p.id = forum_comments.post_id
+        AND p.lgu_id = get_current_user_lgu()
+    )
+  );
+
+-- ── Sections that used to be LGU_ADMIN-only ────────────────────────────────
+-- (patch 15) These WIDEN access so a granted module actually works: without
+-- them an admin could tick "Forum Moderation" for a clerk, the nav item would
+-- appear, and the page would render permanently empty. staff_can() is true for
+-- LGU_ADMIN/SUPER_ADMIN, so admin behaviour is unchanged.
+DROP POLICY IF EXISTS "Allow LGU Admins to review unapproved posts" ON forum_posts;
+CREATE POLICY "Allow LGU Admins to review unapproved posts" ON forum_posts
+  FOR SELECT USING (
+    get_current_user_lgu() = forum_posts.lgu_id AND staff_can('forum')
+  );
+
+DROP POLICY IF EXISTS "Allow LGU Admins to moderate posts" ON forum_posts;
+CREATE POLICY "Allow LGU Admins to moderate posts" ON forum_posts
+  FOR ALL USING (
+    get_current_user_lgu() = forum_posts.lgu_id AND staff_can('forum')
+  );
+
+DROP POLICY IF EXISTS "Allow LGU Admins to moderate comments" ON forum_comments;
+CREATE POLICY "Allow LGU Admins to moderate comments" ON forum_comments
+  FOR ALL USING (
+    staff_can('forum')
+    AND EXISTS (
+      SELECT 1 FROM forum_posts p
+      WHERE p.id = forum_comments.post_id
+        AND p.lgu_id = get_current_user_lgu()
+    )
+  );
+
+DROP POLICY IF EXISTS "Allow LGU admins to manage facilities" ON lgu_facilities;
+CREATE POLICY "Allow LGU admins to manage facilities" ON lgu_facilities
+  FOR ALL USING (
+    get_current_user_lgu() = lgu_facilities.lgu_id AND staff_can('facilities')
+  );
+
+DROP POLICY IF EXISTS "Allow LGU_ADMIN to manage own LGU services" ON lgu_services;
+CREATE POLICY "Allow LGU_ADMIN to manage own LGU services" ON lgu_services
+  FOR ALL USING (
+    get_current_user_lgu() = lgu_services.lgu_id AND staff_can('eservices-catalog')
+  );
+
+DROP POLICY IF EXISTS "LGU admins can read verification requests in their LGU" ON verification_requests;
+CREATE POLICY "LGU admins can read verification requests in their LGU" ON verification_requests
+  FOR SELECT USING (
+    get_current_user_lgu() = verification_requests.lgu_id AND staff_can('verifications')
+  );
+
+DROP POLICY IF EXISTS "LGU admins can read ai results in their LGU" ON verification_ai_results;
+CREATE POLICY "LGU admins can read ai results in their LGU" ON verification_ai_results
+  FOR SELECT USING (
+    staff_can('verifications')
+    AND EXISTS (
+      SELECT 1 FROM verification_requests vr
+      WHERE vr.id = verification_ai_results.request_id
+        AND vr.lgu_id = get_current_user_lgu()
+    )
+  );
+
+DROP POLICY IF EXISTS "LGU admins can read appeals in their LGU" ON citizen_appeals;
+CREATE POLICY "LGU admins can read appeals in their LGU" ON citizen_appeals
+  FOR SELECT USING (
+    get_current_user_lgu() = citizen_appeals.lgu_id AND staff_can('citizens')
+  );
+
+-- The Citizens & Moderation page lists the LGU's citizens. LGU_ADMIN already
+-- has a FOR ALL policy on users; this adds READ-ONLY access for a personnel
+-- holding the module, scoped to role = 'CITIZEN' so a clerk can never read
+-- other staff members' rows (verified: they see citizens + only their own row).
+-- Moderation itself still goes through moderate_citizen() — writes to `users`
+-- stay closed to personnel.
+DROP POLICY IF EXISTS "Staff with citizens module read citizens" ON users;
+CREATE POLICY "Staff with citizens module read citizens" ON users
+  FOR SELECT USING (
+    users.role = 'CITIZEN'
+    AND users.lgu_id = get_current_user_lgu()
+    AND staff_can('citizens')
+  );
+
+-- The verify_citizen / moderate_citizen / resolve_citizen_appeal RPCs each
+-- hard-checked role = 'LGU_ADMIN'; patch 15 changes their authorization block
+-- to `role IN ('LGU_ADMIN','LGU_PERSONNEL') AND staff_can('<module>')`, which
+-- keeps admins identical while admitting a clerk who holds the module. See
+-- patches/15_module_gating_admin_only_sections.sql for the full bodies
+-- (verify_citizen also gained the SET search_path it was missing).
+--
+-- Patch 16 then adds a double-decision guard to verify_citizen() and
+-- resolve_citizen_appeal(): both previously wrote unconditionally, so with two
+-- reviewers on the same queue the second decision silently overwrote the first
+-- — a verification one admin REJECTED (with a reason the citizen was shown)
+-- could become APPROVED, and a denied appeal could be re-approved, silently
+-- un-suspending an account. Each now raises unless the record is still
+-- 'pending'. See patches/16_rpc_double_decision_guards.sql.
+--
+-- The equivalent guard for report and service-request status changes lives
+-- client-side in apps/admin/src/lib/concurrency.ts (updateIfUnchanged) — a
+-- compare-and-set on the row's last-read status, since those writes go
+-- straight through PostgREST rather than an RPC.
+

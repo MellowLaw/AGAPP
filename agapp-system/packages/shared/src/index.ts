@@ -84,9 +84,32 @@ export interface User {
     sms: boolean;
     email: boolean;
   };
+  /**
+   * Admin-panel sections an LGU_PERSONNEL account may use, e.g.
+   * ['reports', 'services']. Empty/undefined for every other role —
+   * LGU_ADMIN and SUPER_ADMIN implicitly hold all modules (see the
+   * staff_can() SQL helper). Only writable via the set_staff_modules RPC.
+   */
+  modulePermissions?: AdminModule[];
   isActive: boolean;
   createdAt: string;
 }
+
+/** Grantable admin-panel sections. Mirrors v_allowed in set_staff_modules(). */
+export const ADMIN_MODULES = [
+  'dashboard',
+  'reports',
+  'services',
+  'eservices-catalog',
+  'news',
+  'forum',
+  'facilities',
+  'citizen-guide',
+  'citizens',
+  'verifications',
+] as const;
+
+export type AdminModule = (typeof ADMIN_MODULES)[number];
 
 export interface Report {
   id: string;

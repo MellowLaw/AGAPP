@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
+import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
 import { timeAgo } from '@/lib/timeAgo';
 import { ReportsMap } from '@/components/map';
 import { Danger, Location, User, Calendar, TickSquare, CloseCircle, Refresh, SearchNormal1, Filter, DocumentDownload } from 'iconsax-react';
@@ -27,6 +28,13 @@ interface ReportItem {
   lat: number;
   lng: number;
   status: ReportStatus;
+  /**
+   * Raw reports.status as stored. Kept alongside the UI enum because
+   * mapDbStatusToUi() is lossy (unknown values, including the citizen
+   * self-withdraw 'Cancelled', fold into 'submitted'), and the
+   * optimistic-concurrency guard must compare exact database values.
+   */
+  dbStatus: string;
   submittedBy: string;
   citizenId: string | null; // reports.citizen_id (null if account deleted)
   submittedAt: string;   // human readable timestamp
@@ -106,6 +114,7 @@ const mapReportRowToItem = (row: any): ReportItem => {
     lat: row.latitude,
     lng: row.longitude,
     status: mapDbStatusToUi(row.status || 'Submitted'),
+    dbStatus: row.status || 'Submitted',
     submittedBy: row.citizen_name || 'Citizen',
     citizenId: row.citizen_id || null,
     submittedAt: row.created_at
@@ -160,44 +169,74 @@ export default function ReportsPage() {
     };
   }, [selectedCitizenId]);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      setLoading(true);
-      setLoadError(null);
-      // Explicit column list — only what the list + detail panel actually
-      // render (avoids hauling unused blobs like status_history over the wire).
-      const { data, error } = await supabase
-        .from('reports')
-        .select('id, reference_number, category, status, barangay, latitude, longitude, citizen_id, citizen_name, created_at, photo_url, assigned_office, ml_verified, ml_confidence')
-        .eq('lgu_id', lguId)
-        .order('created_at', { ascending: false });
+  /**
+   * `silent` is used by the realtime listener and the conflict path: it skips the
+   * loading spinner and, crucially, keeps whatever the operator currently has
+   * open instead of snapping the selection back to the newest report. A
+   * colleague's edit landing mid-triage must not move the panel under them.
+   */
+  const fetchReports = React.useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
+    setLoadError(null);
+    // Explicit column list — only what the list + detail panel actually
+    // render (avoids hauling unused blobs like status_history over the wire).
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, reference_number, category, status, barangay, latitude, longitude, citizen_id, citizen_name, created_at, photo_url, assigned_office, ml_verified, ml_confidence')
+      .eq('lgu_id', lguId)
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading reports', error);
+    if (error) {
+      console.error('Error loading reports', error);
+      if (!silent) {
         setLoadError(error.message);
         showToast('Failed to load reports. Please try again.', 'error');
         setLoading(false);
-        return;
       }
+      return;
+    }
 
-      const mapped = (data || []).map(mapReportRowToItem);
-      setReportsList(mapped);
+    const mapped = (data || []).map(mapReportRowToItem);
+    setReportsList(mapped);
 
-      const reportParam = params?.get('reportId') || '';
-      if (reportParam) {
-        const found = mapped.find(r => r.id === reportParam || r.dbId === reportParam);
-        setSelectedReport(found || mapped[0] || null);
-      } else {
-        setSelectedReport(mapped[0] || null);
-      }
-      setLoading(false);
-    };
+    if (silent) {
+      setSelectedReport(prev =>
+        prev ? mapped.find(r => r.dbId === prev.dbId) ?? null : null
+      );
+      return;
+    }
 
-    fetchReports();
+    const reportParam = params?.get('reportId') || '';
+    if (reportParam) {
+      const found = mapped.find(r => r.id === reportParam || r.dbId === reportParam);
+      setSelectedReport(found || mapped[0] || null);
+    } else {
+      setSelectedReport(mapped[0] || null);
+    }
+    setLoading(false);
     // showToast is deliberately excluded — useToast() returns a new function
     // reference on every render, so including it here would refetch in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lguId, params]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  // Live refresh: two staff share this queue, so pick up a colleague's status
+  // change (or a new citizen report) without waiting for a manual reload.
+  // `reports` is already in the supabase_realtime publication.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`lgu-reports-${lguId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reports', filter: `lgu_id=eq.${lguId}` },
+        () => { fetchReports({ silent: true }); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [lguId, fetchReports]);
 
   const filteredReports = reportsList.filter(r => {
     const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -230,37 +269,60 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleAcknowledge = async () => {
+  /**
+   * Apply a status change with an optimistic-concurrency guard.
+   *
+   * Two staff share this queue, so the write is a compare-and-set against the
+   * status we last read: if a colleague already moved the report (or the citizen
+   * cancelled it) our change is refused rather than silently clobbering theirs,
+   * and we refetch so the operator sees the truth.
+   */
+  const applyStatusChange = async (
+    newStatus: ReportStatus,
+    verb: string,
+    successMsg: string,
+    successTone: 'success' | 'info' = 'success',
+  ) => {
     if (!selectedReport) return;
 
     const prevList = reportsList;
     const prevSelected = selectedReport;
-    const newStatus: ReportStatus = 'under_review';
+    const newDbStatus = mapUiStatusToDb(newStatus);
 
-    const updated = reportsList.map(r => 
-      r.id === selectedReport.id ? { ...r, status: newStatus } : r
-    );
-    setReportsList(updated);
-    setSelectedReport({ ...selectedReport, status: newStatus });
+    setReportsList(reportsList.map(r =>
+      r.id === selectedReport.id ? { ...r, status: newStatus, dbStatus: newDbStatus } : r
+    ));
+    setSelectedReport({ ...selectedReport, status: newStatus, dbStatus: newDbStatus });
 
-    const { data, error } = await supabase
-      .from('reports')
-      .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId)
-      .select('id');
+    const res = await updateIfUnchanged({
+      table: 'reports',
+      id: prevSelected.dbId,
+      expected: { column: 'status', value: prevSelected.dbStatus },
+      patch: { status: newDbStatus },
+    });
 
-    // supabase-js returns error: null even when the UPDATE matched 0 rows
-    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
-    if (error || !data || data.length === 0) {
-      console.error('Failed to acknowledge report', error);
+    if (res.outcome === 'conflict') {
       setReportsList(prevList);
       setSelectedReport(prevSelected);
-      showToast('Failed to acknowledge report. Please try again.', 'error');
+      showToast(conflictMessage(`Report ${prevSelected.id}`, res.currentValue), 'error');
+      fetchReports();
       return;
     }
 
-    showToast(`Report ${selectedReport.id} acknowledged!`, 'success');
+    if (res.outcome === 'error') {
+      console.error(`Failed to ${verb} report`, res.error);
+      setReportsList(prevList);
+      setSelectedReport(prevSelected);
+      showToast(`Failed to ${verb} report. Please try again.`, 'error');
+      return;
+    }
+
+    showToast(successMsg, successTone);
   };
+
+  const handleAcknowledge = () =>
+    applyStatusChange('under_review', 'acknowledge',
+      `Report ${selectedReport?.id} acknowledged!`);
 
   const handleReassign = () => {
     if (!selectedReport) return;
@@ -289,16 +351,30 @@ export default function ReportsPage() {
     setAssignHistory(newHistory);
     setAssignOpen(false);
 
-    const { data, error } = await supabase
-      .from('reports')
-      .update({ assigned_office: officeLabel })
-      .eq('id', selectedReport.dbId)
-      .select('id');
+    // Same compare-and-set as the status actions: if a colleague reassigned this
+    // report while the modal was open, don't silently overwrite their choice.
+    const res = await updateIfUnchanged({
+      table: 'reports',
+      id: prevSelected.dbId,
+      expected: { column: 'assigned_office', value: prevSelected.assignedOffice },
+      patch: { assigned_office: officeLabel },
+    });
 
-    // supabase-js returns error: null even when the UPDATE matched 0 rows
-    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
-    if (error || !data || data.length === 0) {
-      console.error('Failed to assign office', error);
+    if (res.outcome === 'conflict') {
+      setReportsList(prevList);
+      setSelectedReport(prevSelected);
+      setAssignHistory(prevHistory);
+      showToast(
+        `Report ${prevSelected.id} was just assigned to "${String(res.currentValue ?? 'Unassigned')}" ` +
+        `by someone else. Your change was not applied — the list has been refreshed.`,
+        'error',
+      );
+      fetchReports();
+      return;
+    }
+
+    if (res.outcome === 'error') {
+      console.error('Failed to assign office', res.error);
       setReportsList(prevList);
       setSelectedReport(prevSelected);
       setAssignHistory(prevHistory);
@@ -307,72 +383,16 @@ export default function ReportsPage() {
       return;
     }
 
-    showToast(`Report ${selectedReport.id} reassigned to ${officeLabel}!`, 'success');
+    showToast(`Report ${prevSelected.id} reassigned to ${officeLabel}!`, 'success');
   };
 
-  const handleReject = async () => {
-    if (!selectedReport) return;
+  const handleReject = () =>
+    applyStatusChange('rejected', 'reject',
+      `Report ${selectedReport?.id} rejected!`, 'info');
 
-    const prevList = reportsList;
-    const prevSelected = selectedReport;
-    const newStatus: ReportStatus = 'rejected';
-
-    const updated = reportsList.map(r => 
-      r.id === selectedReport.id ? { ...r, status: newStatus } : r
-    );
-    setReportsList(updated);
-    setSelectedReport({ ...selectedReport, status: newStatus });
-
-    const { data, error } = await supabase
-      .from('reports')
-      .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId)
-      .select('id');
-
-    // supabase-js returns error: null even when the UPDATE matched 0 rows
-    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
-    if (error || !data || data.length === 0) {
-      console.error('Failed to reject report', error);
-      setReportsList(prevList);
-      setSelectedReport(prevSelected);
-      showToast('Failed to reject report. Please try again.', 'error');
-      return;
-    }
-
-    showToast(`Report ${selectedReport.id} rejected!`, 'info');
-  };
-
-  const handleResolve = async () => {
-    if (!selectedReport) return;
-
-    const prevList = reportsList;
-    const prevSelected = selectedReport;
-    const newStatus: ReportStatus = 'resolved';
-
-    const updated = reportsList.map(r => 
-      r.id === selectedReport.id ? { ...r, status: newStatus } : r
-    );
-    setReportsList(updated);
-    setSelectedReport({ ...selectedReport, status: newStatus });
-
-    const { data, error } = await supabase
-      .from('reports')
-      .update({ status: mapUiStatusToDb(newStatus) })
-      .eq('id', selectedReport.dbId)
-      .select('id');
-
-    // supabase-js returns error: null even when the UPDATE matched 0 rows
-    // (RLS block, row deleted, etc.) — treat an empty result as a failure too.
-    if (error || !data || data.length === 0) {
-      console.error('Failed to resolve report', error);
-      setReportsList(prevList);
-      setSelectedReport(prevSelected);
-      showToast('Failed to mark report as resolved. Please try again.', 'error');
-      return;
-    }
-
-    showToast(`Report ${selectedReport.id} marked as resolved!`, 'success');
-  };
+  const handleResolve = () =>
+    applyStatusChange('resolved', 'mark as resolved',
+      `Report ${selectedReport?.id} marked as resolved!`);
 
   return (
     <DashboardLayout 

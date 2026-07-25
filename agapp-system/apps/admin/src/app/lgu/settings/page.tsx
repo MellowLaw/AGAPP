@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
+import { ADMIN_MODULES, MODULE_LABELS } from '@/lib/modules';
 import { Setting2, User, Notification, Shield, Building, Location, Sms, Call, Add, Trash, Edit, CloseCircle } from 'iconsax-react';
 import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
 
@@ -19,6 +20,8 @@ interface StaffMember {
   email: string;
   role: 'LGU_ADMIN' | 'LGU_PERSONNEL' | string;
   is_active: boolean;
+  /** Granted admin-panel sections. Personnel only — admins hold all. */
+  module_permissions?: string[];
 }
 
 export default function SettingsPage() {
@@ -91,6 +94,7 @@ export default function SettingsPage() {
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'LGU_ADMIN' | 'LGU_PERSONNEL'>('LGU_PERSONNEL');
+  const [staffModules, setStaffModules] = useState<string[]>([]);
 
   // Notification Preference States
   const [notifPush, setNotifPush] = useState(true);
@@ -241,6 +245,9 @@ export default function SettingsPage() {
     }
 
     try {
+      // Admins implicitly hold every module; only personnel carry a list.
+      const modulesToSave = staffRole === 'LGU_PERSONNEL' ? staffModules : [];
+
       if (editingStaff) {
         // Update profile only (password changes are out of scope here)
         const { error } = await supabase
@@ -250,8 +257,21 @@ export default function SettingsPage() {
 
         if (error) throw error;
 
+        // module_permissions is protected by the users_guard_staff_columns
+        // trigger — a direct .update() is rejected, set_staff_modules() is the
+        // only sanctioned writer (it re-checks that we admin this staffer's LGU).
+        if (staffRole === 'LGU_PERSONNEL') {
+          const { error: modErr } = await supabase.rpc('set_staff_modules', {
+            p_user_id: editingStaff.id,
+            p_modules: modulesToSave,
+          });
+          if (modErr) throw modErr;
+        }
+
         setStaffList(prev => prev.map(s =>
-          s.id === editingStaff.id ? { ...s, name: staffName, email: staffEmail, role: staffRole } : s
+          s.id === editingStaff.id
+            ? { ...s, name: staffName, email: staffEmail, role: staffRole, module_permissions: modulesToSave }
+            : s
         ));
         showToast('Staff member updated successfully!', 'success');
       } else {
@@ -264,13 +284,19 @@ export default function SettingsPage() {
         const res = await fetch('/api/create-staff', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: staffEmail, password: staffPassword, name: staffName, role: staffRole, lguId }),
+          body: JSON.stringify({
+            email: staffEmail, password: staffPassword, name: staffName,
+            role: staffRole, lguId, modulePermissions: modulesToSave,
+          }),
         });
 
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed to create staff account.');
 
-        setStaffList(prev => [...prev, { id: json.id, name: staffName, email: staffEmail, role: staffRole, is_active: true }]);
+        setStaffList(prev => [...prev, {
+          id: json.id, name: staffName, email: staffEmail, role: staffRole,
+          is_active: true, module_permissions: modulesToSave,
+        }]);
         showToast(`Staff account created! Share these credentials securely: ${staffEmail} / ${staffPassword}`, 'success');
       }
 
@@ -281,6 +307,7 @@ export default function SettingsPage() {
       setStaffEmail('');
       setStaffPassword('');
       setStaffRole('LGU_PERSONNEL');
+      setStaffModules([]);
     } catch (err: any) {
       console.error('Failed to save staff member:', err);
       showToast(err.message || 'Failed to save staff member details', 'error');
@@ -699,7 +726,9 @@ export default function SettingsPage() {
                   setEditingStaff(null);
                   setStaffName('');
                   setStaffEmail('');
+                  setStaffPassword('');
                   setStaffRole('LGU_PERSONNEL');
+                  setStaffModules([]);
                   setShowStaffModal(true);
                 }}>
                   <Add className="w-4 h-4 mr-1" />
@@ -721,6 +750,15 @@ export default function SettingsPage() {
                           <Badge variant={member.role === 'LGU_ADMIN' ? 'info' : 'default'}>
                             {member.role.replace('_', ' ')}
                           </Badge>
+                          {member.role === 'LGU_ADMIN' ? (
+                            <span className="text-xs text-text-faint">Full access</span>
+                          ) : (
+                            <span className="text-xs text-text-faint">
+                              {member.module_permissions?.length
+                                ? `${member.module_permissions.length} of ${ADMIN_MODULES.length} sections`
+                                : 'No sections granted yet'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -730,6 +768,7 @@ export default function SettingsPage() {
                         setStaffName(member.name);
                         setStaffEmail(member.email);
                         setStaffRole(member.role as any);
+                        setStaffModules(member.module_permissions ?? []);
                         setShowStaffModal(true);
                       }}>
                         <Edit className="w-4 h-4" />
@@ -796,7 +835,7 @@ export default function SettingsPage() {
       {/* Add/Edit Staff Modal */}
       {showStaffModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-surface rounded-lg border border-theme p-6 shadow-xl">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-lg border border-theme p-6 shadow-xl">
             <div className="flex justify-between items-center border-b border-theme pb-3 mb-4">
               <h3 className="text-base font-semibold text-text-primary">
                 {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
@@ -843,6 +882,57 @@ export default function SettingsPage() {
                   <option value="LGU_ADMIN">LGU Administrator</option>
                 </select>
               </div>
+
+              {/* Module access — personnel only. An LGU Administrator always
+                  has every section, so there is nothing to choose. */}
+              {staffRole === 'LGU_PERSONNEL' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm text-text-muted">
+                      Sections this staff member can use
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setStaffModules(
+                        staffModules.length === ADMIN_MODULES.length ? [] : [...ADMIN_MODULES]
+                      )}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      {staffModules.length === ADMIN_MODULES.length ? 'Clear all' : 'Select all'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ADMIN_MODULES.map((m) => (
+                      <label
+                        key={m}
+                        className="flex items-center gap-2 p-2 border border-theme rounded-md bg-surface cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={staffModules.includes(m)}
+                          onChange={(e) => setStaffModules(prev =>
+                            e.target.checked ? [...prev, m] : prev.filter(x => x !== m)
+                          )}
+                          className="w-4 h-4 accent-accent rounded"
+                        />
+                        <span className="text-xs text-text-primary font-semibold">
+                          {MODULE_LABELS[m]}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-faint mt-2">
+                    They&apos;ll only see these in their sidebar, and the database blocks
+                    everything else even by direct request. Leave all unticked and they can
+                    only reach their own profile.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-text-faint">
+                  LGU Administrators have access to every section, including branding
+                  and staff management.
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-6 border-t border-theme pt-4">

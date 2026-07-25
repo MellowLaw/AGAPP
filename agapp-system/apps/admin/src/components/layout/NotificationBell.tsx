@@ -62,7 +62,18 @@ export function NotificationBell() {
         .not('audience', 'is', null)
         .order('created_at', { ascending: false })
         .limit(30);
-      if (!cancelled) setItems(rows || []);
+      // Merge rather than replace: the realtime subscription starts as soon as
+      // userId is set (just above), so a notice arriving before this query
+      // resolves would otherwise be silently overwritten.
+      if (!cancelled) {
+        setItems(prev => {
+          const byId = new Map<string, NotificationRow>();
+          [...(rows || []), ...prev].forEach(r => byId.set(r.id, r));
+          return [...byId.values()]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 30);
+        });
+      }
 
       if (profile.lgu_id) {
         const notices = await fetchImportantNotices(profile.lgu_id);
@@ -77,13 +88,20 @@ export function NotificationBell() {
     const channel = supabase
       .channel(`staff-notifications-${userId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload: any) => {
-        const row = payload.new as NotificationRow & { audience: string | null };
+        const row = payload.new as NotificationRow & { audience: string | null; lgu_id: string | null };
         if (!row.audience) return; // citizen-targeted row, not for the staff bell
-        setItems(prev => [row, ...prev].slice(0, 30));
+        // Defence in depth: Realtime applies RLS, but don't rely on that alone
+        // to keep another LGU's notice out of this bell.
+        if (role !== 'SUPER_ADMIN' && lguId && row.lgu_id !== lguId) return;
+        // Dedupe — the initial fetch and this subscription can both deliver the
+        // same row, which would otherwise duplicate a React key.
+        setItems(prev =>
+          prev.some(x => x.id === row.id) ? prev : [row, ...prev].slice(0, 30)
+        );
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+  }, [userId, role, lguId]);
 
   // Refresh the computed "needs attention" set each time the panel opens —
   // cheap (two small LGU-scoped queries) and keeps aging thresholds accurate
@@ -103,9 +121,21 @@ export function NotificationBell() {
   const markAllRead = useCallback(async () => {
     if (!userId) return;
     const now = new Date().toISOString();
-    setSeenAt(now);
-    await supabase.from('users').update({ notifications_seen_at: now }).eq('id', userId);
-  }, [userId]);
+    const prevSeenAt = seenAt;
+    setSeenAt(now); // optimistic
+
+    const { error } = await supabase
+      .from('users')
+      .update({ notifications_seen_at: now })
+      .eq('id', userId);
+
+    // Without this the badge cleared locally and then silently came back on the
+    // next page load, which reads as "mark all read is broken".
+    if (error) {
+      console.error('Failed to mark notifications read', error);
+      setSeenAt(prevSeenAt);
+    }
+  }, [userId, seenAt]);
 
   const lguQs = useMemo(() => {
     // Prefer the ?lguName= already in the URL — the login redirect sets it to a
@@ -116,22 +146,30 @@ export function NotificationBell() {
     return lguName ? `?lguName=${encodeURIComponent(lguName)}` : '';
   }, [lguId, params]);
 
+  // Both LGU roles now share the /lgu/* pages — a personnel is limited by their
+  // granted modules, not by a separate set of screens. If they lack the module
+  // middleware bounces them to one they do hold, which is a better outcome than
+  // the silent dead click this used to produce (it returned null for anyone who
+  // wasn't an LGU_ADMIN, so the panel just closed and nothing happened).
   const linkForNotice = (n: NotificationRow): string | null => {
     if (role === 'SUPER_ADMIN') return '/super';
-    if (role === 'LGU_ADMIN') {
+    if (role === 'LGU_ADMIN' || role === 'LGU_PERSONNEL') {
       if (n.type === 'new_verification') return `/lgu/verifications${lguQs}`;
       if (n.type === 'forum_flagged') return `/lgu/forum${lguQs}`;
+      // Citizen moderation appeals (patch 05) — previously unrouted, so
+      // clicking one did nothing at all.
+      if (n.type === 'new_appeal') return `/lgu/citizens${lguQs}`;
     }
     return null;
   };
 
   const linkForAttention = (n: ImportantNotice): string => {
-    const reportsBase = role === 'LGU_PERSONNEL' ? '/personnel/reports' : '/lgu/reports';
-    const servicesBase = role === 'LGU_PERSONNEL' ? '/personnel/dashboard' : '/lgu/services';
+    // /personnel/reports and /personnel/dashboard are retired redirects; linking
+    // straight at /lgu/* keeps the ?reportId= deep link intact.
     if (n.reportId) {
-      return `${reportsBase}${lguQs}${lguQs ? '&' : '?'}reportId=${n.reportId}`;
+      return `/lgu/reports${lguQs}${lguQs ? '&' : '?'}reportId=${n.reportId}`;
     }
-    return `${servicesBase}${lguQs}`;
+    return `/lgu/services${lguQs}`;
   };
 
   const handleClickNotice = (n: NotificationRow) => {
@@ -190,8 +228,15 @@ export function NotificationBell() {
                 <>
                   {needsAttention.length > 0 && (
                     <>
-                      <p className="px-4 pt-3 pb-1 text-[10px] font-mono font-semibold tracking-widest text-text-faint uppercase">
+                      <p className="px-4 pt-3 pb-0.5 text-[10px] font-mono font-semibold tracking-widest text-text-faint uppercase">
                         Needs attention
+                      </p>
+                      {/* "Mark all read" only clears the stored notices below.
+                          These are computed live from still-open work, so they
+                          stay until the underlying report/request is actually
+                          dealt with — saying so stops that reading as a bug. */}
+                      <p className="px-4 pb-1.5 text-[10px] text-text-faint">
+                        Stays until resolved — not cleared by “Mark all read”.
                       </p>
                       <ul>
                         {needsAttention.map(n => (

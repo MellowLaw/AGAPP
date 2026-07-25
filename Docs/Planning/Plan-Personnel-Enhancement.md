@@ -1,5 +1,30 @@
 # Plan — LGU Personnel enhancement: office-based accounts + a real front-line workflow
 
+> ## ⛔ SUPERSEDED — 2026-07-25. Do not implement this plan.
+> The user chose a **module-permission** model over the office-based scoping
+> proposed here: an LGU Admin ticks which *sections of the admin panel* each
+> `LGU_PERSONNEL` account may use (`users.module_permissions`), and personnel
+> reuse the existing `/lgu/*` pages rather than getting parallel simplified
+> screens. Rationale for dropping the office model: it forces exactly one office
+> per person, which is wrong for a small municipality where one clerk wears
+> several hats.
+>
+> **Shipped instead** (all applied to the live database and verified):
+> `supabase/patches/11_fix_staff_column_escalation.sql`,
+> `12_staff_module_permissions.sql`, `13_rls_module_gating.sql`,
+> `14_fix_guest_reads_users_subquery.sql`,
+> `15_module_gating_admin_only_sections.sql`, plus `src/lib/modules.ts`,
+> a permission-aware `src/middleware.ts`, a permission-filtered `Sidebar.tsx`,
+> and the module checkboxes in `lgu/settings`. `/personnel/dashboard` and
+> `/personnel/reports` are now redirects.
+>
+> Still unbuilt and still worth considering **later, on top of** the module
+> system (they are orthogonal — modules pick *which sections*, offices would
+> filter *which rows within* them): the `internal_notes` staff-only thread and
+> "attach resolution proof / released document", both of which the manuscript's
+> Fig 34 / UAT Table 3 commit to. The office-scoping layer itself (Phases 1–2
+> below) is the part that was rejected.
+
 > **Status:** 🔵 Draft for review · not started in code · _living doc._
 > **Updated:** 2026-07-06
 > **Scope:** Make the **LGU Personnel** role genuinely useful and non-redundant vs. LGU

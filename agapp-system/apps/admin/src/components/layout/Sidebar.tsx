@@ -9,6 +9,7 @@ import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Lo
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
+import type { AdminModule } from '@/lib/modules';
 
 const ROLE_LABEL: Record<SidebarProps['role'], string> = {
   'lgu-admin': 'LGU Admin',
@@ -28,6 +29,10 @@ interface NavItem {
   icon: React.ComponentType<any>;
   /** "New since last visit" badge section, if this tab shows one. */
   section?: NavSection;
+  /** Module an LGU_PERSONNEL must hold to see this entry. */
+  module?: AdminModule;
+  /** Hidden from personnel regardless of their granted modules. */
+  adminOnly?: boolean;
 }
 
 interface SidebarProps {
@@ -35,18 +40,23 @@ interface SidebarProps {
   lguName?: string;
 }
 
-const LGU_ADMIN_NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/lgu/dashboard', icon: Home },
-  { label: 'Service Requests', href: '/lgu/services', icon: DocumentText, section: 'services' },
-  { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: Scroll },
-  { label: 'Issue Reports', href: '/lgu/reports', icon: Danger, section: 'reports' },
-  { label: 'Community', href: '/lgu/news', icon: Book },
-  { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum' },
-  { label: 'Facilities', href: '/lgu/facilities', icon: Location },
-  { label: 'Citizen Guide', href: '/lgu/citizen-guide', icon: InfoCircle },
-  { label: 'Citizens & Moderation', href: '/lgu/citizens', icon: People, section: 'citizens' },
-  { label: 'Verifications', href: '/lgu/verifications', icon: Personalcard, section: 'verifications' },
-  { label: 'Settings', href: '/lgu/settings', icon: Setting2 },
+// One nav list for both LGU roles. An LGU_ADMIN sees everything; an
+// LGU_PERSONNEL sees only the entries whose `module` their account was granted
+// (users.module_permissions). This is UX only — the actual boundary is
+// staff_can('<module>') inside the RLS policies.
+const LGU_NAV: NavItem[] = [
+  { label: 'Dashboard', href: '/lgu/dashboard', icon: Home, module: 'dashboard' },
+  { label: 'Service Requests', href: '/lgu/services', icon: DocumentText, section: 'services', module: 'services' },
+  { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: Scroll, module: 'eservices-catalog' },
+  { label: 'Issue Reports', href: '/lgu/reports', icon: Danger, section: 'reports', module: 'reports' },
+  { label: 'Community', href: '/lgu/news', icon: Book, module: 'news' },
+  { label: 'Forum', href: '/lgu/forum', icon: MessageSquare, section: 'forum', module: 'forum' },
+  { label: 'Facilities', href: '/lgu/facilities', icon: Location, module: 'facilities' },
+  { label: 'Citizen Guide', href: '/lgu/citizen-guide', icon: InfoCircle, module: 'citizen-guide' },
+  { label: 'Citizens & Moderation', href: '/lgu/citizens', icon: People, section: 'citizens', module: 'citizens' },
+  { label: 'Verifications', href: '/lgu/verifications', icon: Personalcard, section: 'verifications', module: 'verifications' },
+  // Branding + staff management are never delegated to personnel.
+  { label: 'Settings', href: '/lgu/settings', icon: Setting2, adminOnly: true },
 ];
 
 const SUPER_ADMIN_NAV: NavItem[] = [
@@ -55,11 +65,8 @@ const SUPER_ADMIN_NAV: NavItem[] = [
   { label: 'Settings', href: '/super/settings', icon: Setting2 },
 ];
 
-const LGU_PERSONNEL_NAV: NavItem[] = [
-  { label: 'My Queue', href: '/personnel/dashboard', icon: DocumentText, section: 'services' },
-  { label: 'Issue Reports', href: '/personnel/reports', icon: Danger, section: 'reports' },
-  { label: 'Settings', href: '/personnel/settings', icon: Setting2 },
-];
+// Personnel keep their own profile page — they must never reach /lgu/settings.
+const PERSONNEL_PROFILE_NAV: NavItem = { label: 'Settings', href: '/personnel/settings', icon: Setting2 };
 
 // Active: soft accent-tinted backdrop (no hard fill), bolded rose text, +2%
 // scale. Hover: a faint 2%-opacity wash, never a hard-edged box. Both are
@@ -109,6 +116,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   const lguParam = (lguName || params?.get('lguName') || '').toString();
 
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  // Every /lgu/* page hardcodes role="lgu-admin" on DashboardLayout, so the
+  // prop can't be trusted once personnel share those pages — read the real
+  // role and grants from the session instead.
+  const [dbRole, setDbRole] = useState<string | null>(null);
+  const [modules, setModules] = useState<string[]>([]);
   const { showToast, ToastContainer } = useToast();
   const { counts } = useNavBadges();
 
@@ -118,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
       if (authUser) {
         const { data: profile } = await supabase
           .from('users')
-          .select('name, email')
+          .select('name, email, role, module_permissions')
           .eq('id', authUser.id)
           .single();
 
@@ -126,16 +138,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
           name: profile?.name || authUser.user_metadata?.name || 'Admin User',
           email: profile?.email || authUser.email || 'admin@lgu.gov.ph',
         });
+        setDbRole(profile?.role ?? null);
+        setModules(profile?.module_permissions ?? []);
       }
     };
     fetchUser();
   }, []);
 
-  const navItems = role === 'super-admin'
-    ? SUPER_ADMIN_NAV
-    : role === 'lgu-personnel'
-    ? LGU_PERSONNEL_NAV
-    : LGU_ADMIN_NAV;
+  const isPersonnel = dbRole === 'LGU_PERSONNEL';
+  const effectiveRole: SidebarProps['role'] =
+    dbRole === 'SUPER_ADMIN' ? 'super-admin'
+    : isPersonnel ? 'lgu-personnel'
+    : dbRole === 'LGU_ADMIN' ? 'lgu-admin'
+    : role;
+
+  const navItems = React.useMemo(() => {
+    if (effectiveRole === 'super-admin') return SUPER_ADMIN_NAV;
+    if (isPersonnel) {
+      // Only the granted modules, plus their own profile settings.
+      return [
+        ...LGU_NAV.filter(i => !i.adminOnly && i.module && modules.includes(i.module)),
+        PERSONNEL_PROFILE_NAV,
+      ];
+    }
+    return LGU_NAV;
+  }, [effectiveRole, isPersonnel, modules]);
 
   const isActive = (href: string) => {
     if (pathname === href) return true;
@@ -155,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
       <div className="flex flex-col justify-center pl-6 pr-4 py-5 border-b border-transparent group-hover:border-theme/50 transition-colors shrink-0">
         <AgappLogo size={44} textClassName="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap" />
         <p className="text-xs font-serif italic text-accent mt-1.5 ml-[1px] pl-[52px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-          {ROLE_LABEL[role]}
+          {ROLE_LABEL[effectiveRole]}
         </p>
       </div>
 
@@ -163,7 +190,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto min-h-0 sidebar-nav-scroll">
         {navItems.map((item) => {
           const active = isActive(item.href);
-          const href = (role === 'lgu-admin' || role === 'lgu-personnel') && lguParam
+          const href = (effectiveRole === 'lgu-admin' || effectiveRole === 'lgu-personnel') && lguParam
+            && item.href.startsWith('/lgu')
             ? `${item.href}?lguName=${encodeURIComponent(lguParam)}`
             : item.href;
 

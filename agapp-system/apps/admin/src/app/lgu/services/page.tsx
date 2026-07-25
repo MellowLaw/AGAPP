@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
+import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
 import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload } from 'iconsax-react';
 
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
@@ -75,8 +76,13 @@ export default function ServicesPage() {
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
   const lguId = lguIdFromName(lguNameParam);
 
-  const fetchRequests = async () => {
-    setLoading(true);
+  /**
+   * `silent` (realtime listener + conflict path) skips the loading spinner and
+   * never falls back to mapped[0], so a colleague's edit landing mid-review
+   * can't snap the detail panel onto a different request.
+   */
+  const fetchRequests = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setLoadError(null);
     const { data, error } = await supabase
       .from('service_requests')
@@ -86,22 +92,44 @@ export default function ServicesPage() {
 
     if (error) {
       console.error('Error loading service requests', error);
-      setLoadError(error.message);
-      showToast('Failed to load service requests. Please try again.', 'error');
-      setLoading(false);
+      if (!silent) {
+        setLoadError(error.message);
+        showToast('Failed to load service requests. Please try again.', 'error');
+        setLoading(false);
+      }
       return;
     }
 
     const mapped = (data || []).map(mapServiceRowToItem);
     setRequestsList(mapped);
-    setSelectedRequest(prev => mapped.find(r => r.dbId === prev?.dbId) || mapped[0] || null);
-    setLoading(false);
+    setSelectedRequest(prev =>
+      silent
+        ? (prev ? mapped.find(r => r.dbId === prev.dbId) ?? null : null)
+        : (mapped.find(r => r.dbId === prev?.dbId) || mapped[0] || null)
+    );
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
     fetchRequests();
     // showToast is deliberately excluded — useToast() returns a new function
     // reference on every render, so including it here would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lguId]);
+
+  // Live refresh so a colleague's status change (or a new citizen application)
+  // appears without a manual reload. service_requests is already in the
+  // supabase_realtime publication.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`lgu-services-${lguId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'service_requests', filter: `lgu_id=eq.${lguId}` },
+        () => { fetchRequests({ silent: true }); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lguId]);
 
@@ -208,14 +236,25 @@ export default function ServicesPage() {
   const updateStatus = async (newStatus: ServiceStatus) => {
     if (!selectedRequest) return;
     setActionBusy(true);
-    const { error } = await supabase
-      .from('service_requests')
-      .update({ status: newStatus })
-      .eq('id', selectedRequest.dbId);
+    // Compare-and-set: two clerks share this queue, so refuse the write if a
+    // colleague already moved this request rather than silently overwriting
+    // them. service_requests.status is stored raw, so the UI value is the
+    // database value — no lossy mapping to round-trip.
+    const res = await updateIfUnchanged({
+      table: 'service_requests',
+      id: selectedRequest.dbId,
+      expected: { column: 'status', value: selectedRequest.status },
+      patch: { status: newStatus },
+    });
     setActionBusy(false);
 
-    if (error) {
-      console.error('Failed to update status', error);
+    if (res.outcome === 'conflict') {
+      showToast(conflictMessage(selectedRequest.id, res.currentValue), 'error');
+      fetchRequests({ silent: true });
+      return;
+    }
+    if (res.outcome === 'error') {
+      console.error('Failed to update status', res.error);
       showToast('Failed to update status. Please try again.', 'error');
       return;
     }
@@ -256,14 +295,25 @@ export default function ServicesPage() {
   const handleReject = async () => {
     if (!selectedRequest || !rejectReason.trim()) return;
     setActionBusy(true);
-    const { error } = await supabase
-      .from('service_requests')
-      .update({ status: 'Rejected', reject_reason: rejectReason.trim() })
-      .eq('id', selectedRequest.dbId);
+    // Guarded like updateStatus — the reject modal can sit open for a while,
+    // which is exactly when a colleague is most likely to have acted already.
+    const res = await updateIfUnchanged({
+      table: 'service_requests',
+      id: selectedRequest.dbId,
+      expected: { column: 'status', value: selectedRequest.status },
+      patch: { status: 'Rejected', reject_reason: rejectReason.trim() },
+    });
     setActionBusy(false);
 
-    if (error) {
-      console.error('Failed to reject request', error);
+    if (res.outcome === 'conflict') {
+      showToast(conflictMessage(selectedRequest.id, res.currentValue), 'error');
+      setRejectModal(false);
+      setRejectReason('');
+      fetchRequests({ silent: true });
+      return;
+    }
+    if (res.outcome === 'error') {
+      console.error('Failed to reject request', res.error);
       showToast('Failed to reject request. Please try again.', 'error');
       return;
     }
