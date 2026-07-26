@@ -1,20 +1,90 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Text, TouchableOpacity, Image, StyleSheet, Modal, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View, ScrollView, Text, TouchableOpacity, Image, StyleSheet, Modal, TextInput, ActivityIndicator,
+  KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import { supabase } from '../../supabaseClient';
-import { ShieldCross, Eye, MessageQuestion, CloseSquare, Danger } from 'iconsax-react-native';
+import { ShieldCross, Eye, MessageQuestion, CloseSquare, Danger, Clock, TickCircle, CloseCircle, Send2 } from 'iconsax-react-native';
 
 export function RestrictedScreen({ navigation }: any) {
   const { T, isDarkMode } = useTheme();
-  const { selectedLgu, profile } = useAuth();
+  const { selectedLgu, profile, refreshProfile } = useAuth();
   const { showToast } = useToast();
 
   const [appealModalOpen, setAppealModalOpen] = useState(false);
   const [appealText, setAppealText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loadingAppeal, setLoadingAppeal] = useState(true);
+  const [existingAppeal, setExistingAppeal] = useState<any | null>(null);
+
+  // Auto-dismiss if account status changes back to 'active' in real-time
+  useEffect(() => {
+    if (profile?.moderation_status === 'active') {
+      showToast('Your account restriction has been lifted!', 'success');
+      if (navigation && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation) {
+        navigation.replace('Main');
+      }
+    }
+  }, [profile?.moderation_status]);
+
+  // Load existing appeal if any
+  const fetchAppeal = async () => {
+    setLoadingAppeal(true);
+    try {
+      if (!profile?.id) return;
+      const { data, error } = await supabase
+        .from('citizen_appeals')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setExistingAppeal(data[0]);
+      } else {
+        setExistingAppeal(null);
+      }
+    } catch (err: any) {
+      console.error('[RestrictedScreen] Fetch appeal error:', err);
+    } finally {
+      setLoadingAppeal(false);
+    }
+  };
+
+  // Realtime subscription for appeal review changes
+  useEffect(() => {
+    fetchAppeal();
+
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-restricted-appeals-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'citizen_appeals',
+          filter: `user_id=eq.${profile.id}`,
+        },
+        () => {
+          fetchAppeal();
+          if (refreshProfile) refreshProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   const handleDismiss = () => {
     if (navigation && navigation.canGoBack()) {
@@ -38,9 +108,11 @@ export function RestrictedScreen({ navigation }: any) {
 
       if (error) throw error;
 
-      showToast('Your appeal has been submitted for LGU admin review.', 'success');
+      showToast('Your appeal has been submitted to your LGU administrators for review.', 'success');
       setAppealModalOpen(false);
       setAppealText('');
+      await fetchAppeal();
+      if (refreshProfile) refreshProfile();
     } catch (err: any) {
       showToast(err.message || 'Failed to submit appeal. Please try again.', 'error');
     } finally {
@@ -91,6 +163,7 @@ export function RestrictedScreen({ navigation }: any) {
         <ScrollView
           contentContainerStyle={{ padding: 24, paddingBottom: 40, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Sticker 14 */}
           <Image
@@ -158,6 +231,47 @@ export function RestrictedScreen({ navigation }: any) {
             ))}
           </View>
 
+          {/* Existing Appeal Status Card */}
+          {existingAppeal && (
+            <View style={{
+              width: '100%',
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              borderColor: T.border,
+              borderWidth: 1,
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+            }}>
+              {existingAppeal.status === 'pending' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Clock size={20} color="#F59E0B" variant="Bold" style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14 }}>
+                      Appeal Submitted — Pending Review
+                    </Text>
+                    <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, marginTop: 2 }}>
+                      Your appeal is currently being evaluated by your LGU administrators.
+                    </Text>
+                  </View>
+                </View>
+              ) : existingAppeal.status === 'denied' ? (
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <CloseCircle size={20} color="#EF4444" variant="Bold" style={{ marginRight: 10 }} />
+                    <Text style={{ fontFamily: 'Octarine-Bold', color: '#EF4444', fontSize: 14 }}>
+                      Prior Appeal Denied
+                    </Text>
+                  </View>
+                  {existingAppeal.admin_response && (
+                    <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 13, lineHeight: 18, marginTop: 4 }}>
+                      Admin note: {existingAppeal.admin_response}
+                    </Text>
+                  )}
+                </View>
+              ) : null}
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={{ width: '100%', gap: 12 }}>
             <TouchableOpacity
@@ -171,12 +285,12 @@ export function RestrictedScreen({ navigation }: any) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.outlineBtn, { borderColor: T.border }]}
+              style={[styles.outlineBtn, { borderColor: T.border, opacity: existingAppeal?.status === 'pending' ? 0.7 : 1 }]}
               onPress={() => setAppealModalOpen(true)}
               activeOpacity={0.8}
             >
               <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 16 }}>
-                Submit an Appeal
+                {existingAppeal?.status === 'pending' ? 'View / Update Appeal' : 'Submit an Appeal'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -185,62 +299,73 @@ export function RestrictedScreen({ navigation }: any) {
 
       {/* Appeal Submission Modal */}
       <Modal visible={appealModalOpen} transparent animationType="slide" onRequestClose={() => setAppealModalOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Submit Appeal to LGU</Text>
-              <TouchableOpacity onPress={() => setAppealModalOpen(false)}>
-                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <TouchableWithoutFeedback>
+                <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, maxHeight: '85%' }}>
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Submit Appeal to LGU</Text>
+                      <TouchableOpacity onPress={() => setAppealModalOpen(false)}>
+                        <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, lineHeight: 18, marginBottom: 16 }}>
+                      Explain clearly why you believe your account restriction should be lifted. Your appeal will be sent to your LGU administrators for review.
+                    </Text>
+
+                    <TextInput
+                      multiline
+                      numberOfLines={4}
+                      value={appealText}
+                      onChangeText={setAppealText}
+                      placeholder="Type your appeal message here..."
+                      placeholderTextColor={T.textMuted}
+                      style={{
+                        minHeight: 100,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        padding: 16,
+                        fontSize: 14,
+                        textAlignVertical: 'top',
+                        marginBottom: 20,
+                      }}
+                    />
+
+                    <TouchableOpacity
+                      onPress={handleSubmitAppeal}
+                      disabled={submitting}
+                      activeOpacity={0.9}
+                      style={{
+                        height: 52,
+                        borderRadius: 999,
+                        backgroundColor: '#292929',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: submitting ? 0.6 : 1,
+                      }}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Send Appeal</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-
-            <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, lineHeight: 18, marginBottom: 16 }}>
-              Explain clearly why you believe your account restriction should be lifted. Your appeal will be sent to your LGU administrators for review.
-            </Text>
-
-            <TextInput
-              multiline
-              numberOfLines={4}
-              value={appealText}
-              onChangeText={setAppealText}
-              placeholder="Type your appeal message here..."
-              placeholderTextColor={T.textMuted}
-              style={{
-                minHeight: 100,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                padding: 16,
-                fontSize: 14,
-                textAlignVertical: 'top',
-                marginBottom: 20,
-              }}
-            />
-
-            <TouchableOpacity
-              onPress={handleSubmitAppeal}
-              disabled={submitting}
-              activeOpacity={0.9}
-              style={{
-                height: 52,
-                borderRadius: 999,
-                backgroundColor: '#292929',
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: submitting ? 0.6 : 1,
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Send Appeal</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

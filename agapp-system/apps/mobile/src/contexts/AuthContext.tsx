@@ -219,6 +219,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Real-time Postgres subscription: Listen for live updates to the logged-in user's profile row
+  // (e.g. moderation_status changes to 'restricted', 'banned', or 'active', or verification changes)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[AuthContext] Subscribing to realtime user profile changes for ID:', user.id);
+
+    const channel = supabase
+      .channel(`realtime-user-profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[AuthContext] Real-time profile payload received:', payload.new);
+          if (payload.new) {
+            setProfile((prev: any) => ({
+              ...prev,
+              ...payload.new,
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[AuthContext] Cleaning up realtime user profile subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const signOut = async () => {
     // Best-effort: clear the push token while still authenticated (RLS
     // requires it) so this device stops receiving notifications meant for

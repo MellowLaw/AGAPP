@@ -1285,29 +1285,35 @@ export function ForumScreen({ navigation, route }: any) {
             />
           }
         >
-          {isRestricted && (
-            <View style={{
-              marginBottom: 16,
-              padding: 14,
-              borderRadius: 16,
-              backgroundColor: isDarkMode ? 'rgba(251, 191, 36, 0.12)' : '#FEF3C7',
-              borderWidth: 1,
-              borderColor: '#F59E0B',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <Danger size={24} color="#B45309" variant="Bold" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>
-                  Account Restricted
-                </Text>
-                <Text style={{ color: '#B45309', fontFamily: 'Inter-Medium', fontSize: 12, lineHeight: 16, marginTop: 2 }}>
-                  Your account is restricted from posting or commenting in the forum.
-                  {profile?.moderation_reason ? ` Reason: ${profile.moderation_reason}` : ''}
-                </Text>
+          {profile?.moderation_status === 'restricted' && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Restricted')}
+              style={{
+                marginBottom: 16,
+                padding: 14,
+                borderRadius: 16,
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                <Danger size={20} color="#DC2626" variant="Bold" style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: '#DC2626', fontSize: 13 }}>
+                    Your Account is Restricted
+                  </Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, marginTop: 1 }}>
+                    Tap to view restriction notice & submit an appeal
+                  </Text>
+                </View>
               </View>
-            </View>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>View →</Text>
+            </TouchableOpacity>
           )}
 
           {!verified && session && (

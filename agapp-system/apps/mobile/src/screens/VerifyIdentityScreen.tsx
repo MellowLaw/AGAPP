@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, Image, Modal, FlatList, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1286,63 +1287,69 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
         {/* Picker Modal */}
         <Modal visible={pickerOpen !== null} transparent animationType="slide" onRequestClose={() => setPickerOpen(null)}>
-          <View style={styles.pickerOverlay}>
-            <View style={[styles.pickerSheet, { backgroundColor: T.card, borderWidth: 1, borderColor: T.border }]}>
-              <View style={[styles.pickerHeader, { borderBottomColor: T.border }]}>
-                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>
-                  {pickerOpen === 'idType'   && 'Select ID type'}
-                  {pickerOpen === 'region'   && 'Select Region'}
-                  {pickerOpen === 'province' && 'Select Province'}
-                  {pickerOpen === 'city'     && 'Select City/Municipality'}
-                  {pickerOpen === 'barangay' && `Select barangay in ${lguName}`}
-                </Text>
-                <TouchableOpacity onPress={() => setPickerOpen(null)}>
-                  <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-                </TouchableOpacity>
-              </View>
-              {pickerOpen !== 'idType' && (
-                <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-                  <TextInput
-                    style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium', height: 44 }]}
-                    placeholder="Search..."
-                    placeholderTextColor={T.textMuted}
-                    value={searchText}
-                    onChangeText={setSearchText}
-                  />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.pickerOverlay}>
+              <View style={[styles.pickerSheet, { backgroundColor: T.card, borderWidth: 1, borderColor: T.border, maxHeight: '80%' }]}>
+                <View style={[styles.pickerHeader, { borderBottomColor: T.border }]}>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>
+                    {pickerOpen === 'idType'   && 'Select ID type'}
+                    {pickerOpen === 'region'   && 'Select Region'}
+                    {pickerOpen === 'province' && 'Select Province'}
+                    {pickerOpen === 'city'     && 'Select City/Municipality'}
+                    {pickerOpen === 'barangay' && `Select barangay in ${lguName}`}
+                  </Text>
+                  <TouchableOpacity onPress={() => setPickerOpen(null)}>
+                    <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+                  </TouchableOpacity>
                 </View>
-              )}
-              <FlatList
-                data={filteredPickerData}
-                keyExtractor={item => item.key}
-                contentContainerStyle={{ paddingBottom: 40 }}
-                renderItem={({ item }) => {
-                  let selected = false;
-                  if (pickerOpen === 'idType')   selected = idType === item.key;
-                  else if (pickerOpen === 'region')   selected = regionCode === item.key;
-                  else if (pickerOpen === 'province') selected = provinceCode === item.key;
-                  else if (pickerOpen === 'city')     selected = cityCode === item.key;
-                  else if (pickerOpen === 'barangay') selected = barangay === item.key;
-                  return (
-                    <TouchableOpacity
-                      style={[styles.pickerRow, { borderBottomColor: T.border }]}
-                      onPress={() => {
-                        if (pickerOpen === 'idType')        setIdType(item.key as any);
-                        else if (pickerOpen === 'region')   handleSelectRegion(item.key, item.label);
-                        else if (pickerOpen === 'province') handleSelectProvince(item.key, item.label);
-                        else if (pickerOpen === 'city')     handleSelectCity(item.key, item.label);
-                        else if (pickerOpen === 'barangay') setBarangay(item.key);
-                        setPickerOpen(null);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium', flex: 1 }}>{item.label}</Text>
-                      {selected && <TickCircle size={20} color={T.accent} variant="Bold" />}
-                    </TouchableOpacity>
-                  );
-                }}
-              />
+                {pickerOpen !== 'idType' && (
+                  <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+                    <TextInput
+                      style={[styles.textInput, { borderColor: inputBorder, backgroundColor: inputBg, color: T.text, fontFamily: 'Inter-Medium', height: 44 }]}
+                      placeholder="Search..."
+                      placeholderTextColor={T.textMuted}
+                      value={searchText}
+                      onChangeText={setSearchText}
+                    />
+                  </View>
+                )}
+                <FlatList
+                  data={filteredPickerData}
+                  keyExtractor={item => item.key}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                  renderItem={({ item }) => {
+                    let selected = false;
+                    if (pickerOpen === 'idType')   selected = idType === item.key;
+                    else if (pickerOpen === 'region')   selected = regionCode === item.key;
+                    else if (pickerOpen === 'province') selected = provinceCode === item.key;
+                    else if (pickerOpen === 'city')     selected = cityCode === item.key;
+                    else if (pickerOpen === 'barangay') selected = barangay === item.key;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.pickerRow, { borderBottomColor: T.border }]}
+                        onPress={() => {
+                          if (pickerOpen === 'idType')        setIdType(item.key as any);
+                          else if (pickerOpen === 'region')   handleSelectRegion(item.key, item.label);
+                          else if (pickerOpen === 'province') handleSelectProvince(item.key, item.label);
+                          else if (pickerOpen === 'city')     handleSelectCity(item.key, item.label);
+                          else if (pickerOpen === 'barangay') setBarangay(item.key);
+                          setPickerOpen(null);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ color: T.text, fontSize: 15, fontFamily: 'Inter-Medium', flex: 1 }}>{item.label}</Text>
+                        {selected && <TickCircle size={20} color={T.accent} variant="Bold" />}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Guided camera */}

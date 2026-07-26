@@ -452,6 +452,26 @@ export function AppNavigator() {
     checkOnboarding();
   }, []);
 
+  // Listen for real-time moderation status changes to trigger immediate navigation when restricted
+  const prevModStatusRef = React.useRef(profile?.moderation_status);
+
+  React.useEffect(() => {
+    const currentStatus = profile?.moderation_status;
+    const prevStatus = prevModStatusRef.current;
+    prevModStatusRef.current = currentStatus;
+
+    if (currentStatus === 'restricted' && prevStatus !== 'restricted') {
+      console.log('[AppNavigator] Moderation status changed to restricted. Navigating to Restricted screen.');
+      if (navigationRef.isReady()) {
+        try {
+          (navigationRef as any).navigate('Restricted');
+        } catch (err) {
+          console.warn('[AppNavigator] Failed to navigate to Restricted:', err);
+        }
+      }
+    }
+  }, [profile?.moderation_status]);
+
   if (isLoading || !onboardingLoaded) {
     return (
       <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: 'center', alignItems: 'center' }}>

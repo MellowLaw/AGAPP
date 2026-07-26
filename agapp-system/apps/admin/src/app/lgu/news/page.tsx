@@ -1040,7 +1040,7 @@ export default function NewsPage() {
                             <div className="flex items-center justify-between gap-2">
                               <h4 className="font-semibold text-sm text-text-primary truncate">{announcement.title}</h4>
                               <div className="flex gap-1 shrink-0">
-                                <Badge size="xs" variant={announcement.status === 'published' ? 'success' : announcement.status === 'scheduled' ? 'info' : 'warning'}>
+                                <Badge variant={announcement.status === 'published' ? 'success' : announcement.status === 'scheduled' ? 'info' : 'warning'}>
                                   {announcement.status}
                                 </Badge>
                               </div>

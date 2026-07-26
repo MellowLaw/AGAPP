@@ -19,6 +19,7 @@ import {
   TickCircle,
   Document,
   ShieldTick,
+  Danger,
 } from 'iconsax-react-native';
 
 const OFFICE_ICONS: Record<string, any> = {
@@ -592,6 +593,40 @@ export function ServicesScreen({ route, navigation }: any) {
             Quick guide and downloadable forms for other essential city services.
           </Text>
         </View>
+
+        {/* Restricted Status Banner */}
+        {profile?.moderation_status === 'restricted' && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Restricted')}
+            style={{
+              marginHorizontal: 20,
+              marginTop: 4,
+              marginBottom: 12,
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderColor: 'rgba(239, 68, 68, 0.3)',
+              borderWidth: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <Danger size={20} color="#DC2626" variant="Bold" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: '#DC2626', fontSize: 13 }}>
+                  Your Account is Restricted
+                </Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, marginTop: 1 }}>
+                  Tap to view restriction notice & submit an appeal
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>View →</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Tab navigation under title */}
         <View style={{

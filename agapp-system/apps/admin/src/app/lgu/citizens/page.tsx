@@ -189,14 +189,12 @@ export default function CitizensPage() {
       if (appErr) throw appErr;
 
       if (isApprove) {
-        await supabase
-          .from('users')
-          .update({
-            moderation_status: 'active',
-            moderation_reason: null,
-            moderated_at: null,
-          })
-          .eq('id', selectedAppeal.user_id);
+        const { error: modErr } = await supabase.rpc('moderate_citizen', {
+          p_user_id: selectedAppeal.user_id,
+          p_action: 'reactivate',
+          p_reason: null,
+        });
+        if (modErr) throw modErr;
       }
 
       showToast(`Appeal ${isApprove ? 'APPROVED (user reactivated)' : 'DENIED'}.`, 'success');

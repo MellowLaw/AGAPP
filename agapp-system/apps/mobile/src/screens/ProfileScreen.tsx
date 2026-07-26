@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Image, Linking, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Image, Linking, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,6 +30,7 @@ import {
   User,
   Lock,
   InfoCircle,
+  Danger,
 } from 'iconsax-react-native';
 
 const ICON_SIZE = 26; // no more icon-circle backdrop, so icons need to read on their own
@@ -46,7 +47,7 @@ export function ProfileScreen({ navigation }: any) {
   const { T, isDarkMode, setIsDarkMode } = useTheme();
   const { profile, selectedLgu, guestLgu, signOut, refreshProfile } = useAuth();
   const { showToast } = useToast();
-  const [infoModal, setInfoModal] = useState<null | 'terms' | 'security' | 'history'>(null);
+  const [infoModal, setInfoModal] = useState<null | 'terms' | 'privacy' | 'security' | 'history'>(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -370,6 +371,38 @@ export function ProfileScreen({ navigation }: any) {
           Account · settings · privacy
         </Text>
 
+        {/* Restricted Status Banner */}
+        {profile?.moderation_status === 'restricted' && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Restricted')}
+            style={{
+              marginBottom: 16,
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderColor: 'rgba(239, 68, 68, 0.3)',
+              borderWidth: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <Danger size={20} color="#DC2626" variant="Bold" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: '#DC2626', fontSize: 13 }}>
+                  Your Account is Restricted
+                </Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, marginTop: 1 }}>
+                  Tap to view restriction notice & submit an appeal
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>View →</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Settings Search Bar */}
         <View style={{
           flexDirection: 'row',
@@ -691,58 +724,69 @@ export function ProfileScreen({ navigation }: any) {
 
       {/* Change Email Modal */}
       <Modal visible={emailModalOpen} transparent animationType="slide" onRequestClose={() => setEmailModalOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, padding: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Change email</Text>
-              <TouchableOpacity onPress={() => setEmailModalOpen(false)}>
-                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+              <TouchableWithoutFeedback>
+                <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, padding: 20 }}>
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Change email</Text>
+                      <TouchableOpacity onPress={() => setEmailModalOpen(false)}>
+                        <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
+                      We'll send a confirmation link to your new address — your email only changes once you click it.
+                    </Text>
+                    <TextInput
+                      value={newEmail}
+                      onChangeText={setNewEmail}
+                      placeholder="you@email.com"
+                      placeholderTextColor={T.textMuted}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      style={{
+                        height: 48,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        paddingHorizontal: 20,
+                        fontSize: 14,
+                        marginBottom: 16,
+                      }}
+                    />
+                    <TouchableOpacity
+                      onPress={handleChangeEmail}
+                      disabled={emailSaving}
+                      activeOpacity={0.9}
+                      style={{
+                        height: 52,
+                        borderRadius: 999,
+                        backgroundColor: T.accentSoft,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: emailSaving ? 0.6 : 1,
+                      }}
+                    >
+                      {emailSaving ? (
+                        <ActivityIndicator color="#292929" />
+                      ) : (
+                        <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Send confirmation link</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-            <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
-              We'll send a confirmation link to your new address — your email only changes once you click it.
-            </Text>
-            <TextInput
-              value={newEmail}
-              onChangeText={setNewEmail}
-              placeholder="you@email.com"
-              placeholderTextColor={T.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={{
-                height: 48,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                paddingHorizontal: 20,
-                fontSize: 14,
-                marginBottom: 16,
-              }}
-            />
-            <TouchableOpacity
-              onPress={handleChangeEmail}
-              disabled={emailSaving}
-              activeOpacity={0.9}
-              style={{
-                height: 52,
-                borderRadius: 999,
-                backgroundColor: T.accentSoft,
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: emailSaving ? 0.6 : 1,
-              }}
-            >
-              {emailSaving ? (
-                <ActivityIndicator color="#292929" />
-              ) : (
-                <Text style={{ color: '#292929', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Send confirmation link</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Info Modal Sheet */}
@@ -851,144 +895,166 @@ export function ProfileScreen({ navigation }: any) {
 
       {/* Edit Profile Modal */}
       <Modal visible={editProfileOpen} transparent animationType="slide" onRequestClose={() => setEditProfileOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditProfileOpen(false)}>
-                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+              <TouchableWithoutFeedback>
+                <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, maxHeight: '85%' }}>
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Edit Profile</Text>
+                      <TouchableOpacity onPress={() => setEditProfileOpen(false)}>
+                        <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NAME</Text>
+                    <TextInput
+                      value={editName}
+                      onChangeText={setEditName}
+                      style={{
+                        height: 48,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        paddingHorizontal: 16,
+                        fontSize: 14,
+                        marginBottom: 16,
+                      }}
+                    />
+
+                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>BARANGAY</Text>
+                    <TextInput
+                      value={editBarangay}
+                      onChangeText={setEditBarangay}
+                      style={{
+                        height: 48,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        paddingHorizontal: 16,
+                        fontSize: 14,
+                        marginBottom: 24,
+                      }}
+                    />
+
+                    <TouchableOpacity
+                      onPress={handleEditProfile}
+                      disabled={editSaving}
+                      activeOpacity={0.9}
+                      style={{
+                        height: 52,
+                        borderRadius: 999,
+                        backgroundColor: '#292929',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: editSaving ? 0.6 : 1,
+                      }}
+                    >
+                      {editSaving ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Save Changes</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-
-            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NAME</Text>
-            <TextInput
-              value={editName}
-              onChangeText={setEditName}
-              style={{
-                height: 48,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                paddingHorizontal: 16,
-                fontSize: 14,
-                marginBottom: 16,
-              }}
-            />
-
-            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>BARANGAY</Text>
-            <TextInput
-              value={editBarangay}
-              onChangeText={setEditBarangay}
-              style={{
-                height: 48,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                paddingHorizontal: 16,
-                fontSize: 14,
-                marginBottom: 24,
-              }}
-            />
-
-            <TouchableOpacity
-              onPress={handleEditProfile}
-              disabled={editSaving}
-              activeOpacity={0.9}
-              style={{
-                height: 52,
-                borderRadius: 999,
-                backgroundColor: '#292929',
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: editSaving ? 0.6 : 1,
-              }}
-            >
-              {editSaving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Change Password Modal */}
       <Modal visible={changePasswordOpen} transparent animationType="slide" onRequestClose={() => setChangePasswordOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Change Password</Text>
-              <TouchableOpacity onPress={() => setChangePasswordOpen(false)}>
-                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+              <TouchableWithoutFeedback>
+                <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, maxHeight: '85%' }}>
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Change Password</Text>
+                      <TouchableOpacity onPress={() => setChangePasswordOpen(false)}>
+                        <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NEW PASSWORD</Text>
+                    <TextInput
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      secureTextEntry
+                      style={{
+                        height: 48,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        paddingHorizontal: 16,
+                        fontSize: 14,
+                        marginBottom: 16,
+                      }}
+                    />
+
+                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>CONFIRM NEW PASSWORD</Text>
+                    <TextInput
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                      style={{
+                        height: 48,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: T.bg,
+                        color: T.text,
+                        fontFamily: 'Inter-Medium',
+                        paddingHorizontal: 16,
+                        fontSize: 14,
+                        marginBottom: 24,
+                      }}
+                    />
+
+                    <TouchableOpacity
+                      onPress={handleChangePassword}
+                      disabled={passwordSaving}
+                      activeOpacity={0.9}
+                      style={{
+                        height: 52,
+                        borderRadius: 999,
+                        backgroundColor: '#292929',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: passwordSaving ? 0.6 : 1,
+                      }}
+                    >
+                      {passwordSaving ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Update Password</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-
-            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NEW PASSWORD</Text>
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              style={{
-                height: 48,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                paddingHorizontal: 16,
-                fontSize: 14,
-                marginBottom: 16,
-              }}
-            />
-
-            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>CONFIRM NEW PASSWORD</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              style={{
-                height: 48,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: T.border,
-                backgroundColor: T.bg,
-                color: T.text,
-                fontFamily: 'Inter-Medium',
-                paddingHorizontal: 16,
-                fontSize: 14,
-                marginBottom: 24,
-              }}
-            />
-
-            <TouchableOpacity
-              onPress={handleChangePassword}
-              disabled={passwordSaving}
-              activeOpacity={0.9}
-              style={{
-                height: 52,
-                borderRadius: 999,
-                backgroundColor: '#292929',
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: passwordSaving ? 0.6 : 1,
-              }}
-            >
-              {passwordSaving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Update Password</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Help Center Modal */}

@@ -63,15 +63,7 @@ export function HomeScreen({ navigation }: any) {
 
   useEffect(() => {
     if (profile?.moderation_status === 'restricted' && profile?.id) {
-      const checkRestrictedGreeting = async () => {
-        const key = `restricted_greeting_shown_${profile.id}`;
-        const shown = await AsyncStorage.getItem(key);
-        if (!shown) {
-          await AsyncStorage.setItem(key, 'true');
-          navigation.navigate('Restricted');
-        }
-      };
-      checkRestrictedGreeting();
+      navigation.navigate('Restricted');
     }
   }, [profile?.moderation_status, profile?.id]);
 
@@ -671,11 +663,44 @@ export function HomeScreen({ navigation }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[T.accent]}
             tintColor={T.accent}
+            colors={[T.accent]}
           />
         }
       >
+        {/* Restricted Status Banner */}
+        {profile?.moderation_status === 'restricted' && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Restricted')}
+            style={{
+              marginHorizontal: 20,
+              marginTop: 12,
+              marginBottom: 4,
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderColor: 'rgba(239, 68, 68, 0.3)',
+              borderWidth: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <Danger size={20} color="#DC2626" variant="Bold" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'Octarine-Bold', color: '#DC2626', fontSize: 13 }}>
+                  Your Account is Restricted
+                </Text>
+                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, marginTop: 1 }}>
+                  Tap to view restriction notice & submit an appeal
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 13 }}>View →</Text>
+          </TouchableOpacity>
+        )}
         
         {/* TAB 1: FOR YOU */}
         {activeTab === 'for_you' && (

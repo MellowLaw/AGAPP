@@ -56,9 +56,39 @@ export function BannedScreen({ navigation }: any) {
     }
   };
 
+  // Realtime subscription for appeal updates and unban notifications
   useEffect(() => {
     fetchAppeal();
+
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-banned-appeals-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'citizen_appeals',
+          filter: `user_id=eq.${profile.id}`,
+        },
+        () => {
+          fetchAppeal();
+          if (refreshProfile) refreshProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id]);
+
+  useEffect(() => {
+    if (profile?.moderation_status === 'active') {
+      showToast('Your account suspension has been lifted! Welcome back.', 'success');
+    }
+  }, [profile?.moderation_status]);
 
   const handleSubmitAppeal = async () => {
     if (!appealMessage.trim()) {
@@ -91,12 +121,13 @@ export function BannedScreen({ navigation }: any) {
     <ScreenBackground>
       <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={{ padding: 24, paddingBottom: 40, flexGrow: 1, justifyContent: 'center' }}
+            contentContainerStyle={{ padding: 24, paddingBottom: 60, flexGrow: 1, justifyContent: 'center' }}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Header Warning Icon */}
             <View style={{ alignItems: 'center', marginBottom: 20 }}>
