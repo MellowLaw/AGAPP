@@ -61,6 +61,20 @@ export function HomeScreen({ navigation }: any) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (profile?.moderation_status === 'restricted' && profile?.id) {
+      const checkRestrictedGreeting = async () => {
+        const key = `restricted_greeting_shown_${profile.id}`;
+        const shown = await AsyncStorage.getItem(key);
+        if (!shown) {
+          await AsyncStorage.setItem(key, 'true');
+          navigation.navigate('Restricted');
+        }
+      };
+      checkRestrictedGreeting();
+    }
+  }, [profile?.moderation_status, profile?.id]);
+
   const formatDateTime = () => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

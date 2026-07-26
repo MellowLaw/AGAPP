@@ -35,6 +35,7 @@ import { NewsScreen } from '../screens/NewsScreen';
 import { BannedScreen } from '../screens/BannedScreen';
 import { VerifiedGreetingScreen } from '../screens/VerifiedGreetingScreen';
 import { DeleteAccountScreen } from '../screens/DeleteAccountScreen';
+import { RestrictedScreen } from '../screens/RestrictedScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -513,6 +514,7 @@ export function AppNavigator() {
             <Stack.Screen name="SplashGreeting" component={SplashGreetingScreen} />
             <Stack.Screen name="VerifiedGreeting" component={VerifiedGreetingScreen} />
             <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+            <Stack.Screen name="Restricted" component={RestrictedScreen} />
           </>
         )}
       </Stack.Navigator>
