@@ -505,13 +505,25 @@ export default function CitizensPage() {
             </p>
 
             {(modalAction === 'ban' || modalAction === 'restrict') && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium">
+                ⚠️ <span className="font-bold">Are you sure you want to perform this action?</span> This will immediately change their status. Banned accounts are completely blocked from logging in or using the AGAPP mobile client.
+              </div>
+            )}
+
+            {modalAction === 'reactivate' && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium">
+                ℹ️ <span className="font-bold">Are you sure you want to reactivate this account?</span> This will restore their status to active and grant full access to their mobile citizen account.
+              </div>
+            )}
+
+            {(modalAction === 'ban' || modalAction === 'restrict') && (
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase text-text-muted">Reason for Moderation Action:</label>
                 <textarea
                   placeholder="Enter clear reason for this citizen..."
                   value={reasonInput}
                   onChange={e => setReasonInput(e.target.value)}
-                  className="w-full p-3 text-sm rounded-xl border border-border bg-surface text-text-primary"
+                  className="w-full p-3 text-sm rounded-xl border border-border bg-surface text-text-primary focus:outline-none"
                   rows={3}
                 />
               </div>
@@ -520,7 +532,7 @@ export default function CitizensPage() {
             <div className="flex items-center justify-end gap-3 pt-2">
               <Button variant="secondary" size="sm" onClick={() => { setSelectedCitizen(null); setModalAction(null); }}>Cancel</Button>
               <Button variant={modalAction === 'ban' ? 'danger' : 'primary'} size="sm" onClick={handleModerateSubmit} disabled={submitting}>
-                Confirm Action
+                {modalAction === 'reactivate' ? 'Confirm Reactivation' : 'Confirm Action'}
               </Button>
             </div>
           </Card>

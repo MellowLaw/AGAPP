@@ -9,6 +9,7 @@ import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Lo
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
+import { lguIdFromName } from '@/lib/lgu';
 import type { AdminModule } from '@/lib/modules';
 
 const ROLE_LABEL: Record<SidebarProps['role'], string> = {
@@ -123,6 +124,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   const [modules, setModules] = useState<string[]>([]);
   const { showToast, ToastContainer } = useToast();
   const { counts } = useNavBadges();
+  const [lguLogo, setLguLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!lguParam) return;
+    const fetchLguLogo = async () => {
+      try {
+        const targetId = lguIdFromName(lguParam);
+        const { data: lgu } = await supabase
+          .from('lgus')
+          .select('logo')
+          .eq('id', targetId)
+          .single();
+        if (lgu?.logo) {
+          setLguLogo(lgu.logo);
+        } else {
+          setLguLogo(null);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch LGU logo', err);
+      }
+    };
+    fetchLguLogo();
+  }, [lguParam]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -202,8 +226,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
       {/* User Section */}
       <div className="p-3 mt-auto border-t border-transparent group-hover:border-theme/50 transition-colors shrink-0">
         <div className="flex items-center gap-2 pl-6 py-2">
-          <div className="w-8 h-8 shrink-0 rounded-full bg-accent-soft flex items-center justify-center">
-            <span className="text-xs font-bold text-accent">{initials(userProfile?.name || '?')}</span>
+          <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-accent-soft flex items-center justify-center">
+            {lguLogo ? (
+              <img src={lguLogo} alt="LGU Seal" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-bold text-accent">{initials(userProfile?.name || '?')}</span>
+            )}
           </div>
           <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <p className="text-sm font-semibold text-text-primary truncate">{userProfile?.name || 'Loading...'}</p>
