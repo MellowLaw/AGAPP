@@ -22,15 +22,26 @@ page, so File → Export as → PDF gives one chart per sheet.
 | Rectangle | Process / action |
 | Parallelogram | Input / output — a screen, form or report |
 | Diamond | Decision |
-| Circle | **On-page** connector (`A`, `AA`, `1A`) |
-| Inverted pentagon | **Off-page** connector (`1`, `2`, `3` …) |
+| Circle | **On-page** connector — jump within the same page (only `1A`, the login retry) |
+| Inverted pentagon | **Off-page** connector — flow continues on a different page |
 
 Black on white, no fills or accent colours.
 
-Numbered off-page connectors point at the page whose title starts with that number —
-e.g. `4` on the main flow continues on the page titled `4 — Report an Issue`. `AA`
-returns to the main interface. Every connector is checked against an existing page at
-build time.
+**Both ends of a jump use the same symbol.** Because each chart is its own page,
+almost every jump here crosses pages and so is a pentagon at the exit *and* at the
+arrival. The one true on-page connector is `1A` (failed login → back to the form,
+same page), drawn as a circle.
+
+| Label | Meaning |
+|---|---|
+| `1`, `2`, `3` … | Jump to the page whose title starts with that number |
+| `1A` | Login failed — back to the login form (same page) |
+| `A`, `B` | This same flow continues on the next page |
+| `AA` | Return to the main interface / tabs |
+
+Every connector is validated at build time: numbered ones must match a real page, and
+**every label must have both an exit and an arrival**. The first build shipped an `AA`
+that 35 pages returned to and no page received — that check now makes it a build error.
 
 ## Editing
 

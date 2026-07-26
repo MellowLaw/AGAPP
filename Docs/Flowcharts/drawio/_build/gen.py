@@ -168,7 +168,39 @@ def render_page(chart: Chart) -> ET.Element:
     return diagram
 
 
+def check_connectors(charts: list[Chart]) -> None:
+    """
+    Every connector label must have BOTH an exit and an arrival somewhere.
+
+    A connector with an incoming edge is an exit ("jump to X"); one with an
+    outgoing edge is an arrival ("continue from X"). A label with only exits is a
+    dead end — the reader is told to go to X and no page says where X is. That is
+    exactly what happened to `AA` on the first build: 35 pages returned to it and
+    nothing received it, and because the earlier check only cross-referenced the
+    NUMBERED connectors against page titles, it went unnoticed.
+    """
+    exits: dict[str, list[str]] = {}
+    arrivals: dict[str, list[str]] = {}
+    for ch in charts:
+        conn = {n.nid: n.label for n in ch.nodes if n.kind in ("on", "off")}
+        for src, dst, _ in ch.edges:
+            if dst in conn:
+                exits.setdefault(conn[dst], []).append(ch.cid)
+            if src in conn:
+                arrivals.setdefault(conn[src], []).append(ch.cid)
+
+    problems = []
+    for label in sorted(set(exits) | set(arrivals)):
+        if label not in arrivals:
+            problems.append(f"  {label!r}: exits from {sorted(set(exits[label]))} but nothing arrives at it")
+        if label not in exits:
+            problems.append(f"  {label!r}: arrives on {sorted(set(arrivals[label]))} but nothing jumps to it")
+    if problems:
+        raise ValueError("dangling connectors:\n" + "\n".join(problems))
+
+
 def write_file(path: str, charts: list[Chart]) -> None:
+    check_connectors(charts)
     mxfile = ET.Element("mxfile", {"host": "app.diagrams.net", "type": "device"})
     for ch in charts:
         mxfile.append(render_page(ch))

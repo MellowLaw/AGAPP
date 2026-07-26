@@ -25,6 +25,9 @@
         <mxCell id="S0-wrong" value="Redirected to that&amp;#10;role's own home" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="370" y="361" width="170" height="50" as="geometry" />
         </mxCell>
+        <mxCell id="S0-aaIn" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="370" y="457" width="64" height="54" as="geometry" />
+        </mxCell>
         <mxCell id="S0-main" value="Main Interface —&amp;#10;all LGUs in scope" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="120" y="460" width="190" height="48" as="geometry" />
         </mxCell>
@@ -40,8 +43,8 @@
         <mxCell id="S0-o2" value="2" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="370" y="669" width="64" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="S0-toA" value="A" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="770" width="44" height="44" as="geometry" />
+        <mxCell id="S0-toA" value="A" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="770" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S0-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-start" target="S0-login">
           <mxGeometry relative="1" as="geometry" />
@@ -64,19 +67,22 @@
         <mxCell id="S0-e6" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-role" target="S0-main">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="S0-e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-main" target="S0-d1">
+        <mxCell id="S0-e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-aaIn" target="S0-main">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="S0-e8" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d1" target="S0-o1">
+        <mxCell id="S0-e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-main" target="S0-d1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="S0-e9" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d1" target="S0-d2">
+        <mxCell id="S0-e9" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d1" target="S0-o1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="S0-e10" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d2" target="S0-o2">
+        <mxCell id="S0-e10" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d1" target="S0-d2">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="S0-e11" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d2" target="S0-toA">
+        <mxCell id="S0-e11" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d2" target="S0-o2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="S0-e12" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0-d2" target="S0-toA">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
@@ -90,29 +96,29 @@
         <mxCell id="S0b-title" value="Super Admin — Main Flow (continued)" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S0b-fromA" value="A" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S0b-fromA" value="A" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S0b-d3" value="If Analytics?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S0b-o3" value="3" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="165" width="64" height="54" as="geometry" />
+          <mxGeometry x="370" y="175" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S0b-d4" value="If Settings?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="266" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="276" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S0b-o4" value="4" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="279" width="64" height="54" as="geometry" />
+          <mxGeometry x="370" y="289" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S0b-d5" value="If Logout?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="380" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="390" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S0b-o5" value="5" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="393" width="64" height="54" as="geometry" />
+          <mxGeometry x="370" y="403" width="64" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="S0b-back" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="494" width="44" height="44" as="geometry" />
+        <mxCell id="S0b-back" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="504" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S0b-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S0b-fromA" target="S0b-d3">
           <mxGeometry relative="1" as="geometry" />
@@ -146,29 +152,29 @@
         <mxCell id="S1-title" value="1 — Cross-LGU Dashboard" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S1-i" value="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S1-i" value="1" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S1-ld" value="Load totals for every LGU:&amp;#10;reports, requests, users" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="50" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S1-sh" value="Platform overview and&amp;#10;LGU comparison table" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="236" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="246" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S1-q" value="Export the figures?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="318" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="328" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S1-csv" value="Download CSV" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="333" width="150" height="50" as="geometry" />
+          <mxGeometry x="370" y="343" width="150" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S1-dr" value="Open one LGU?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="432" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="442" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S1-into" value="Drill into that&amp;#10;LGU's figures" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="447" width="170" height="50" as="geometry" />
+          <mxGeometry x="370" y="457" width="170" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="S1-o" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="546" width="44" height="44" as="geometry" />
+        <mxCell id="S1-o" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="556" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S1-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S1-i" target="S1-ld">
           <mxGeometry relative="1" as="geometry" />
@@ -208,32 +214,32 @@
         <mxCell id="S2-title" value="2 — LGU Directory" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S2-i" value="2" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S2-i" value="2" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S2-ld" value="List of onboarded LGUs" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S2-q" value="Which action?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="234" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="244" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S2-tog" value="Activate or deactivate&amp;#10;an LGU" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="249" width="170" height="50" as="geometry" />
+          <mxGeometry x="370" y="259" width="170" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S2-add" value="Onboard a new LGU?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="348" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="358" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S2-wiz" value="2A" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="361" width="64" height="54" as="geometry" />
+          <mxGeometry x="370" y="371" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S2-cfg" value="Edit branding or&amp;#10;feature flags?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="462" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="472" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S2-save" value="Save changes to&amp;#10;that LGU" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="477" width="170" height="50" as="geometry" />
+          <mxGeometry x="370" y="487" width="170" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="S2-o" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="576" width="44" height="44" as="geometry" />
+        <mxCell id="S2-o" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="586" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S2-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S2-i" target="S2-ld">
           <mxGeometry relative="1" as="geometry" />
@@ -276,35 +282,35 @@
         <mxCell id="S2A-title" value="2A — Onboarding a New LGU (Wizard)" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S2A-i" value="2A" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S2A-i" value="2A" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S2A-st1" value="Step 1 — Location:&amp;#10;region, province, city" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S2A-dup" value="Already onboarded?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="234" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="244" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S2A-stop" value="Blocked as a duplicate" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="249" width="170" height="50" as="geometry" />
+          <mxGeometry x="370" y="259" width="170" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S2A-st2" value="Step 2 — Branding:&amp;#10;colours, logo, feature flags" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="348" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="358" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S2A-st3" value="Create the first&amp;#10;LGU Admin now?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="430" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="440" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S2A-acct" value="Step 3 — Name, email,&amp;#10;temporary password" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="544" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="554" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S2A-st4" value="Step 4 — Review" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="626" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="636" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S2A-save" value="Create the LGU record,&amp;#10;then the admin account" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="708" width="190" height="50" as="geometry" />
+          <mxGeometry x="120" y="718" width="190" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="S2A-o" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="792" width="44" height="44" as="geometry" />
+        <mxCell id="S2A-o" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="802" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S2A-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S2A-i" target="S2A-st1">
           <mxGeometry relative="1" as="geometry" />
@@ -350,26 +356,26 @@
         <mxCell id="S3-title" value="3 — Analytics" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S3-i" value="3" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S3-i" value="3" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S3-ld" value="Aggregate reports and requests&amp;#10;per LGU, per month" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="50" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S3-sh" value="Reports vs. Requests&amp;#10;over time" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="236" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="246" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S3-mx" value="Cross-LGU metrics table" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="318" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="328" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S3-q" value="Change the period&amp;#10;or metric?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="400" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="410" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S3-re" value="Recompute the totals" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="415" width="170" height="50" as="geometry" />
+          <mxGeometry x="370" y="425" width="170" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="S3-o" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="514" width="44" height="44" as="geometry" />
+        <mxCell id="S3-o" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="524" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S3-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S3-i" target="S3-ld">
           <mxGeometry relative="1" as="geometry" />
@@ -403,26 +409,26 @@
         <mxCell id="S4-title" value="4 — Super Admin Settings" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S4-i" value="4" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S4-i" value="4" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S4-sh" value="Own profile and&amp;#10;notification preferences" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="48" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="48" as="geometry" />
         </mxCell>
         <mxCell id="S4-q" value="Change the password?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="234" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="244" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S4-re" value="Re-enter the current&amp;#10;password to confirm" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="249" width="180" height="50" as="geometry" />
+          <mxGeometry x="370" y="259" width="180" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S4-np" value="Update notification&amp;#10;preferences?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="348" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="358" width="190" height="80" as="geometry" />
         </mxCell>
         <mxCell id="S4-sv" value="Save preferences" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="363" width="150" height="50" as="geometry" />
+          <mxGeometry x="370" y="373" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="S4-o" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="462" width="44" height="44" as="geometry" />
+        <mxCell id="S4-o" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="472" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S4-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S4-i" target="S4-sh">
           <mxGeometry relative="1" as="geometry" />
@@ -459,20 +465,20 @@
         <mxCell id="S5-title" value="5 — Logout" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
           <mxGeometry x="40" y="30" width="700" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="S5-i" value="5" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="193" y="74" width="44" height="44" as="geometry" />
+        <mxCell id="S5-i" value="5" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="183" y="74" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S5-q" value="Confirm logout?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="152" width="190" height="80" as="geometry" />
+          <mxGeometry x="120" y="162" width="190" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="S5-no" value="AA" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="370" y="170" width="44" height="44" as="geometry" />
+        <mxCell id="S5-no" value="AA" style="shape=offPageConnector;whiteSpace=wrap;html=1;size=0.5;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="370" y="175" width="64" height="54" as="geometry" />
         </mxCell>
         <mxCell id="S5-cl" value="End the session and&amp;#10;clear the cookie" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="120" y="266" width="190" height="50" as="geometry" />
+          <mxGeometry x="120" y="276" width="190" height="50" as="geometry" />
         </mxCell>
         <mxCell id="S5-end" value="End" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
-          <mxGeometry x="140" y="350" width="150" height="42" as="geometry" />
+          <mxGeometry x="140" y="360" width="150" height="42" as="geometry" />
         </mxCell>
         <mxCell id="S5-e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;endArrow=classic;fontSize=10;" edge="1" parent="1" source="S5-i" target="S5-q">
           <mxGeometry relative="1" as="geometry" />

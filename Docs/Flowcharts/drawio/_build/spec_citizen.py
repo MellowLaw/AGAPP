@@ -37,7 +37,7 @@ c0 = Chart("C0", "Citizen App — Entry", nodes=[
 ])
 
 c1 = Chart("C1", "1 — Guest Browsing and Sign Up", nodes=[
-    N("i",   "on",   "1"),
+    N("i",   "off",   "1"),
     N("det", "io",   "Detect or choose&#10;a municipality"),
     N("brw", "io",   "Browse news, forum,&#10;guide and map"),
     N("act", "dec",  "Tries a members-only&#10;action?"),
@@ -60,9 +60,11 @@ c1 = Chart("C1", "1 — Guest Browsing and Sign Up", nodes=[
 ])
 
 c2 = Chart("C2", "2 — Main Interface (Tabs)", nodes=[
-    N("i",  "on",   "2"),
+    N("i",  "off",   "2"),
     N("wel", "dec", "Welcome animation&#10;pending?"),
     N("play", "io", "Play once, then&#10;clear the flag"),
+    # Arrival point for AA — every feature page returns to the tabs.
+    N("aaIn", "off", "AA", side=True, at="home"),
     N("home", "io", "Home tab"),
     N("d1",  "dec", "If Services?"),
     N("o1",  "off", "3", side=True, at="d1"),
@@ -72,11 +74,12 @@ c2 = Chart("C2", "2 — Main Interface (Tabs)", nodes=[
     N("o3",  "off", "5", side=True, at="d3"),
     N("d4",  "dec", "If Profile?"),
     N("o4",  "off", "6", side=True, at="d4"),
-    N("toA", "on",  "A"),
+    N("toA", "off",  "A"),
 ], edges=[
     ("i", "wel", ""),
     ("wel", "play", "Yes"), ("play", "home", ""),
     ("wel", "home", "No"),
+    ("aaIn", "home", ""),
     ("home", "d1", ""),
     ("d1", "o1", "Yes"), ("d1", "d2", "No"),
     ("d2", "o2", "Yes"), ("d2", "d3", "No"),
@@ -85,7 +88,7 @@ c2 = Chart("C2", "2 — Main Interface (Tabs)", nodes=[
 ])
 
 c2b = Chart("C2B", "2 — Main Interface (continued)", nodes=[
-    N("fromA", "on", "A"),
+    N("fromA", "off", "A"),
     N("d5",  "dec", "If News or&#10;Announcements?"),
     N("o5",  "off", "7", side=True, at="d5"),
     N("d6",  "dec", "If Assistant&#10;(chatbot)?"),
@@ -94,7 +97,7 @@ c2b = Chart("C2B", "2 — Main Interface (continued)", nodes=[
     N("o7",  "io",  "Open that screen", side=True, at="d7", w=180),
     N("d8",  "dec", "If Notifications?"),
     N("o8",  "io",  "Notification list —&#10;tap to open the item", side=True, at="d8", w=180),
-    N("back", "on", "AA"),
+    N("back", "off", "AA"),
 ], edges=[
     ("fromA", "d5", ""),
     ("d5", "o5", "Yes"), ("d5", "d6", "No"),
@@ -104,7 +107,7 @@ c2b = Chart("C2B", "2 — Main Interface (continued)", nodes=[
 ])
 
 c3 = Chart("C3", "3 — Apply for a Service", nodes=[
-    N("i",   "on",   "3"),
+    N("i",   "off",   "3"),
     N("ld",  "io",   "Service catalogue&#10;for this municipality"),
     N("ver", "dec",  "Identity verified?"),
     N("nv",  "off",  "10", side=True, at="ver"),
@@ -124,14 +127,14 @@ c3 = Chart("C3", "3 — Apply for a Service", nodes=[
 ])
 
 c3a = Chart("C3A", "3A — Tracking and Claiming", nodes=[
-    N("i",   "on",   "3A"),
+    N("i",   "off",   "3A"),
     N("ld",  "io",   "My requests and&#10;their status"),
     N("st",  "dec",  "Ready for pickup?"),
     N("wait", "proc", "Wait — push sent on&#10;each status change", side=True, at="st", w=180),
     N("code", "io",  "Claim code and&#10;QR shown"),
     N("go",  "proc", "Present it at the&#10;municipal hall"),
     N("rel", "proc", "Staff releases the&#10;document"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "ld", ""), ("ld", "st", ""),
     ("st", "wait", "No"), ("wait", "o", ""),
@@ -139,7 +142,7 @@ c3a = Chart("C3A", "3A — Tracking and Claiming", nodes=[
 ])
 
 c4 = Chart("C4", "4 — Report an Issue", nodes=[
-    N("i",   "on",   "4"),
+    N("i",   "off",   "4"),
     N("ver", "dec",  "Identity verified?"),
     N("nv",  "off",  "10", side=True, at="ver"),
     N("mod", "dec",  "Account restricted&#10;or banned?"),
@@ -162,7 +165,7 @@ c4 = Chart("C4", "4 — Report an Issue", nodes=[
 ])
 
 c4a = Chart("C4A", "4A — Photo Check and Follow-up", nodes=[
-    N("i",   "on",   "4A"),
+    N("i",   "off",   "4A"),
     N("run", "dec",  "Category has a&#10;detection model?"),
     N("none", "proc", "No automatic check —&#10;staff review only", side=True, at="run", w=180),
     N("det", "dec",  "Subject found in&#10;the photo?"),
@@ -171,7 +174,7 @@ c4a = Chart("C4A", "4A — Photo Check and Follow-up", nodes=[
     N("trk", "io",   "Track status; push sent&#10;on every change"),
     N("res", "dec",  "Resolved?"),
     N("rate", "io",  "Rate the resolution", side=True, at="res", w=150),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "run", ""),
     ("run", "none", "No"), ("none", "trk", ""),
@@ -184,7 +187,7 @@ c4a = Chart("C4A", "4A — Photo Check and Follow-up", nodes=[
 ])
 
 c5 = Chart("C5", "5 — Community Forum", nodes=[
-    N("i",   "on",   "5"),
+    N("i",   "off",   "5"),
     N("ld",  "proc", "Load approved posts, then&#10;look up author names&#10;and photos"),
     N("sh",  "io",   "Post list with authors,&#10;replies and likes"),
     N("act", "dec",  "Post, reply, or like?"),
@@ -207,7 +210,7 @@ c5 = Chart("C5", "5 — Community Forum", nodes=[
 ])
 
 c5a = Chart("C5A", "5A — Posting to the Forum", nodes=[
-    N("i",   "on",   "5A"),
+    N("i",   "off",   "5A"),
     N("wr",  "io",   "Write the post&#10;or reply"),
     N("pf",  "dec",  "Contains blocked&#10;language?"),
     N("rej", "proc", "Held back — the wording&#10;must be changed", side=True, at="pf", w=180),
@@ -215,7 +218,7 @@ c5a = Chart("C5A", "5A — Posting to the Forum", nodes=[
     N("appr", "dec", "Approved by a&#10;moderator?"),
     N("live", "proc", "Visible to everyone,&#10;including guests", side=True, at="appr", w=180),
     N("hid", "proc", "Stays hidden; only the&#10;author can see it"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "wr", ""), ("wr", "pf", ""),
     ("pf", "rej", "Yes"), ("rej", "o", ""),
@@ -225,7 +228,7 @@ c5a = Chart("C5A", "5A — Posting to the Forum", nodes=[
 ])
 
 c6 = Chart("C6", "6 — Profile and Account", nodes=[
-    N("i",  "on",   "6"),
+    N("i",  "off",   "6"),
     N("sh", "io",   "Profile — name, status,&#10;municipality"),
     N("q",  "dec",  "Which action?"),
     N("ph", "io",   "Change profile photo&#10;or email", side=True, at="q", w=170),
@@ -235,7 +238,7 @@ c6 = Chart("C6", "6 — Profile and Account", nodes=[
     N("go", "off",  "10", side=True, at="vf"),
     N("dl", "dec",  "Delete account?"),
     N("cf", "off",  "6A", side=True, at="dl"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "sh", ""), ("sh", "q", ""),
     ("q", "ph", "Photo / email"), ("ph", "o", ""),
@@ -249,10 +252,10 @@ c6 = Chart("C6", "6 — Profile and Account", nodes=[
 ])
 
 c6a = Chart("C6A", "6A — Deleting the Account", nodes=[
-    N("i",  "on",   "6A"),
+    N("i",  "off",   "6A"),
     N("w",  "io",   "Warning — what will&#10;be removed"),
     N("cf", "dec",  "Confirmed?"),
-    N("no", "on",   "AA", side=True, at="cf"),
+    N("no", "off",   "AA", side=True, at="cf"),
     N("del", "proc", "Account and personal&#10;data removed"),
     N("out", "proc", "Signed out"),
     N("end", "term", "End"),
@@ -263,13 +266,13 @@ c6a = Chart("C6A", "6A — Deleting the Account", nodes=[
 ])
 
 c7 = Chart("C7", "7 — News and Announcements", nodes=[
-    N("i",  "on",   "7"),
+    N("i",  "off",   "7"),
     N("ld", "io",   "Published announcements&#10;for this municipality"),
     N("q",  "dec",  "Open one?"),
     N("rd", "io",   "Full article"),
     N("adv", "dec", "Arrived from an&#10;advisory push?"),
     N("deep", "proc", "Opened straight to&#10;that article", side=True, at="adv", w=180),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "ld", ""), ("ld", "q", ""),
     ("q", "rd", "Yes"), ("q", "o", "No"),
@@ -279,14 +282,14 @@ c7 = Chart("C7", "7 — News and Announcements", nodes=[
 ])
 
 c8 = Chart("C8", "8 — Assistant (Chatbot)", nodes=[
-    N("i",  "on",   "8"),
+    N("i",  "off",   "8"),
     N("sh", "io",   "Assistant chat"),
     N("ask", "io",  "Types a question"),
     N("kw", "dec",  "Matches a known&#10;question?"),
     N("faq", "proc", "Stored answer returned", side=True, at="kw", w=170),
     N("ai", "proc", "Passed to the language&#10;model for an answer"),
     N("more", "dec", "Another question?"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "sh", ""), ("sh", "ask", ""), ("ask", "kw", ""),
     ("kw", "faq", "Yes"), ("faq", "more", ""),
@@ -295,7 +298,7 @@ c8 = Chart("C8", "8 — Assistant (Chatbot)", nodes=[
 ])
 
 c9 = Chart("C9", "9 — Restricted or Banned Account", nodes=[
-    N("i",   "on",   "9"),
+    N("i",   "off",   "9"),
     N("k",   "dec",  "Banned or&#10;restricted?"),
     N("bs",  "io",   "Banned screen — reason&#10;shown; nothing else&#10;reachable", side=True, at="k", w=180),
     N("rs",  "io",   "Restricted screen —&#10;reading still allowed"),
@@ -305,7 +308,7 @@ c9 = Chart("C9", "9 — Restricted or Banned Account", nodes=[
     N("cool", "dec", "Denied within the&#10;last 3 days?"),
     N("wait", "proc", "Must wait, or appeal in&#10;person at the hall", side=True, at="cool", w=180),
     N("sub", "proc", "Appeal sent for review"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "k", ""),
     ("k", "bs", "Banned"), ("bs", "ap", ""),
@@ -318,7 +321,7 @@ c9 = Chart("C9", "9 — Restricted or Banned Account", nodes=[
 ])
 
 c10 = Chart("C10", "10 — Identity Verification", nodes=[
-    N("i",   "on",   "10"),
+    N("i",   "off",   "10"),
     N("st",  "dec",  "Current status?"),
     N("pend", "proc", "Already submitted —&#10;awaiting review", side=True, at="st", w=180),
     N("con", "io",   "Consent to ID and&#10;photo processing"),
@@ -334,7 +337,7 @@ c10 = Chart("C10", "10 — Identity Verification", nodes=[
 ])
 
 c10a = Chart("C10A", "10A — Face Check and Review", nodes=[
-    N("i",   "on",   "10A"),
+    N("i",   "off",   "10A"),
     N("ai",  "proc", "Compare the selfie with&#10;the photo on the ID"),
     N("low", "dec",  "Faces clearly&#10;different, or none found?"),
     N("warn", "io",  "Warned, and offered&#10;a retake", side=True, at="low", w=170),
@@ -342,7 +345,7 @@ c10a = Chart("C10A", "10A — Face Check and Review", nodes=[
     N("rev", "dec",  "Approved by the&#10;LGU reviewer?"),
     N("ok",  "io",   "Verified — welcome&#10;screen shown once", side=True, at="rev", w=170),
     N("rj",  "io",   "Rejected, with the&#10;reason shown"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "ai", ""), ("ai", "low", ""),
     ("low", "warn", "Yes"), ("warn", "sub", ""),

@@ -15,6 +15,8 @@ main = Chart("L0", "LGU Admin — Main Flow", nodes=[
     N("login", "io",   "Log In&#10;Email / Password"),
     N("chk",   "dec",  "Is email and&#10;password correct?"),
     N("bad",   "on",   "1A", side=True, at="chk"),
+    # Arrival point for AA — every module page returns here.
+    N("aaIn",  "off",  "AA", side=True, at="main"),
     N("main",  "io",   "Main Interface"),
     N("d1",    "dec",  "If Dashboard?"),
     N("o1",    "off",  "1", side=True, at="d1"),
@@ -24,9 +26,9 @@ main = Chart("L0", "LGU Admin — Main Flow", nodes=[
     N("o3",    "off",  "3", side=True, at="d3"),
     N("d4",    "dec",  "If eServices&#10;Catalog?"),
     N("o4",    "off",  "4", side=True, at="d4"),
-    N("toA",   "on",   "A"),
+    N("toA",   "off",   "A"),
     # column 2
-    N("fromA", "on",   "A", col=1),
+    N("fromA", "off",   "A", col=1),
     N("d5",    "dec",  "If Community&#10;and News?", col=1),
     N("o5",    "off",  "5", col=1, side=True, at="d5"),
     N("d6",    "dec",  "If Forum?", col=1),
@@ -37,11 +39,12 @@ main = Chart("L0", "LGU Admin — Main Flow", nodes=[
     N("o8",    "off",  "8", col=1, side=True, at="d8"),
     N("d9",    "dec",  "If Citizens and&#10;Moderation?", col=1),
     N("o9",    "off",  "9", col=1, side=True, at="d9"),
-    N("toB",   "on",   "B", col=1),
+    N("toB",   "off",   "B", col=1),
 ], edges=[
     ("start", "login", ""), ("login", "chk", ""),
     ("chk", "bad", "No"), ("bad", "login", ""),
     ("chk", "main", "Yes"),
+    ("aaIn", "main", ""),
     ("main", "d1", ""),
     ("d1", "o1", "Yes"), ("d1", "d2", "No"),
     ("d2", "o2", "Yes"), ("d2", "d3", "No"),
@@ -57,7 +60,7 @@ main = Chart("L0", "LGU Admin — Main Flow", nodes=[
 
 # ── Page 2: rest of the menu ─────────────────────────────────────────────────
 main2 = Chart("L0b", "LGU Admin — Main Flow (continued)", nodes=[
-    N("fromB", "on",  "B"),
+    N("fromB", "off",  "B"),
     N("d10",   "dec", "If Verifications?"),
     N("o10",   "off", "10", side=True, at="d10"),
     N("d11",   "dec", "If Settings?"),
@@ -66,7 +69,7 @@ main2 = Chart("L0b", "LGU Admin — Main Flow (continued)", nodes=[
     N("deny",  "proc", "Redirected —&#10;Settings is admin only"),
     N("d12",   "dec", "If Logout?"),
     N("o12",   "off", "12", side=True, at="d12"),
-    N("back",  "on",  "AA"),
+    N("back",  "off",  "AA"),
 ], edges=[
     ("fromB", "d10", ""),
     ("d10", "o10", "Yes"), ("d10", "d11", "No"),
@@ -78,14 +81,14 @@ main2 = Chart("L0b", "LGU Admin — Main Flow (continued)", nodes=[
 
 # ── Module pages (the off-page targets) ──────────────────────────────────────
 p1 = Chart("L1", "1 — Dashboard", nodes=[
-    N("i",  "on",   "1"),
+    N("i",  "off",   "1"),
     N("g",  "dec",  "Holds the&#10;dashboard module?"),
     N("no", "proc", "Redirected to a&#10;granted module"),
     N("ld", "proc", "Load counts for this LGU:&#10;reports, requests, verifications"),
     N("sh", "io",   "Dashboard —&#10;totals and map"),
     N("q",  "dec",  "Opens a&#10;summary card?"),
     N("jump", "proc", "Jump to that module's list"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "sh", ""), ("sh", "q", ""),
@@ -93,7 +96,7 @@ p1 = Chart("L1", "1 — Dashboard", nodes=[
 ])
 
 p2 = Chart("L2", "2 — Issue Reports", nodes=[
-    N("i",   "on",   "2"),
+    N("i",   "off",   "2"),
     N("g",   "dec",  "Holds the&#10;reports module?"),
     N("no",  "proc", "Redirected"),
     N("ld",  "proc", "Load this LGU's reports&#10;(RLS scoped)"),
@@ -103,7 +106,7 @@ p2 = Chart("L2", "2 — Issue Reports", nodes=[
     N("cf",  "dec",  "Was it changed by&#10;someone else first?"),
     N("warn", "proc", "Refuse the write, warn,&#10;and refresh the list", side=True, at="cf"),
     N("ok",  "proc", "Apply and notify the citizen"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "sh", ""), ("sh", "q", ""),
@@ -113,7 +116,7 @@ p2 = Chart("L2", "2 — Issue Reports", nodes=[
 ])
 
 p3 = Chart("L3", "3 — Service Requests", nodes=[
-    N("i",   "on",   "3"),
+    N("i",   "off",   "3"),
     N("g",   "dec",  "Holds the&#10;services module?"),
     N("no",  "proc", "Redirected"),
     N("ld",  "io",   "Request queue&#10;and detail panel"),
@@ -123,7 +126,7 @@ p3 = Chart("L3", "3 — Service Requests", nodes=[
     N("code", "proc", "Generate claim code&#10;and notify the citizen", side=True, at="rdy"),
     N("rel", "dec",  "Release the document?"),
     N("done", "proc", "Verify claim code,&#10;record release", side=True, at="rel"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -135,14 +138,14 @@ p3 = Chart("L3", "3 — Service Requests", nodes=[
 ])
 
 p4 = Chart("L4", "4 — eServices Catalog", nodes=[
-    N("i",  "on",   "4"),
+    N("i",  "off",   "4"),
     N("g",  "dec",  "Holds the eServices&#10;catalog module?"),
     N("no", "proc", "Redirected"),
     N("ld", "io",   "Service catalogue list"),
     N("q",  "dec",  "Add, edit, or&#10;toggle active?"),
     N("frm", "io",  "Service form —&#10;name, fee, requirements"),
     N("sv", "proc", "Save; citizens see only&#10;active services"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -151,7 +154,7 @@ p4 = Chart("L4", "4 — eServices Catalog", nodes=[
 ])
 
 p5 = Chart("L5", "5 — Community and News", nodes=[
-    N("i",  "on",   "5"),
+    N("i",  "off",   "5"),
     N("g",  "dec",  "Holds the&#10;news module?"),
     N("no", "proc", "Redirected"),
     N("ld", "io",   "Announcement list"),
@@ -160,7 +163,7 @@ p5 = Chart("L5", "5 — Community and News", nodes=[
     N("pub", "dec", "Publish as an advisory?"),
     N("push", "proc", "One batched push to&#10;this LGU's citizens", side=True, at="pub"),
     N("save", "proc", "Save as draft or&#10;plain announcement"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -171,14 +174,14 @@ p5 = Chart("L5", "5 — Community and News", nodes=[
 ])
 
 p6 = Chart("L6", "6 — Forum Moderation", nodes=[
-    N("i",  "on",   "6"),
+    N("i",  "off",   "6"),
     N("g",  "dec",  "Holds the&#10;forum module?"),
     N("no", "proc", "Redirected"),
     N("ld", "io",   "Posts and comments,&#10;including unapproved"),
     N("q",  "dec",  "Post acceptable?"),
     N("ap", "proc", "Approve — becomes&#10;publicly visible", side=True, at="q"),
     N("hd", "proc", "Hide or delete"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -187,14 +190,14 @@ p6 = Chart("L6", "6 — Forum Moderation", nodes=[
 ])
 
 p7 = Chart("L7", "7 — Facilities", nodes=[
-    N("i",  "on",   "7"),
+    N("i",  "off",   "7"),
     N("g",  "dec",  "Holds the&#10;facilities module?"),
     N("no", "proc", "Redirected"),
     N("ld", "io",   "Facility list and map"),
     N("q",  "dec",  "Add or edit&#10;a facility?"),
     N("frm", "io",  "Form — name, type,&#10;pin location, photo"),
     N("sv", "proc", "Save; appears on the&#10;citizen map"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -203,14 +206,14 @@ p7 = Chart("L7", "7 — Facilities", nodes=[
 ])
 
 p8 = Chart("L8", "8 — Citizen Guide", nodes=[
-    N("i",  "on",   "8"),
+    N("i",  "off",   "8"),
     N("g",  "dec",  "Holds the citizen&#10;guide module?"),
     N("no", "proc", "Redirected"),
     N("ld", "io",   "Guide directory cards"),
     N("q",  "dec",  "Add or edit&#10;a guide?"),
     N("frm", "io",  "Form — office, contact,&#10;operating hours"),
     N("sv", "proc", "Save; publicly readable"),
-    N("o",  "on",   "AA"),
+    N("o",  "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -219,7 +222,7 @@ p8 = Chart("L8", "8 — Citizen Guide", nodes=[
 ])
 
 p9 = Chart("L9", "9 — Citizens and Moderation", nodes=[
-    N("i",   "on",   "9"),
+    N("i",   "off",   "9"),
     N("g",   "dec",  "Holds the&#10;citizens module?"),
     N("no",  "proc", "Redirected", side=True, at="g", w=140),
     N("ld",  "io",   "Citizens of this LGU,&#10;read-only"),
@@ -228,7 +231,7 @@ p9 = Chart("L9", "9 — Citizens and Moderation", nodes=[
     N("rsn", "io",   "Reason is required&#10;for ban and restrict"),
     N("rpc", "proc", "moderate_citizen RPC —&#10;citizen is notified"),
     N("ap",  "off",  "9A", side=True, at="rpc"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -237,7 +240,7 @@ p9 = Chart("L9", "9 — Citizens and Moderation", nodes=[
 ])
 
 p9a = Chart("L9A", "9A — Reviewing a Citizen Appeal", nodes=[
-    N("i",    "on",   "9A"),
+    N("i",    "off",   "9A"),
     N("ld",   "io",   "Pending appeals&#10;for this LGU"),
     N("q",    "dec",  "Open an appeal?"),
     N("pend", "dec",  "Still pending?"),
@@ -245,7 +248,7 @@ p9a = Chart("L9A", "9A — Reviewing a Citizen Appeal", nodes=[
     N("dec2", "dec",  "Approve the appeal?"),
     N("lift", "proc", "Restrictions lifted;&#10;citizen notified", side=True, at="dec2", w=170),
     N("keep", "proc", "Denied with a note —&#10;3-day cooldown before&#10;the next appeal"),
-    N("o",    "on",   "AA"),
+    N("o",    "off",   "AA"),
 ], edges=[
     ("i", "ld", ""), ("ld", "q", ""),
     ("q", "pend", "Yes"), ("q", "o", "No"),
@@ -256,7 +259,7 @@ p9a = Chart("L9A", "9A — Reviewing a Citizen Appeal", nodes=[
 ])
 
 p10 = Chart("L10", "10 — ID Verifications", nodes=[
-    N("i",   "on",   "10"),
+    N("i",   "off",   "10"),
     N("g",   "dec",  "Holds the&#10;verifications module?"),
     N("no",  "proc", "Redirected"),
     N("ld",  "io",   "Pending requests, ID photo,&#10;selfie and AI match score"),
@@ -265,7 +268,7 @@ p10 = Chart("L10", "10 — ID Verifications", nodes=[
     N("dec2", "dec", "Approve the identity?"),
     N("ok",  "proc", "Marked verified —&#10;citizen gains full access", side=True, at="dec2"),
     N("rj",  "io",   "Reject with a reason&#10;the citizen can see"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "g", ""), ("g", "no", "No"), ("no", "o", ""),
     ("g", "ld", "Yes"), ("ld", "q", ""),
@@ -276,7 +279,7 @@ p10 = Chart("L10", "10 — ID Verifications", nodes=[
 ])
 
 p11 = Chart("L11", "11 — Settings and Staff", nodes=[
-    N("i",   "on",   "11"),
+    N("i",   "off",   "11"),
     N("q",   "dec",  "Which tab?"),
     N("br",  "io",   "Branding — colours,&#10;logo, contact details", side=True, at="q"),
     N("stf", "dec",  "Add or edit staff?"),
@@ -284,7 +287,7 @@ p11 = Chart("L11", "11 — Settings and Staff", nodes=[
     N("mods", "io",  "Tick the sections&#10;this staff member may use"),
     N("full", "proc", "LGU Admin —&#10;all sections implied", side=True, at="role"),
     N("save", "proc", "Save; set_staff_modules&#10;is the only write path"),
-    N("o",   "on",   "AA"),
+    N("o",   "off",   "AA"),
 ], edges=[
     ("i", "q", ""),
     ("q", "br", "Branding"), ("br", "o", ""),
@@ -296,9 +299,9 @@ p11 = Chart("L11", "11 — Settings and Staff", nodes=[
 ])
 
 p12 = Chart("L12", "12 — Logout", nodes=[
-    N("i",  "on",   "12"),
+    N("i",  "off",   "12"),
     N("q",  "dec",  "Confirm logout?"),
-    N("no", "on",   "AA", side=True, at="q"),
+    N("no", "off",   "AA", side=True, at="q"),
     N("cl", "proc", "End the session and&#10;clear the cookie"),
     N("end", "term", "End"),
 ], edges=[
