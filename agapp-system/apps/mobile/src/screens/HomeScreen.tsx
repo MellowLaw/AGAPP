@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabaseClient';
+import { fetchAuthorProfiles, DEFAULT_AVATAR } from '../utils/authorProfiles';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ScreenBackground } from '../components/ScreenBackground';
@@ -232,7 +233,7 @@ export function HomeScreen({ navigation }: any) {
             .limit(10), // Limit 10 to cover emergency hospital/police listings
           supabase
             .from('forum_posts')
-            .select('*, citizen:users!citizen_id(avatar_url)')
+            .select('*')
             .eq('lgu_id', activeLgu.id)
             .ilike('title', `%${query}%`)
             .limit(5),
@@ -332,35 +333,43 @@ export function HomeScreen({ navigation }: any) {
         setNews(sorted.slice(0, 5));
       }
 
-      // 2. Fetch trending threads
+      // 2. Fetch trending threads. Author info comes from a separate lookup —
+      // the old users embed returned null for everyone (see utils/authorProfiles).
       const { data: forumData } = await supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, citizen_id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name))')
+        .select('*, forum_comments(id, citizen_id, is_approved, created_at)')
         .eq('lgu_id', activeLgu.id)
         .eq('is_approved', true)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (forumData) {
+        const forumAuthorIds: (string | null | undefined)[] = [];
+        forumData.forEach((p: any) => {
+          forumAuthorIds.push(p.citizen_id);
+          (p.forum_comments || []).forEach((c: any) => forumAuthorIds.push(c.citizen_id));
+        });
+        const forumAuthors = await fetchAuthorProfiles(forumAuthorIds);
+
         const mapped = forumData.map((p: any) => {
           const approvedComments = (p.forum_comments || [])
             .filter((c: any) => c.is_approved)
             .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          const DEFAULT_AVATAR = 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
+
           const replierAvatars: string[] = [];
           const seenCitizenIds = new Set<string>();
 
           approvedComments.forEach((c: any) => {
             if (replierAvatars.length >= 3) return;
-            const citizenId = c.citizen_id || c.citizen?.id;
+            const citizenId = c.citizen_id;
             if (!citizenId || seenCitizenIds.has(citizenId)) return;
             seenCitizenIds.add(citizenId);
-            replierAvatars.push(c.citizen?.avatar_url || DEFAULT_AVATAR);
+            replierAvatars.push(forumAuthors.get(citizenId)?.avatar_url || DEFAULT_AVATAR);
           });
 
           return {
             ...p,
+            citizen: forumAuthors.get(p.citizen_id) ?? null,
             commentsCount: approvedComments.length,
             replierAvatars,
           };
@@ -419,22 +428,29 @@ export function HomeScreen({ navigation }: any) {
     onRefresh();
   }, [activeLgu.id, profile, onRefresh]);
 
-  // One-time Splash Greeting logic for new sign-ins/registrations
+  // Welcome ("pagbati") animation — shown ONCE, and only to someone who has
+  // just created an account.
+  //
+  // It used to key off a device-wide `hasSeenGreeting_global` flag set on the
+  // first Home render of any signed-in profile, which meant an existing citizen
+  // signing in on a new phone (or after a reinstall, which wipes AsyncStorage)
+  // got the new-user welcome. Now EmailOtpScreen sets `pendingGreeting` at the
+  // exact moment a signup is confirmed, and this consumes it — so it fires on
+  // account creation and nowhere else.
   useEffect(() => {
-    const checkGreetingFlag = async () => {
+    const consumePendingGreeting = async () => {
       if (!profile?.id) return;
       try {
-        // Use a global flag so that once anyone on the device has seen it, it never appears again on reopening.
-        const flag = await AsyncStorage.getItem('hasSeenGreeting_global');
-        if (!flag) {
-          await AsyncStorage.setItem('hasSeenGreeting_global', 'true');
-          navigation.navigate('SplashGreeting');
-        }
+        const pending = await AsyncStorage.getItem('pendingGreeting');
+        if (pending !== profile.id) return;
+        // Clear first: if navigation throws, we still never replay it.
+        await AsyncStorage.removeItem('pendingGreeting');
+        navigation.navigate('SplashGreeting');
       } catch (err) {
         console.warn('[HomeScreen] Failed checking greeting flag:', err);
       }
     };
-    checkGreetingFlag();
+    consumePendingGreeting();
   }, [profile?.id]);
 
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';

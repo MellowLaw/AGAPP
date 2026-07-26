@@ -2052,3 +2052,37 @@ CREATE POLICY "Staff with citizens module read citizens" ON users
 -- compare-and-set on the row's last-read status, since those writes go
 -- straight through PostgREST rather than an RPC.
 
+-- ============================================================
+-- 20. PUBLIC FORUM AUTHOR PROFILES  (patch 17_forum_author_profiles.sql)
+--
+--     Fixes forum avatars/names being blank for SIGNED-IN citizens. The only
+--     SELECT policy that applies to a citizen on `users` is "Users can read
+--     their own record", so the mobile app's embedded author join resolved to
+--     NULL for everybody else. (Guests were fine — their is_public_forum_author
+--     policy plus the column-level grant satisfies PostgREST's embed.)
+--
+--     A row policy for `authenticated` was NOT the fix: that role holds SELECT
+--     on all 23 columns of `users`, so admitting forum-author rows would have
+--     exposed those authors' email, expo_push_token, moderation_reason and role
+--     to every signed-in citizen. This returns exactly three columns, so the
+--     caller cannot widen the set, and needs no grant on `users` at all.
+--
+--     A view would work equally well but trips the security_definer_view linter
+--     at ERROR level (and security_invoker = on would defeat the point, since
+--     the caller can only see their own row). The function form also forces the
+--     caller to name the ids it wants rather than listing every author.
+--     Used by apps/mobile/src/utils/authorProfiles.ts.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.get_forum_author_profiles(p_ids uuid[])
+RETURNS TABLE (id uuid, name text, avatar_url text)
+LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE
+AS $$
+  SELECT u.id, u.name, u.avatar_url
+  FROM users u
+  WHERE u.id = ANY (COALESCE(p_ids, '{}'::uuid[]))
+    AND is_public_forum_author(u.id);
+$$;
+
+REVOKE ALL ON FUNCTION public.get_forum_author_profiles(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_forum_author_profiles(uuid[]) TO anon, authenticated;
+

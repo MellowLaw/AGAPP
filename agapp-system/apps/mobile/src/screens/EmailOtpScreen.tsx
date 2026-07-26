@@ -9,6 +9,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
@@ -88,13 +89,22 @@ export function EmailOtpScreen({ navigation, route }: any) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'signup',
       });
 
       if (error) throw error;
+
+      // This is the one moment we know an account was just CREATED (type
+      // 'signup'), so arm the one-time welcome animation here. HomeScreen
+      // consumes and clears it. Keyed by user id so a different account
+      // signing in on the same device can't pick up a stale flag.
+      const newUserId = data?.user?.id;
+      if (newUserId) {
+        await AsyncStorage.setItem('pendingGreeting', newUserId);
+      }
 
       showToast('Email confirmed! Welcome to AGAPP 🎉', 'success');
       // AuthContext will detect the new session and redirect automatically

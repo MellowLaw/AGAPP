@@ -22,6 +22,13 @@ export function SplashGreetingScreen({ navigation, onFinish }: any) {
         return;
       }
       if (!navigation) return;
+      // Normally this screen is pushed on top of Home, so just pop back to it.
+      // replace('Main') would mount a SECOND Main below the first, leaving a
+      // duplicate in the stack and remounting the whole tab tree.
+      if (navigation.canGoBack?.()) {
+        navigation.goBack();
+        return;
+      }
       if (session) {
         if (selectedLgu) {
           navigation.replace('Main');

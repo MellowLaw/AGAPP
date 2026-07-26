@@ -5,6 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../supabaseClient';
 import { isVerified } from '../utils/verification';
+import { fetchAuthorProfiles, DEFAULT_AVATAR } from '../utils/authorProfiles';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { globalStyles, PASTELS } from '../theme';
@@ -260,9 +261,12 @@ export function ForumScreen({ navigation, route }: any) {
     const lgu = selectedLgu || guestLgu;
     if (!lgu) return;
     try {
+      // Author info is fetched separately (see utils/authorProfiles.ts) — the
+      // old `citizen:users!citizen_id(...)` embeds silently returned null for
+      // everyone but yourself, which is why avatars never loaded.
       let query = supabase
         .from('forum_posts')
-        .select('*, citizen:users!citizen_id(avatar_url), forum_comments(id, citizen_id, is_approved, created_at, citizen:users!citizen_id(avatar_url, name)), forum_post_likes(user_id)')
+        .select('*, forum_comments(id, citizen_id, is_approved, created_at), forum_post_likes(user_id)')
         .eq('lgu_id', lgu.id);
 
       if (profile) {
@@ -276,8 +280,16 @@ export function ForumScreen({ navigation, route }: any) {
         .limit(50);
 
       if (error) throw error;
-      
+
       if (data) {
+        // One lookup covering both post authors and commenters.
+        const authorIds: (string | null | undefined)[] = [];
+        data.forEach((p: any) => {
+          authorIds.push(p.citizen_id);
+          (p.forum_comments || []).forEach((c: any) => authorIds.push(c.citizen_id));
+        });
+        const authors = await fetchAuthorProfiles(authorIds);
+
         const mapped = data.map((p: any) => {
           const approvedComments = (p.forum_comments || []).filter((c: any) => c.is_approved);
           const postLikes = p.forum_post_likes || [];
@@ -285,7 +297,6 @@ export function ForumScreen({ navigation, route }: any) {
           // Collect unique replier avatars — dedupe strictly by citizen_id, most
           // recent commenter first. Falls back to a neutral placeholder (not
           // stock photos) when the user has no profile photo uploaded.
-          const DEFAULT_AVATAR = 'https://jrureblhypfdljwflout.supabase.co/storage/v1/object/public/report-photos/default-avatar.png';
           const seenIds = new Set<string>();
           const replierAvatars: string[] = [];
           const sortedComments = [...approvedComments].sort(
@@ -293,14 +304,16 @@ export function ForumScreen({ navigation, route }: any) {
           );
           for (const c of sortedComments) {
             if (replierAvatars.length >= 3) break;
-            const uid = c.citizen_id ?? c.citizen?.id;
+            const uid = c.citizen_id;
             if (!uid || seenIds.has(uid)) continue;
             seenIds.add(uid);
-            replierAvatars.push(c.citizen?.avatar_url || DEFAULT_AVATAR);
+            replierAvatars.push(authors.get(uid)?.avatar_url || DEFAULT_AVATAR);
           }
 
           return {
             ...p,
+            // Same shape the embed used to produce, so the render is unchanged.
+            citizen: authors.get(p.citizen_id) ?? null,
             commentsCount: approvedComments.length,
             likesCount: postLikes.length,
             isLiked: postLikes.some((like: any) => like.user_id === profile?.id),
@@ -323,7 +336,7 @@ export function ForumScreen({ navigation, route }: any) {
     try {
       let query = supabase
         .from('forum_comments')
-        .select('*, citizen:users!citizen_id(avatar_url)')
+        .select('*')
         .eq('post_id', postId);
 
       if (profile) {
@@ -335,7 +348,12 @@ export function ForumScreen({ navigation, route }: any) {
       const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) throw error;
-      setComments(data || []);
+
+      const authors = await fetchAuthorProfiles((data || []).map((c: any) => c.citizen_id));
+      setComments((data || []).map((c: any) => ({
+        ...c,
+        citizen: authors.get(c.citizen_id) ?? null,
+      })));
       
       // Auto scroll comments to end
       setTimeout(() => {

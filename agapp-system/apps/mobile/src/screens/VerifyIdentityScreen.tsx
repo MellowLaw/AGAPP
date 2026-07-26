@@ -103,6 +103,14 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const { showToast } = useToast();
   const { profile, selectedLgu, session, refreshProfile } = useAuth();
 
+  // Derived here rather than further down because the showRejectionScreen
+  // useState below seeds itself from it. It used to be declared ~60 lines
+  // later, so that initialiser read `status` from its temporal dead zone —
+  // Babel's const→var transpile made it `undefined` instead of throwing, so
+  // `status === 'rejected'` was ALWAYS false and a citizen whose verification
+  // had been rejected never saw the rejection screen when opening this page.
+  const status = getVerificationStatus(profile);
+
   const [idType, setIdType] = useState<typeof ID_TYPES[number]['value']>('PhilSys');
 
   const stepKeys: StepKey[] = ['id_front', 'residency', 'selfie', 'review'];
@@ -228,7 +236,6 @@ export function VerifyIdentityScreen({ navigation }: any) {
     }
   }, [selectedLgu, profile]);
 
-  const status = getVerificationStatus(profile);
   const lguId  = resolvedLgu?.id || selectedLgu?.id || profile?.lgu_id;
   const lguName = (resolvedLgu?.name || selectedLgu?.name || 'your municipality').replace('Municipality of ', '');
 
