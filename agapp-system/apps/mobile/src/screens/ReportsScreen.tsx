@@ -634,25 +634,46 @@ export function ReportsScreen({ navigation, route }: any) {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={{
-                  height: 52,
-                  borderRadius: 999,
-                  backgroundColor: !verified ? '#D1D5DB' : '#292929',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-                onPress={verified ? submitReport : () => navigation.navigate('VerifyIdentity')}
-                disabled={submitting || !verified}
-              >
-                <Text style={{
-                  color: !verified ? '#9CA3AF' : '#FFFCF5',
-                  fontFamily: 'Octarine-Bold',
-                  fontSize: 15,
-                }}>
-                  {!verified ? 'Verify to Submit' : checkingPhoto ? 'Verifying photo…' : submitting ? 'Submitting...' : 'Submit Report'}
-                </Text>
-              </TouchableOpacity>
+              {!verified ? (
+                <TouchableOpacity
+                  style={{
+                    height: 52,
+                    borderRadius: 999,
+                    backgroundColor: '#DC2626',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => navigation.navigate('VerifyIdentity')}
+                >
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontFamily: 'Octarine-Bold',
+                    fontSize: 15,
+                  }}>
+                    Verification Required
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{
+                    height: 52,
+                    borderRadius: 999,
+                    backgroundColor: '#292929',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={submitReport}
+                  disabled={submitting}
+                >
+                  <Text style={{
+                    color: '#FFFCF5',
+                    fontFamily: 'Octarine-Bold',
+                    fontSize: 15,
+                  }}>
+                    {checkingPhoto ? 'Verifying photo…' : submitting ? 'Submitting...' : 'Submit Report'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -711,46 +732,78 @@ export function ReportsScreen({ navigation, route }: any) {
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           {activeTab === 'reports' ? (
-            /* Flat category selection card grid */
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              {REPORT_CATEGORIES.map(cat => {
-                const IconComp = cat.icon;
-                return (
+            <View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                {REPORT_CATEGORIES.map(cat => {
+                  const IconComp = cat.icon;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={{
+                        width: '48%',
+                        backgroundColor: T.card,
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        borderRadius: 20,
+                        padding: 16,
+                        marginBottom: 12,
+                      }}
+                      onPress={() => {
+                        if (!session) {
+                          navigation.navigate('Login', { initialMode: 'register' });
+                          return;
+                        }
+                        setCategory(cat.id);
+                        setShowForm(true);
+                      }}
+                    >
+                      <View style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: T.accent,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginBottom: 12,
+                      }}>
+                        <IconComp size={18} color={T.onAccent} variant="Bold" />
+                      </View>
+                      <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 18 }}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {!verified && session && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 16,
+                  borderRadius: 16,
+                  backgroundColor: '#FEF3C7',
+                  borderWidth: 1,
+                  borderColor: '#F59E0B',
+                  marginTop: 16,
+                  gap: 10,
+                }}>
+                  <ShieldTick size={24} color="#B45309" variant="Bold" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Verification Required</Text>
+                    <Text style={{ color: '#A16207', fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Verify your identity to submit community reports.</Text>
+                  </View>
                   <TouchableOpacity
-                    key={cat.id}
                     style={{
-                      width: '48%',
-                      backgroundColor: T.card,
-                      borderWidth: 1,
-                      borderColor: T.border,
-                      borderRadius: 20,
-                      padding: 16,
-                      marginBottom: 12,
+                      backgroundColor: '#B45309',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 10,
                     }}
-                    onPress={() => {
-                      if (!session) {
-                        navigation.navigate('Login', { initialMode: 'register' });
-                        return;
-                      }
-                      setCategory(cat.id);
-                      setShowForm(true);
-                    }}
+                    onPress={() => navigation.navigate('VerifyIdentity')}
                   >
-                    <View style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: T.accent,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      marginBottom: 12,
-                    }}>
-                      <IconComp size={18} color={T.onAccent} variant="Bold" />
-                    </View>
-                    <Text style={{ fontSize: 15, fontFamily: 'Octarine-Bold', color: T.text, lineHeight: 18 }}>{cat.label}</Text>
+                    <Text style={{ color: '#fff', fontFamily: 'Octarine-Bold', fontSize: 12 }}>Verify</Text>
                   </TouchableOpacity>
-                );
-              })}
+                </View>
+              )}
             </View>
           ) : (
             /* Reports list directly inline */

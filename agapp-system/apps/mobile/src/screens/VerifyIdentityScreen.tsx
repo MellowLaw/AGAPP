@@ -170,6 +170,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const [searchText, setSearchText] = useState('');
   const [resolvedLgu, setResolvedLgu] = useState<any>(null);
   const [showAiWarningModal, setShowAiWarningModal] = useState(false);
+  const [showRejectionScreen, setShowRejectionScreen] = useState(status === 'rejected');
 
   const getAiWarningDetails = (result: any) => {
     if (!result) return null;
@@ -567,6 +568,84 @@ export function VerifyIdentityScreen({ navigation }: any) {
             <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Rejected verification dedicated screen ──────────────────────────────
+  if (showRejectionScreen) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+        <MapBg T={T} isDarkMode={isDarkMode} />
+        <View style={[styles.header, { borderBottomColor: T.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+          </TouchableOpacity>
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Verify Identity</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          <Image
+            source={require('../../assets/brand/stickers/3.png')}
+            style={{ width: 140, height: 140, marginBottom: 24 }}
+            resizeMode="contain"
+          />
+
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
+            Requirements Not Met
+          </Text>
+          
+          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 24 }}>
+            Sorry, you didn't meet the requirements for account verification in {resolvedLgu?.name || selectedLgu?.name || 'the municipality'}.
+          </Text>
+
+          <View style={{
+            width: '100%',
+            backgroundColor: '#FEF2F2',
+            borderWidth: 1,
+            borderColor: '#FCA5A5',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 32,
+          }}>
+            <Text style={{ color: '#991B1B', fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 4 }}>
+              REASON FROM LGU ADMIN
+            </Text>
+            <Text style={{ color: '#B91C1C', fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 18 }}>
+              {profile?.rejection_reason || 'No specific reason provided by the administrator. Please make sure your uploaded ID is clear and your selfie matches the ID.'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={{
+              height: 52,
+              borderRadius: 999,
+              backgroundColor: '#292929',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+              marginBottom: 12,
+            }}
+            onPress={() => setShowRejectionScreen(false)}
+          >
+            <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Re-submit Verification</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              height: 52,
+              borderRadius: 999,
+              backgroundColor: 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+            }}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     );
   }

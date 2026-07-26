@@ -1291,6 +1291,38 @@ export function ForumScreen({ navigation, route }: any) {
               </View>
             </View>
           )}
+
+          {!verified && session && (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 16,
+              borderRadius: 16,
+              backgroundColor: '#FEF3C7',
+              borderWidth: 1,
+              borderColor: '#F59E0B',
+              marginBottom: 16,
+              gap: 10,
+            }}>
+              <ShieldTick size={24} color="#B45309" variant="Bold" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#92400E', fontFamily: 'Octarine-Bold', fontSize: 14 }}>Verification Required</Text>
+                <Text style={{ color: '#A16207', fontFamily: 'Inter-Medium', fontSize: 12, marginTop: 2 }}>Verify your identity to interact in the forum.</Text>
+              </View>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#B45309',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 10,
+                }}
+                onPress={() => navigation.navigate('VerifyIdentity')}
+              >
+                <Text style={{ color: '#fff', fontFamily: 'Octarine-Bold', fontSize: 12 }}>Verify</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* 1. Trending Threads (Horizontal small cards - only in "For you", empty search, and "All" tag filter) */}
           {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
             <View style={{ marginBottom: 24 }}>
