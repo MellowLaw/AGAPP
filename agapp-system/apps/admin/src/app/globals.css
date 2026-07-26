@@ -17,6 +17,10 @@
   --text-muted: #7a7771;
   --text-faint: #a3a097;
   --border-theme: #e5e2d9;
+  /* Unfilled portion of a range slider's track. Needs to sit a step darker
+     than --border-theme to read as a groove against the white surface it's
+     drawn on. */
+  --slider-track: #ddd9cd;
   --accent: #d62a53;
   --accent-contrast: #ffffff;
   --accent-soft: rgba(214, 42, 83, 0.08);
@@ -31,6 +35,9 @@
   --text-muted: #a19e97;
   --text-faint: #5e5c56;
   --border-theme: #3d3d3d;
+  /* Equivalent to the previous hardcoded rgba(255,255,255,0.15) composited
+     over --surface, so dark mode is unchanged. */
+  --slider-track: #525252;
   --accent: #ff758f;
   --accent-contrast: #ffffff;
   --accent-soft: rgba(255, 117, 143, 0.08);

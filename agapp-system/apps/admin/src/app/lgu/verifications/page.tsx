@@ -425,7 +425,11 @@ export default function VerificationsPage() {
                 onChange={e => setMinConfidence(Number(e.target.value))}
                 className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-accent"
                 style={{
-                  background: `linear-gradient(to right, var(--accent) ${minConfidence}%, rgba(255, 255, 255, 0.15) ${minConfidence}%)`,
+                  // The unfilled half must come from a theme token — it was
+                  // hardcoded rgba(255,255,255,0.15), i.e. white on a white
+                  // surface, so in light mode the track vanished entirely and
+                  // only the accent thumb was visible.
+                  background: `linear-gradient(to right, var(--accent) ${minConfidence}%, var(--slider-track) ${minConfidence}%)`,
                 }}
               />
             </div>

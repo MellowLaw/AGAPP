@@ -35,6 +35,7 @@ export function NotificationBell() {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [needsAttention, setNeedsAttention] = useState<ImportantNotice[]>([]);
   const [seenAt, setSeenAt] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'action' | 'unread'>('all');
   const [role, setRole] = useState<string | null>(null);
   const [lguId, setLguId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -111,12 +112,33 @@ export function NotificationBell() {
     fetchImportantNotices(lguId).then(setNeedsAttention);
   }, [open, lguId]);
 
-  const unreadCount = useMemo(() => {
-    const storedUnread = !seenAt
-      ? items.length
-      : items.filter(n => new Date(n.created_at).getTime() > new Date(seenAt).getTime()).length;
-    return storedUnread + needsAttention.length;
-  }, [items, seenAt, needsAttention]);
+  const isUnreadRow = useCallback(
+    (n: NotificationRow) => !seenAt || new Date(n.created_at).getTime() > new Date(seenAt).getTime(),
+    [seenAt]
+  );
+
+  const storedUnreadCount = useMemo(
+    () => items.filter(isUnreadRow).length,
+    [items, isUnreadRow]
+  );
+
+  const unreadCount = useMemo(
+    () => storedUnreadCount + needsAttention.length,
+    [storedUnreadCount, needsAttention]
+  );
+
+  // Panel filter. "Action needed" is the computed backlog (overdue / stale work
+  // that is still open); "Unread" is stored notices newer than the last
+  // "Mark all read". Kept to three so the row stays readable at 320px wide.
+  const TABS = [
+    { key: 'all' as const, label: 'All', count: needsAttention.length + items.length },
+    { key: 'action' as const, label: 'Action needed', count: needsAttention.length },
+    { key: 'unread' as const, label: 'Unread', count: storedUnreadCount },
+  ];
+
+  const visibleAttention = filter === 'unread' ? [] : needsAttention;
+  const visibleItems =
+    filter === 'action' ? [] : filter === 'unread' ? items.filter(isUnreadRow) : items;
 
   const markAllRead = useCallback(async () => {
     if (!userId) return;
@@ -215,18 +237,48 @@ export function NotificationBell() {
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
                 <span className="text-sm font-semibold text-text-primary">Notifications</span>
-                {items.length > 0 && (
+                {storedUnreadCount > 0 && (
                   <button onClick={markAllRead} className="text-[11px] font-mono text-accent hover:underline">
                     Mark all read
                   </button>
                 )}
               </div>
 
+              {hasAny && (
+                <div className="flex items-center gap-1 px-3 py-2 border-b border-theme">
+                  {TABS.map(t => {
+                    const active = filter === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => setFilter(t.key)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                          active
+                            ? 'bg-accent-soft text-accent'
+                            : 'text-text-muted hover:text-text-primary hover:bg-surface-alt'
+                        }`}
+                      >
+                        {t.label}
+                        <span
+                          className={`font-mono text-[10px] ${active ? 'text-accent' : 'text-text-faint'}`}
+                        >
+                          {t.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {!hasAny ? (
                 <div className="px-4 py-8 text-center text-sm text-text-muted">No notifications yet.</div>
+              ) : visibleAttention.length === 0 && visibleItems.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-text-muted">
+                  {filter === 'unread' ? 'Nothing unread.' : 'Nothing needs action right now.'}
+                </div>
               ) : (
                 <>
-                  {needsAttention.length > 0 && (
+                  {visibleAttention.length > 0 && (
                     <>
                       <p className="px-4 pt-3 pb-0.5 text-[10px] font-mono font-semibold tracking-widest text-text-faint uppercase">
                         Needs attention
@@ -239,7 +291,7 @@ export function NotificationBell() {
                         Stays until resolved — not cleared by “Mark all read”.
                       </p>
                       <ul>
-                        {needsAttention.map(n => (
+                        {visibleAttention.map(n => (
                           <li key={n.id}>
                             <button
                               onClick={() => handleClickAttention(n)}
@@ -260,14 +312,14 @@ export function NotificationBell() {
                     </>
                   )}
 
-                  {items.length > 0 && (
+                  {visibleItems.length > 0 && (
                     <>
                       <p className="px-4 pt-3 pb-1 text-[10px] font-mono font-semibold tracking-widest text-text-faint uppercase">
                         Recent notices
                       </p>
                       <ul>
-                        {items.map(n => {
-                          const isUnread = !seenAt || new Date(n.created_at).getTime() > new Date(seenAt).getTime();
+                        {visibleItems.map(n => {
+                          const isUnread = isUnreadRow(n);
                           return (
                             <li key={n.id}>
                               <button
