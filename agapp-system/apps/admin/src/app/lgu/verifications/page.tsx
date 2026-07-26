@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
+import { ClickableImage } from '@/components/ui/ClickableImage';
 import {
   Personalcard, User, Clock, TickSquare, CloseCircle, Eye,
   SearchNormal1, Danger, Sms, Location, DocumentText, Camera,
@@ -703,12 +704,13 @@ export default function VerificationsPage() {
                         <p className="text-xs text-text-muted">Loading…</p>
                       </div>
                     ) : idImageUrl ? (
-                      <img
+                      <ClickableImage
                         src={idImageUrl}
                         alt="Government ID"
-                        className="w-full h-44 object-contain rounded-lg border border-theme bg-surface-alt cursor-zoom-in"
-                        onClick={() => window.open(idImageUrl, '_blank')}
-                        title="Click to open full size"
+                        modalTitle={`Government ID - ${selectedRequest.citizen_name || 'Citizen'}`}
+                        modalSubtitle={`ID Type: ${selectedRequest.id_type || 'N/A'}`}
+                        containerClassName="w-full h-44 border border-theme bg-surface-alt"
+                        className="w-full h-44 object-contain"
                       />
                     ) : selectedRequest.status !== 'pending' ? (
                       <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">
@@ -732,12 +734,13 @@ export default function VerificationsPage() {
                         <p className="text-xs text-text-muted">Loading…</p>
                       </div>
                     ) : selfieUrl ? (
-                      <img
+                      <ClickableImage
                         src={selfieUrl}
                         alt="Selfie"
-                        className="w-full h-44 object-contain rounded-lg border border-theme bg-surface-alt cursor-zoom-in"
-                        onClick={() => window.open(selfieUrl, '_blank')}
-                        title="Click to open full size"
+                        modalTitle={`Selfie Verification - ${selectedRequest.citizen_name || 'Citizen'}`}
+                        modalSubtitle="Citizen facial verification photo"
+                        containerClassName="w-full h-44 border border-theme bg-surface-alt"
+                        className="w-full h-44 object-contain"
                       />
                     ) : selectedRequest.status !== 'pending' ? (
                       <div className="h-44 bg-surface-alt rounded-lg flex items-center justify-center">

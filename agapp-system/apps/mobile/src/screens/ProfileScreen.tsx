@@ -533,6 +533,8 @@ export function ProfileScreen({ navigation }: any) {
             { category: 'Account Settings', label: 'Account Verification', icon: ShieldTick, iconType: 'iconsax' as const, cta: statusLabel(status), textStyle: { color: rowStatusColor }, onPress: goToVerify, keywords: ['verify', 'verification', 'identity', 'id', 'status', 'account'] },
             { category: 'Account Settings', label: 'History', icon: Clock, iconType: 'iconsax' as const, onPress: openHistory, keywords: ['history', 'logs', 'past', 'requests', 'reports', 'activities', 'account'] },
 
+            { category: 'Appearance', label: 'Dark Mode', icon: Moon, iconType: 'iconsax' as const, isToggle: true, toggleValue: isDarkMode, onPress: () => setIsDarkMode(!isDarkMode), keywords: ['dark', 'mode', 'darkmode', 'theme', 'appearance', 'light', 'night', 'color'] },
+
             { category: 'System Permissions', label: 'Push Notifications', icon: Notification, iconType: 'iconsax' as const, isToggle: true, toggleValue: pushEnabled, onPress: handleTogglePush, keywords: ['push', 'notifications', 'alerts', 'preferences'] },
             { category: 'System Permissions', label: 'Location Permissions', icon: LocationIcon, iconType: 'iconsax' as const, isToggle: true, toggleValue: gpsEnabled, onPress: handleToggleGps, keywords: ['gps', 'location', 'map', 'permission', 'tracking', 'access', 'preferences'] },
             { category: 'System Permissions', label: 'Camera Permissions', icon: Camera, iconType: 'iconsax' as const, isToggle: true, toggleValue: cameraEnabled, onPress: handleToggleCamera, keywords: ['camera', 'photo', 'permission', 'access', 'preferences'] },
@@ -642,7 +644,7 @@ export function ProfileScreen({ navigation }: any) {
           }
 
           // Otherwise, render grouped by categories
-          const categories = ['Account Settings', 'System Permissions', 'Help & Support', 'About', 'Danger Zone'];
+          const categories = ['Account Settings', 'Appearance', 'System Permissions', 'Help & Support', 'About', 'Danger Zone'];
 
           return categories.map(cat => {
             const catItems = filtered.filter(item => item.category === cat);

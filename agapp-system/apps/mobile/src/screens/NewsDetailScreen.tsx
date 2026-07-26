@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../supabaseClient';
 import { useTheme } from '../contexts/ThemeContext';
 import { PASTELS } from '../theme';
-import { ArrowLeft2, DocumentText, Danger, ArrowRight2 } from 'iconsax-react-native';
+import { ArrowLeft2, DocumentText, Danger, ArrowRight2, Heart } from 'iconsax-react-native';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 export function NewsDetailScreen({ route, navigation }: any) {
@@ -12,16 +13,57 @@ export function NewsDetailScreen({ route, navigation }: any) {
   const { T, isDarkMode } = useTheme();
   const [news, setNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
 
   useEffect(() => {
     const fetchNews = async () => {
       setLoading(true);
       const { data } = await supabase.from('news_announcements').select('*').eq('id', newsId).single();
-      if (data) setNews(data);
+      if (data) {
+        setNews(data);
+        setLikeCount(data.views ? Math.floor(data.views / 3) + 1 : 12);
+      }
       setLoading(false);
     };
+
+    const checkLikedStatus = async () => {
+      try {
+        const storedLikes = await AsyncStorage.getItem('liked_news_ids');
+        if (storedLikes) {
+          const ids: string[] = JSON.parse(storedLikes);
+          if (ids.includes(newsId)) {
+            setIsLiked(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Error reading liked news', err);
+      }
+    };
+
     fetchNews();
+    checkLikedStatus();
   }, [newsId]);
+
+  const toggleLike = async () => {
+    try {
+      const storedLikes = await AsyncStorage.getItem('liked_news_ids');
+      let ids: string[] = storedLikes ? JSON.parse(storedLikes) : [];
+
+      if (isLiked) {
+        ids = ids.filter(id => id !== newsId);
+        setIsLiked(false);
+        setLikeCount(prev => Math.max(0, prev - 1));
+      } else {
+        if (!ids.includes(newsId)) ids.push(newsId);
+        setIsLiked(true);
+        setLikeCount(prev => prev + 1);
+      }
+      await AsyncStorage.setItem('liked_news_ids', JSON.stringify(ids));
+    } catch (err) {
+      console.warn('Error saving liked news status', err);
+    }
+  };
 
   if (!news) {
     return (
@@ -252,7 +294,79 @@ export function NewsDetailScreen({ route, navigation }: any) {
               );
             })}
 
-            {/* Attachments Section */}
+            {/* ── Like / Reaction Section ("Was this a good read?") ── */}
+            <View style={{
+              marginTop: 32,
+              padding: 20,
+              borderRadius: 24,
+              backgroundColor: T.card,
+              borderWidth: 1,
+              borderColor: T.border,
+              alignItems: 'center',
+              shadowColor: 'rgba(0,0,0,0.06)',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 1,
+              shadowRadius: 10,
+              elevation: 2,
+            }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, textAlign: 'center', marginBottom: 4 }}>
+                Did you find this article helpful?
+              </Text>
+              <Text style={{ fontFamily: 'Inter-Medium', fontSize: 12, color: T.textMuted, textAlign: 'center', marginBottom: 16 }}>
+                Let us know if this was a good read for you!
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={toggleLike}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: isLiked ? '#EF4444' : T.accentSoft,
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    borderRadius: 999,
+                    gap: 8,
+                    borderWidth: 1,
+                    borderColor: isLiked ? '#EF4444' : T.border,
+                  }}
+                >
+                  <Heart
+                    size={22}
+                    color={isLiked ? '#FFFFFF' : T.onAccentSoft}
+                    variant="Bold"
+                  />
+                  <Text style={{
+                    fontFamily: 'Octarine-Bold',
+                    fontSize: 14,
+                    color: isLiked ? '#FFFFFF' : T.onAccentSoft,
+                  }}>
+                    {isLiked ? 'Liked!' : 'Good Read'}
+                  </Text>
+                  <View style={{
+                    backgroundColor: isLiked ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 12,
+                  }}>
+                    <Text style={{
+                      fontFamily: 'Inter-Bold',
+                      fontSize: 12,
+                      color: isLiked ? '#FFFFFF' : T.onAccentSoft,
+                    }}>
+                      {likeCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {isLiked && (
+                <Text style={{ fontFamily: 'Inter-Medium', fontSize: 11, color: '#10B981', marginTop: 12 }}>
+                  ✓ Thanks for your feedback!
+                </Text>
+              )}
+            </View>
             {Array.isArray(news.attachments) && news.attachments.filter((att: any) => !att.type?.startsWith('image/') && !/\.(jpg|jpeg|png|webp|gif)/i.test(att.url)).length > 0 && (
               <View style={{ marginTop: 32 }}>
                 <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginBottom: 12 }}>
