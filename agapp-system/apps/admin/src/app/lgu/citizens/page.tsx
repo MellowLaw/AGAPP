@@ -68,7 +68,7 @@ export default function CitizensPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const searchParams = useSearchParams();
-  const { showToast } = useToast();
+  const { showToast, ToastContainer } = useToast();
 
   // Load LGU Name & ID
   const [lguName, setLguName] = useState('LILIW');
@@ -142,10 +142,11 @@ export default function CitizensPage() {
   // Moderation action submit
   const handleModerateSubmit = async () => {
     if (!selectedCitizen || !modalAction) return;
-    if ((modalAction === 'ban' || modalAction === 'restrict') && !reasonInput.trim()) {
-      showToast('Please specify a reason for moderation action.', 'error');
-      return;
-    }
+
+    const finalReason = reasonInput.trim() || (
+      modalAction === 'ban' ? 'Account banned by municipal administrator' :
+      modalAction === 'restrict' ? 'Account restricted by municipal administrator' : ''
+    );
 
     setSubmitting(true);
     try {
@@ -157,7 +158,7 @@ export default function CitizensPage() {
         .from('users')
         .update({
           moderation_status: nextStatus,
-          moderation_reason: nextStatus === 'active' ? null : reasonInput.trim(),
+          moderation_reason: nextStatus === 'active' ? null : finalReason,
           moderated_at: nextStatus === 'active' ? null : new Date().toISOString(),
         })
         .eq('id', selectedCitizen.id);
@@ -242,6 +243,7 @@ export default function CitizensPage() {
 
   return (
     <DashboardLayout role="lgu-admin" title="Citizens & Moderation" lguName={lguName}>
+      <ToastContainer />
       <div className="space-y-6">
         
         {/* Header bar */}
