@@ -529,6 +529,14 @@ CREATE TABLE news_announcements (
 
 CREATE INDEX news_announcements_lgu_status_idx ON news_announcements(lgu_id, status);
 
+-- 11.5 NEWS REACTIONS (Good Read / Likes per user)
+CREATE TABLE news_reactions (
+    news_id uuid REFERENCES news_announcements(id) ON DELETE CASCADE NOT NULL,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    PRIMARY KEY (news_id, user_id)
+);
+
 -- 12. NOTIFICATIONS (per-user in-app notifications, plus staff-audience rows)
 CREATE TABLE notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

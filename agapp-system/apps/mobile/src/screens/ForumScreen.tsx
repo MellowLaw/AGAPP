@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, KeyboardAvoidingView, Platform, PanResponder, Animated, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,6 +32,8 @@ import {
   More,
   TickCircle,
   Heart,
+  ArchiveBook,
+  Trash,
 } from 'iconsax-react-native';
 
 type ViewState = 'list' | 'detail' | 'create';
@@ -162,6 +164,7 @@ export function ForumScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<'foryou' | 'bookmarks'>('foryou');
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
+  const [archivedPostIds, setArchivedPostIds] = useState<string[]>([]);
 
   // Form State (New Post / Thread)
   const [newTitle, setNewTitle] = useState('');
@@ -178,7 +181,7 @@ export function ForumScreen({ navigation, route }: any) {
   
   const commentScrollViewRef = useRef<ScrollView>(null);
 
-  // Load bookmarks & likes
+  // Load bookmarks, likes, and archived posts
   useEffect(() => {
     const loadBookmarksAndLikes = async () => {
       try {
@@ -190,12 +193,75 @@ export function ForumScreen({ navigation, route }: any) {
         if (storedLikes) {
           setLikedPostIds(JSON.parse(storedLikes));
         }
+        const storedArchived = await AsyncStorage.getItem('archived_posts');
+        if (storedArchived) {
+          setArchivedPostIds(JSON.parse(storedArchived));
+        }
       } catch (err) {
-        console.warn('Failed to load bookmarks or likes', err);
+        console.warn('Failed to load bookmarks, likes, or archived posts', err);
       }
     };
     loadBookmarksAndLikes();
   }, []);
+
+  // Handler to toggle archive state of a post
+  const toggleArchivePost = async (postId: string) => {
+    try {
+      const isArchived = archivedPostIds.includes(postId);
+      let updated: string[];
+      if (isArchived) {
+        updated = archivedPostIds.filter(id => id !== postId);
+        showToast('Thread unarchived.', 'info');
+      } else {
+        updated = [...archivedPostIds, postId];
+        showToast('Thread saved to Archived.', 'success');
+      }
+      setArchivedPostIds(updated);
+      await AsyncStorage.setItem('archived_posts', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Failed to toggle archive status:', err);
+    }
+  };
+
+  // Handler to delete a thread (Only allowed for post author if verified)
+  const handleDeletePost = async (postId: string) => {
+    if (!verified) {
+      showToast('Only verified users can delete their threads.', 'error');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('forum_posts').delete().eq('id', postId);
+      if (error) throw error;
+      showToast('Thread deleted successfully.', 'success');
+      if (selectedPost?.id === postId) {
+        setSelectedPost(null);
+        setViewState('list');
+      }
+      fetchPosts();
+    } catch (err: any) {
+      console.error('Failed to delete post:', err.message);
+      showToast('Failed to delete thread.', 'error');
+    }
+  };
+
+  // Handler to delete a reply/comment (Only allowed for comment author if verified)
+  const handleDeleteComment = async (commentId: string) => {
+    if (!verified) {
+      showToast('Only verified users can delete their replies.', 'error');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('forum_comments').delete().eq('id', commentId);
+      if (error) throw error;
+      showToast('Reply deleted.', 'success');
+      if (selectedPost) {
+        fetchPostComments(selectedPost.id);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete comment:', err.message);
+      showToast('Failed to delete reply.', 'error');
+    }
+  };
 
   // 1. Fetch Posts subscription
   useEffect(() => {
@@ -573,6 +639,10 @@ export function ForumScreen({ navigation, route }: any) {
       post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.citizen_name.toLowerCase().includes(searchQuery.toLowerCase());
       
+    if (selectedFilter === 'Archived') {
+      return matchesSearch && archivedPostIds.includes(post.id);
+    }
+
     const matchesTag = 
       selectedFilter === 'All' || 
       (post.tags && post.tags.includes(selectedFilter));
@@ -810,6 +880,42 @@ export function ForumScreen({ navigation, route }: any) {
               }}>
                 <Link size={18} color={T.textMuted} variant="Bold" />
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const isArchived = archivedPostIds.includes(selectedPost.id);
+                  const isAuthor = verified && (selectedPost.citizen_id === profile?.id);
+
+                  const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+                    {
+                      text: isArchived ? 'Unarchive Thread' : 'Archive Thread',
+                      onPress: () => toggleArchivePost(selectedPost.id),
+                    },
+                  ];
+
+                  if (isAuthor) {
+                    options.push({
+                      text: 'Delete Thread',
+                      style: 'destructive',
+                      onPress: () => {
+                        Alert.alert('Delete Thread', 'Are you sure you want to delete this thread permanently?', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => handleDeletePost(selectedPost.id) },
+                        ]);
+                      },
+                    });
+                  }
+
+                  options.push({ text: 'Cancel', style: 'cancel' });
+
+                  Alert.alert(
+                    selectedPost.title || 'Thread Options',
+                    isArchived ? 'This thread is saved in your Archived list.' : 'Manage this thread:',
+                    options
+                  );
+                }}
+              >
+                <More size={20} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => { setSelectedPost(null); setViewState('list'); }} style={{ marginLeft: 4 }}>
                 <CloseSquare size={20} color={T.text} variant="Bold" />
               </TouchableOpacity>
@@ -928,9 +1034,24 @@ export function ForumScreen({ navigation, route }: any) {
                                 <Text style={{ color: '#854D0E', fontSize: 8, fontFamily: 'Octarine-Bold' }}>PENDING</Text>
                               </View>
                             )}
-                            <TouchableOpacity onPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })} style={{ marginLeft: 'auto', padding: 2 }}>
-                              <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
-                            </TouchableOpacity>
+                            <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                              {verified && (c.citizen_id === profile?.id) && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    Alert.alert('Delete Reply', 'Are you sure you want to delete this reply?', [
+                                      { text: 'Cancel', style: 'cancel' },
+                                      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteComment(c.id) },
+                                    ]);
+                                  }}
+                                  style={{ padding: 2 }}
+                                >
+                                  <Trash size={14} color="#EF4444" variant="Bold" />
+                                </TouchableOpacity>
+                              )}
+                              <TouchableOpacity onPress={() => session ? setReplyTarget(c) : navigation.navigate('Login', { initialMode: 'register' })} style={{ padding: 2 }}>
+                                <Text style={{ fontSize: 10, fontFamily: 'Octarine-Bold', color: T.textMuted }}>Reply</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
 
                           <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 14, lineHeight: 18 }}>{c.content}</Text>
@@ -1143,6 +1264,7 @@ export function ForumScreen({ navigation, route }: any) {
 
   // Helper tags icons map
   const TAG_ICONS: Record<string, any> = {
+    'Archived': ArchiveBook,
     'All': SearchNormal1,
     'General': MessageText1,
     'Questions': MessageQuestion,
@@ -1165,58 +1287,63 @@ export function ForumScreen({ navigation, route }: any) {
         <View style={{
           flexDirection: 'row',
           justifyContent: 'center',
-          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingBottom: 0,
+          marginTop: 8,
           gap: 36,
-          paddingTop: 20,
-          marginBottom: 16,
         }}>
-          <TouchableOpacity onPress={() => setActiveTab('foryou')} activeOpacity={0.8}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('foryou')}
+            activeOpacity={0.8}
+            style={{ paddingBottom: 6 }}
+          >
             <Text style={{
+              color: activeTab === 'foryou' ? T.text : T.textMuted,
               fontFamily: 'Octarine-Bold',
               fontSize: 18,
-              color: activeTab === 'foryou' ? T.text : T.textMuted,
             }}>
               For you
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setActiveTab('bookmarks')} activeOpacity={0.8}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('bookmarks')}
+            activeOpacity={0.8}
+            style={{ paddingBottom: 6 }}
+          >
             <Text style={{
+              color: activeTab === 'bookmarks' ? T.text : T.textMuted,
               fontFamily: 'Octarine-Bold',
               fontSize: 18,
-              color: activeTab === 'bookmarks' ? T.text : T.textMuted,
             }}>
               Bookmarks
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar Row */}
+        {/* Search Bar */}
         <View style={{
-          flexDirection: 'row',
           paddingHorizontal: 20,
-          alignItems: 'center',
-          gap: 10,
-          marginBottom: 6,
+          marginTop: 12,
+          marginBottom: 4,
         }}>
           <View style={{
-            flex: 1,
             flexDirection: 'row',
-            height: 44,
-            borderRadius: 999, // Pill layout
+            alignItems: 'center',
+            backgroundColor: T.card,
             borderWidth: 1,
             borderColor: T.border,
-            backgroundColor: T.card,
-            alignItems: 'center',
+            borderRadius: 999,
+            height: 44,
             paddingHorizontal: 16,
+            gap: 10,
           }}>
-            <SearchNormal1 size={18} color={T.textMuted} variant="Outline" style={{ marginRight: 8 }} />
+            <SearchNormal1 size={18} color={T.textMuted} variant="Outline" />
             <TextInput
               style={{
                 flex: 1,
-                height: '100%',
-                fontSize: 14,
                 fontFamily: 'Inter-Medium',
                 color: T.text,
+                fontSize: 14,
               }}
               placeholder="Search threads..."
               placeholderTextColor={T.textMuted}
@@ -1231,7 +1358,7 @@ export function ForumScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        {/* Horizontal tag filter bar with icons */}
+        {/* Horizontal tag filter bar with icons (Archived button to the left of All) */}
         <View>
           <ScrollView 
             horizontal 
@@ -1243,9 +1370,31 @@ export function ForumScreen({ navigation, route }: any) {
               gap: 8,
             }}
           >
-            {['All', ...AVAILABLE_TAGS].map(tag => {
+            {['Archived', 'All', ...AVAILABLE_TAGS].map(tag => {
               const isSelected = selectedFilter === tag;
+              const isArchivedBtn = tag === 'Archived';
               const TagIcon = TAG_ICONS[tag] || SearchNormal1;
+
+              // Distinct Amber accent for Archived button to stand out from regular palette
+              let btnBg = isSelected ? T.text : T.card;
+              let btnBorderColor = T.border;
+              let iconColor = isSelected ? T.bg : T.textMuted;
+              let textColor = isSelected ? T.bg : T.text;
+
+              if (isArchivedBtn) {
+                if (isSelected) {
+                  btnBg = '#D97706'; // Vibrant Amber 600
+                  btnBorderColor = '#B45309';
+                  iconColor = '#FFFFFF';
+                  textColor = '#FFFFFF';
+                } else {
+                  btnBg = isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7'; // Warm Amber Tint
+                  btnBorderColor = isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#FDE68A';
+                  iconColor = '#D97706';
+                  textColor = isDarkMode ? '#FBBF24' : '#B45309';
+                }
+              }
+
               return (
                 <TouchableOpacity
                   key={tag}
@@ -1256,15 +1405,15 @@ export function ForumScreen({ navigation, route }: any) {
                     paddingHorizontal: 16,
                     paddingVertical: 8,
                     borderRadius: 999, // Pill layout
-                    borderWidth: isSelected ? 0 : 1,
-                    borderColor: T.border,
-                    backgroundColor: isSelected ? T.text : T.card,
+                    borderWidth: 1,
+                    borderColor: btnBorderColor,
+                    backgroundColor: btnBg,
                     gap: 6,
                   }}
                 >
-                  <TagIcon size={14} color={isSelected ? T.bg : T.textMuted} variant="Bold" />
-                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: isSelected ? T.bg : T.text }}>
-                    #{tag}
+                  <TagIcon size={14} color={iconColor} variant="Bold" />
+                  <Text style={{ fontSize: 13, fontFamily: 'Octarine-Bold', color: textColor }}>
+                    {isArchivedBtn ? 'Archived' : `#${tag}`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1351,7 +1500,12 @@ export function ForumScreen({ navigation, route }: any) {
           {activeTab === 'foryou' && selectedFilter === 'All' && searchQuery === '' && trendingThreads.length > 0 && (
             <View style={{ marginBottom: 24 }}>
               <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 18, color: T.text, marginBottom: 12 }}>Trending Threads</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 20 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginHorizontal: -20 }}
+                contentContainerStyle={{ gap: 14, paddingHorizontal: 20 }}
+              >
                 {trendingThreads.map((thread, idx) => {
                   const ranking = idx + 1;
                   const tag = thread.tags?.[0] || 'General';
@@ -1516,7 +1670,7 @@ export function ForumScreen({ navigation, route }: any) {
                       setViewState('detail');
                     }}
                   >
-                    {/* Author row */}
+                    {/* Author row + 3 dots menu button */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center', marginRight: 10, overflow: 'hidden' }}>
                         <Image
@@ -1529,9 +1683,49 @@ export function ForumScreen({ navigation, route }: any) {
                           {post.citizen_name}
                         </Text>
                       </View>
-                      <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12 }}>
+                      <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 12, marginRight: 6 }}>
                         {getRelativeTime(post.created_at)}
                       </Text>
+
+                      {/* 3 Dots Options Menu (Archived & Delete options) */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          const isArchived = archivedPostIds.includes(post.id);
+                          const isAuthor = verified && (post.citizen_id === profile?.id);
+
+                          const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+                            {
+                              text: isArchived ? 'Unarchive Thread' : 'Archive Thread',
+                              onPress: () => toggleArchivePost(post.id),
+                            },
+                          ];
+
+                          if (isAuthor) {
+                            options.push({
+                              text: 'Delete Thread',
+                              style: 'destructive',
+                              onPress: () => {
+                                Alert.alert('Delete Thread', 'Are you sure you want to delete this thread permanently?', [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Delete', style: 'destructive', onPress: () => handleDeletePost(post.id) },
+                                ]);
+                              },
+                            });
+                          }
+
+                          options.push({ text: 'Cancel', style: 'cancel' });
+
+                          Alert.alert(
+                            post.title || 'Thread Options',
+                            isArchived ? 'This thread is saved in your Archived list.' : 'Manage this thread:',
+                            options
+                          );
+                        }}
+                        style={{ padding: 4 }}
+                      >
+                        <More size={20} color={T.textMuted} variant="Bold" />
+                      </TouchableOpacity>
                     </View>
 
                     {/* Title */}

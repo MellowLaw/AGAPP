@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Lin
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { PASTELS } from '../theme';
 import { ArrowLeft2, DocumentText, Danger, ArrowRight2, Heart } from 'iconsax-react-native';
@@ -11,57 +12,120 @@ import { ScreenBackground } from '../components/ScreenBackground';
 export function NewsDetailScreen({ route, navigation }: any) {
   const { newsId } = route.params;
   const { T, isDarkMode } = useTheme();
+  const { session, profile } = useAuth();
   const [news, setNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
 
   useEffect(() => {
-    const fetchNews = async () => {
+    const fetchNewsAndReactions = async () => {
       setLoading(true);
+      // Fetch news article
       const { data } = await supabase.from('news_announcements').select('*').eq('id', newsId).single();
-      if (data) {
-        setNews(data);
-        setLikeCount(data.views ? Math.floor(data.views / 3) + 1 : 12);
+      if (data) setNews(data);
+
+      // Fetch actual DB reactions count for this news article
+      try {
+        const { count, error } = await supabase
+          .from('news_reactions')
+          .select('news_id', { count: 'exact', head: true })
+          .eq('news_id', newsId);
+
+        if (!error && count !== null) {
+          setLikeCount(count);
+        }
+      } catch (err) {
+        console.warn('news_reactions table query error:', err);
       }
+
+      // Check if logged-in user has reacted
+      if (profile?.id) {
+        try {
+          const { data: userReaction } = await supabase
+            .from('news_reactions')
+            .select('user_id')
+            .eq('news_id', newsId)
+            .eq('user_id', profile.id)
+            .maybeSingle();
+
+          if (userReaction) {
+            setIsLiked(true);
+          } else {
+            setIsLiked(false);
+          }
+        } catch (err) {
+          console.warn('Error checking user reaction:', err);
+        }
+      } else {
+        // Fallback check for guests using local AsyncStorage
+        try {
+          const storedLikes = await AsyncStorage.getItem('liked_news_ids');
+          if (storedLikes) {
+            const ids: string[] = JSON.parse(storedLikes);
+            setIsLiked(ids.includes(newsId));
+          }
+        } catch (err) {
+          console.warn('Error reading local liked news', err);
+        }
+      }
+
       setLoading(false);
     };
 
-    const checkLikedStatus = async () => {
-      try {
-        const storedLikes = await AsyncStorage.getItem('liked_news_ids');
-        if (storedLikes) {
-          const ids: string[] = JSON.parse(storedLikes);
-          if (ids.includes(newsId)) {
-            setIsLiked(true);
-          }
-        }
-      } catch (err) {
-        console.warn('Error reading liked news', err);
-      }
-    };
-
-    fetchNews();
-    checkLikedStatus();
-  }, [newsId]);
+    fetchNewsAndReactions();
+  }, [newsId, profile?.id]);
 
   const toggleLike = async () => {
-    try {
-      const storedLikes = await AsyncStorage.getItem('liked_news_ids');
-      let ids: string[] = storedLikes ? JSON.parse(storedLikes) : [];
+    // If not logged in, prompt user to sign in
+    if (!session || !profile?.id) {
+      Alert.alert('Sign In Required', 'Please sign in to react and leave a Good Read feedback on news articles.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+      ]);
+      return;
+    }
 
+    try {
       if (isLiked) {
-        ids = ids.filter(id => id !== newsId);
+        // Optimistic UI update
         setIsLiked(false);
         setLikeCount(prev => Math.max(0, prev - 1));
+
+        const { error } = await supabase
+          .from('news_reactions')
+          .delete()
+          .eq('news_id', newsId)
+          .eq('user_id', profile.id);
+
+        if (error) {
+          console.warn('Failed to remove news reaction from DB:', error.message);
+        }
       } else {
-        if (!ids.includes(newsId)) ids.push(newsId);
+        // Optimistic UI update
         setIsLiked(true);
         setLikeCount(prev => prev + 1);
+
+        const { error } = await supabase
+          .from('news_reactions')
+          .insert({ news_id: newsId, user_id: profile.id });
+
+        if (error) {
+          console.warn('Failed to insert news reaction into DB:', error.message);
+        }
+      }
+
+      // Sync local AsyncStorage cache as well
+      const storedLikes = await AsyncStorage.getItem('liked_news_ids');
+      let ids: string[] = storedLikes ? JSON.parse(storedLikes) : [];
+      if (isLiked) {
+        ids = ids.filter(id => id !== newsId);
+      } else {
+        if (!ids.includes(newsId)) ids.push(newsId);
       }
       await AsyncStorage.setItem('liked_news_ids', JSON.stringify(ids));
     } catch (err) {
-      console.warn('Error saving liked news status', err);
+      console.warn('Error toggling news reaction:', err);
     }
   };
 
