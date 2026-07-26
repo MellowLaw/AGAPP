@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll, InfoCircle, People } from 'iconsax-react';
+import { Home, DocumentText, Danger, Book, MessageSquare, Setting2, Building, Logout, Personalcard, Location, Scroll, InfoCircle, People, Chart2 } from 'iconsax-react';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
@@ -63,6 +63,9 @@ const LGU_NAV: NavItem[] = [
 const SUPER_ADMIN_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/super', icon: Home },
   { label: 'LGU Directory', href: '/super/lgus', icon: Building },
+  // /super/analytics had no inbound link anywhere in the app — it existed but
+  // was reachable only by typing the URL. Found while charting the flows.
+  { label: 'Analytics', href: '/super/analytics', icon: Chart2 },
   { label: 'Settings', href: '/super/settings', icon: Setting2 },
 ];
 

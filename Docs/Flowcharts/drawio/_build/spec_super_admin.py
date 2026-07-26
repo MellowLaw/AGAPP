@@ -3,9 +3,10 @@ Super Admin flowcharts — one chart per page, short-bond portrait.
 
 Derived from apps/admin/src/app/super/* and middleware.ts.
 
-NOTE: /super/analytics exists as a page but has NO inbound link anywhere in the
-admin app (verified by grep) — it is reachable only by typing the URL. Charted
-that way rather than inventing a menu entry that isn't there.
+History: /super/analytics used to have no inbound link anywhere in the admin app
+— it existed but was reachable only by typing the URL. Found while charting
+these flows and fixed by adding it to SUPER_ADMIN_NAV in Sidebar.tsx, so it is
+now a normal menu entry and charted as one.
 """
 from gen import Chart, Node as N, write_file
 
@@ -21,11 +22,7 @@ main = Chart("S0", "Super Admin — Main Flow", nodes=[
     N("o1",    "off",  "1", side=True, at="d1"),
     N("d2",    "dec",  "If LGU Directory?"),
     N("o2",    "off",  "2", side=True, at="d2"),
-    N("d3",    "dec",  "If Settings?"),
-    N("o3",    "off",  "3", side=True, at="d3"),
-    N("d4",    "dec",  "If Logout?"),
-    N("o4",    "off",  "4", side=True, at="d4"),
-    N("back",  "on",   "AA"),
+    N("toA",   "on",   "A"),
 ], edges=[
     ("start", "login", ""), ("login", "chk", ""),
     ("chk", "bad", "No"), ("bad", "login", ""),
@@ -34,9 +31,23 @@ main = Chart("S0", "Super Admin — Main Flow", nodes=[
     ("role", "main", "Yes"),
     ("main", "d1", ""),
     ("d1", "o1", "Yes"), ("d1", "d2", "No"),
-    ("d2", "o2", "Yes"), ("d2", "d3", "No"),
+    ("d2", "o2", "Yes"), ("d2", "toA", "No"),
+])
+
+main2 = Chart("S0b", "Super Admin — Main Flow (continued)", nodes=[
+    N("fromA", "on",  "A"),
+    N("d3",    "dec", "If Analytics?"),
+    N("o3",    "off", "3", side=True, at="d3"),
+    N("d4",    "dec", "If Settings?"),
+    N("o4",    "off", "4", side=True, at="d4"),
+    N("d5",    "dec", "If Logout?"),
+    N("o5",    "off", "5", side=True, at="d5"),
+    N("back",  "on",  "AA"),
+], edges=[
+    ("fromA", "d3", ""),
     ("d3", "o3", "Yes"), ("d3", "d4", "No"),
-    ("d4", "o4", "Yes"), ("d4", "back", "No"),
+    ("d4", "o4", "Yes"), ("d4", "d5", "No"),
+    ("d5", "o5", "Yes"), ("d5", "back", "No"),
 ])
 
 s1 = Chart("S1", "1 — Cross-LGU Dashboard", nodes=[
@@ -45,15 +56,15 @@ s1 = Chart("S1", "1 — Cross-LGU Dashboard", nodes=[
     N("sh", "io",   "Platform overview and&#10;LGU comparison table"),
     N("q",  "dec",  "Export the figures?"),
     N("csv", "proc", "Download CSV", side=True, at="q", w=150),
-    N("an", "dec",  "Open Analytics?"),
-    N("note", "proc", "Only by typing the URL —&#10;no menu link exists", side=True, at="an", w=190),
+    N("dr", "dec",  "Open one LGU?"),
+    N("into", "proc", "Drill into that&#10;LGU's figures", side=True, at="dr", w=170),
     N("o",  "on",   "AA"),
 ], edges=[
     ("i", "ld", ""), ("ld", "sh", ""), ("sh", "q", ""),
-    ("q", "csv", "Yes"), ("csv", "an", ""),
-    ("q", "an", "No"),
-    ("an", "note", "Yes"), ("note", "o", ""),
-    ("an", "o", "No"),
+    ("q", "csv", "Yes"), ("csv", "dr", ""),
+    ("q", "dr", "No"),
+    ("dr", "into", "Yes"), ("into", "o", ""),
+    ("dr", "o", "No"),
 ])
 
 s2 = Chart("S2", "2 — LGU Directory", nodes=[
@@ -96,8 +107,22 @@ s2a = Chart("S2A", "2A — Onboarding a New LGU (Wizard)", nodes=[
     ("st4", "save", ""), ("save", "o", ""),
 ])
 
-s3 = Chart("S3", "3 — Super Admin Settings", nodes=[
-    N("i",  "on",   "3"),
+s3 = Chart("S3", "3 — Analytics", nodes=[
+    N("i",   "on",   "3"),
+    N("ld",  "proc", "Aggregate reports and requests&#10;per LGU, per month"),
+    N("sh",  "io",   "Reports vs. Requests&#10;over time"),
+    N("mx",  "io",   "Cross-LGU metrics table"),
+    N("q",   "dec",  "Change the period&#10;or metric?"),
+    N("re",  "proc", "Recompute the totals", side=True, at="q", w=170),
+    N("o",   "on",   "AA"),
+], edges=[
+    ("i", "ld", ""), ("ld", "sh", ""), ("sh", "mx", ""), ("mx", "q", ""),
+    ("q", "re", "Yes"), ("re", "mx", ""),
+    ("q", "o", "No"),
+])
+
+s4 = Chart("S4", "4 — Super Admin Settings", nodes=[
+    N("i",  "on",   "4"),
     N("sh", "io",   "Own profile and&#10;notification preferences"),
     N("q",  "dec",  "Change the password?"),
     N("re", "proc", "Re-enter the current&#10;password to confirm", side=True, at="q", w=180),
@@ -112,8 +137,8 @@ s3 = Chart("S3", "3 — Super Admin Settings", nodes=[
     ("np", "o", "No"),
 ])
 
-s4 = Chart("S4", "4 — Logout", nodes=[
-    N("i",  "on",   "4"),
+s5 = Chart("S5", "5 — Logout", nodes=[
+    N("i",  "on",   "5"),
     N("q",  "dec",  "Confirm logout?"),
     N("no", "on",   "AA", side=True, at="q"),
     N("cl", "proc", "End the session and&#10;clear the cookie"),
@@ -124,4 +149,4 @@ s4 = Chart("S4", "4 — Logout", nodes=[
 ])
 
 if __name__ == "__main__":
-    write_file("../03-Super-Admin.drawio", [main, s1, s2, s2a, s3, s4])
+    write_file("../03-Super-Admin.drawio", [main, main2, s1, s2, s2a, s3, s4, s5])

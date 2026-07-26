@@ -9,7 +9,7 @@ away from `/lgu/*` and include charts for `/personnel/dashboard` and
 |---|---|---|
 | `01-Citizen-App.drawio` | 17 | Mobile app — guest, sign-up, tabs, services, reports, forum, profile, verification, moderation |
 | `02-LGU-Admin.drawio` | 15 | Admin panel for an LGU Admin / Personnel, per-module |
-| `03-Super-Admin.drawio` | 6 | Cross-LGU console and LGU onboarding |
+| `03-Super-Admin.drawio` | 8 | Cross-LGU console, analytics and LGU onboarding |
 
 Every page is **850 × 1100 px = 8.5in × 11in (short bond, portrait)**, one chart per
 page, so File → Export as → PDF gives one chart per sheet.
@@ -58,9 +58,10 @@ split as a result), which is the point of generating rather than hand-drawing.
 
 For long bond (8.5in × 13in) set `PAGE_H = 1300` in `gen.py` and rebuild all three.
 
-## Known gap recorded in the charts
+## Gap found while charting, since fixed
 
-`/super/analytics` exists as a page but has **no inbound link anywhere** in the admin
-app — reachable only by typing the URL. `03-Super-Admin.drawio` page `1` states this
-rather than implying a menu entry that does not exist. Either link it from the Super
-Admin dashboard or drop the page.
+`/super/analytics` existed as a page but had **no inbound link anywhere** in the admin
+app — reachable only by typing the URL. Fixed by adding it to `SUPER_ADMIN_NAV` in
+`components/layout/Sidebar.tsx`, so it is now a normal menu entry between LGU Directory
+and Settings. The Super Admin menu charts renumbered accordingly
+(3 = Analytics, 4 = Settings, 5 = Logout).
