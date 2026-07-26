@@ -160,3 +160,27 @@ body {
 }
 .toggle-track.on  .toggle-knob { left: 21px; }
 .toggle-track.off .toggle-knob { left: 3px; }
+
+/* Print optimization for seamless printable report output */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #printable-document, #printable-document * {
+    visibility: visible !important;
+  }
+  #printable-document {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

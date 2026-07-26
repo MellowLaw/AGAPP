@@ -21,7 +21,7 @@ import { STATUS_COLORS } from '@/components/map/colors';
 import type { LguRankingDatum } from '@/components/charts/LguRankingBarChart';
 import type { StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
 import { NeedsAttentionPanel, type NeedsAttentionData } from '@/components/charts/NeedsAttentionPanel';
-import { Building, People, Danger, DocumentText, Add } from 'iconsax-react';
+import { Building, People, Danger, DocumentText, Add, DocumentDownload, Printer } from 'iconsax-react';
 
 const LguRankingBarChart = dynamic(
   () => import('@/components/charts/LguRankingBarChart').then((m) => m.LguRankingBarChart),
@@ -85,6 +85,12 @@ export default function SuperAdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [dbReports, setDbReports] = useState<any[]>([]);
   const [dbRequests, setDbRequests] = useState<any[]>([]);
+  const [dbUsersList, setDbUsersList] = useState<any[]>([]);
+
+  // Printable Report Modal state
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printCategory, setPrintCategory] = useState('overall');
+  const [printLgu, setPrintLgu] = useState<string>('all');
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -96,11 +102,12 @@ export default function SuperAdminDashboard() {
           supabase
             .from('reports')
             .select('id, lgu_id, status, created_at, updated_at, reference_number, category, barangay, latitude, longitude, photo_url, sla_due_date'),
-          supabase.from('service_requests').select('id, lgu_id, status, created_at, updated_at'),
+          supabase.from('service_requests').select('id, lgu_id, status, created_at, updated_at, reference_number, service_type, office_name'),
         ]);
 
         if (dbReportsData) setDbReports(dbReportsData);
         if (dbRequestsData) setDbRequests(dbRequestsData);
+        if (dbUsers) setDbUsersList(dbUsers);
 
         if (dbLgus) {
           const mapped = dbLgus.map((lgu: any) => {
@@ -341,6 +348,124 @@ export default function SuperAdminDashboard() {
         })}
       </div>
 
+      {/* Quick Actions Panel */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-xl font-bold text-text-primary">Quick Actions</h3>
+            <p className="text-xs font-serif italic text-accent mt-0.5">Key administrative shortcuts & system operations</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Link href="/super/lgus">
+            <motion.div
+              whileHover={{ y: -3, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-4 bg-surface hover:bg-surface-alt border border-theme hover:border-accent/40 rounded-[18px] transition-all cursor-pointer group flex flex-col justify-between h-32"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-accent-contrast transition-colors">
+                  <Add className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">LGUs →</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">Add & Manage LGUs</p>
+                <p className="text-[12px] text-text-muted truncate mt-0.5">Municipalities & staff</p>
+              </div>
+            </motion.div>
+          </Link>
+
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              setPrintLgu(selectedLgu || 'all');
+              setShowPrintModal(true);
+            }}
+            className="p-4 bg-surface hover:bg-surface-alt border border-theme hover:border-accent/40 rounded-[18px] transition-all cursor-pointer group flex flex-col justify-between h-32"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-neutral-950 transition-colors">
+                <Printer className="w-5 h-5" />
+              </div>
+              <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">Print PDF 🖨️</span>
+            </div>
+            <div>
+              <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">Printable Reports</p>
+              <p className="text-[12px] text-text-muted truncate mt-0.5">Per-category & overall audit</p>
+            </div>
+          </motion.div>
+
+          <Link href="/super/analytics">
+            <motion.div
+              whileHover={{ y: -3, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-4 bg-surface hover:bg-surface-alt border border-theme hover:border-accent/40 rounded-[18px] transition-all cursor-pointer group flex flex-col justify-between h-32"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-accent-contrast transition-colors">
+                  <DocumentText className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">Analytics →</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">Platform Analytics</p>
+                <p className="text-[12px] text-text-muted truncate mt-0.5">Cross-LGU SLA metrics</p>
+              </div>
+            </motion.div>
+          </Link>
+
+          <Link href="/super/settings">
+            <motion.div
+              whileHover={{ y: -3, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-4 bg-surface hover:bg-surface-alt border border-theme hover:border-accent/40 rounded-[18px] transition-all cursor-pointer group flex flex-col justify-between h-32"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-accent-contrast transition-colors">
+                  <Building className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">Settings →</span>
+              </div>
+              <div>
+                <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">System Settings</p>
+                <p className="text-[12px] text-text-muted truncate mt-0.5">Global parameters</p>
+              </div>
+            </motion.div>
+          </Link>
+
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              const rows = (selectedLgu ? lgus.filter(l => l.id === selectedLgu) : lgus).map(l => [l.name, l.users, l.reports, l.requests, l.responseTime, 'Active'].map(v => typeof v === 'string' ? '"'+v.replace(/"/g,'""')+'"' : String(v)).join(','));
+              const csv = ['LGU,People,Reports,Requests,Avg Response,Status', ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'lgu-system-summary.csv';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="p-4 bg-surface hover:bg-surface-alt border border-theme hover:border-accent/40 rounded-[18px] transition-all cursor-pointer group flex flex-col justify-between h-32"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-accent-contrast transition-colors">
+                <DocumentDownload className="w-5 h-5" />
+              </div>
+              <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">Export CSV ↓</span>
+            </div>
+            <div>
+              <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">Export Audit Report</p>
+              <p className="text-[12px] text-text-muted truncate mt-0.5">Download CSV summary</p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
       {/* Needs Attention + LGU Ranking */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
         <div className="lg:col-span-1">
@@ -461,6 +586,250 @@ export default function SuperAdminDashboard() {
           </table>
         </div>
       </div>
+
+      {/* PRINTABLE REPORT GENERATOR MODAL */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-start overflow-y-auto p-4 md:p-8 print:p-0 print:bg-white print:static">
+          
+          {/* Modal Header Controls (Hidden during printing) */}
+          <div className="print:hidden w-full max-w-[900px] bg-neutral-900 text-white rounded-2xl p-4 mb-4 shadow-2xl flex flex-wrap items-center justify-between gap-4 border border-neutral-800">
+            <div className="flex items-center gap-2">
+              <Printer className="w-5 h-5 text-amber-400" />
+              <div>
+                <h3 className="font-bold text-sm text-white">Superadmin Audit Report Generator</h3>
+                <p className="text-[11px] text-neutral-400">Configure parameters and print or save as official PDF</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Category Dropdown */}
+              <select
+                value={printCategory}
+                onChange={(e) => setPrintCategory(e.target.value)}
+                className="bg-neutral-800 border border-neutral-700 text-white text-xs font-semibold px-3 py-2 rounded-xl focus:outline-none cursor-pointer"
+              >
+                <option value="overall">Overall Platform Executive Audit</option>
+                <option value="pothole">Pothole & Road Infrastructure</option>
+                <option value="clogged_drainage">Drainage & Waterways</option>
+                <option value="stray_animal">Stray Pets & Animal Welfare</option>
+                <option value="damaged_pole">Damaged Pole & Utility Hazards</option>
+                <option value="eservices">eServices & Municipal Permits</option>
+                <option value="moderation">Citizen Moderation & Appeals Audit</option>
+              </select>
+
+              {/* LGU Dropdown */}
+              <select
+                value={printLgu}
+                onChange={(e) => setPrintLgu(e.target.value)}
+                className="bg-neutral-800 border border-neutral-700 text-white text-xs font-semibold px-3 py-2 rounded-xl focus:outline-none cursor-pointer"
+              >
+                <option value="all">All LGUs Combined</option>
+                {lgus.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+
+              {/* Print Button */}
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg active:scale-95"
+              >
+                <Printer className="w-4 h-4" /> Print / Save PDF
+              </button>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Close ✕
+              </button>
+            </div>
+          </div>
+
+          {/* PRINTABLE DOCUMENT SHEET */}
+          <div id="printable-document" className="w-full max-w-[900px] bg-white text-neutral-900 p-8 md:p-10 shadow-2xl rounded-2xl border border-neutral-200 print:shadow-none print:border-0 print:rounded-none print:p-4 my-auto">
+            
+            {/* Header Block */}
+            <div className="border-b-2 border-neutral-900 pb-5 mb-6 flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono tracking-widest uppercase bg-neutral-900 text-white px-2 py-0.5 rounded font-bold">
+                    OFFICIAL SYSTEM AUDIT REPORT
+                  </span>
+                  <span className="text-[11px] font-semibold text-neutral-500">
+                    AGAPP MONOREPO • MUNICIPAL CONTROL CENTER
+                  </span>
+                </div>
+                <h1 className="text-2xl font-black text-neutral-900 tracking-tight uppercase">
+                  {printCategory === 'overall' ? 'Overall Platform Executive Audit' :
+                   printCategory === 'pothole' ? 'Pothole & Road Infrastructure Reports' :
+                   printCategory === 'clogged_drainage' ? 'Drainage & Waterways Maintenance Reports' :
+                   printCategory === 'stray_animal' ? 'Stray Pets & Animal Welfare Reports' :
+                   printCategory === 'damaged_pole' ? 'Damaged Pole & Utility Hazard Reports' :
+                   printCategory === 'eservices' ? 'eServices & Municipal Permits Audit' :
+                   'Citizen Moderation & Appeals Audit'}
+                </h1>
+                <p className="text-xs text-neutral-600 mt-1 font-medium">
+                  Scope: <span className="font-bold text-neutral-900">{printLgu === 'all' ? 'All Municipalities' : (lgus.find(l => l.id === printLgu)?.name || printLgu)}</span> • Generated on {new Date().toLocaleDateString('en-US', { dateStyle: 'full' })} at {new Date().toLocaleTimeString()}
+                </p>
+              </div>
+              <div className="text-right border-l-2 border-neutral-200 pl-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">AUTHORITY</p>
+                <p className="text-xs font-bold text-neutral-900">Super Admin Office</p>
+                <p className="text-[11px] text-neutral-500 font-mono">ID: SA-AUDIT</p>
+              </div>
+            </div>
+
+            {/* KPI Summary Row */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Total Workload</p>
+                <p className="text-xl font-mono font-bold text-neutral-900 mt-0.5">
+                  {printCategory === 'eservices'
+                    ? (printLgu === 'all' ? dbRequests.length : dbRequests.filter(r => r.lgu_id === printLgu).length)
+                    : (printLgu === 'all' ? dbReports.length : dbReports.filter(r => r.lgu_id === printLgu).length)}
+                </p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">{printCategory === 'eservices' ? 'Applications' : 'Incident Reports'}</p>
+              </div>
+
+              <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Resolved / Released</p>
+                <p className="text-xl font-mono font-bold text-emerald-700 mt-0.5">
+                  {printCategory === 'eservices'
+                    ? dbRequests.filter(r => (printLgu === 'all' || r.lgu_id === printLgu) && ['Released', 'Approved'].includes(r.status)).length
+                    : dbReports.filter(r => (printLgu === 'all' || r.lgu_id === printLgu) && r.status === 'Resolved').length}
+                </p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">Completed Workload</p>
+              </div>
+
+              <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Active Municipalities</p>
+                <p className="text-xl font-mono font-bold text-neutral-900 mt-0.5">{lgus.length}</p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">Tenants Operating</p>
+              </div>
+
+              <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Citizen Accounts</p>
+                <p className="text-xl font-mono font-bold text-neutral-900 mt-0.5">{dbUsersList.filter(u => u.role === 'CITIZEN').length}</p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">Registered Base</p>
+              </div>
+            </div>
+
+            {/* LGU Breakdown Table */}
+            <div className="mb-6">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-900 mb-2 border-b border-neutral-200 pb-1">
+                LGU Performance & Workload Summary
+              </h2>
+              <table className="w-full text-xs text-left border-collapse border border-neutral-300">
+                <thead>
+                  <tr className="bg-neutral-900 text-white font-bold">
+                    <th className="p-2 border border-neutral-800">LGU Name</th>
+                    <th className="p-2 border border-neutral-800 text-center">Citizen Count</th>
+                    <th className="p-2 border border-neutral-800 text-center">Reports Filed</th>
+                    <th className="p-2 border border-neutral-800 text-center">eServices Filed</th>
+                    <th className="p-2 border border-neutral-800 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lgus
+                    .filter(l => printLgu === 'all' || l.id === printLgu)
+                    .map((lgu, idx) => {
+                      const repCount = dbReports.filter(r => r.lgu_id === lgu.id).length;
+                      const reqCount = dbRequests.filter(r => r.lgu_id === lgu.id).length;
+                      const citCount = dbUsersList.filter(u => u.lgu_id === lgu.id && u.role === 'CITIZEN').length;
+                      return (
+                        <tr key={lgu.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                          <td className="p-2 border border-neutral-300 font-semibold">{lgu.name}</td>
+                          <td className="p-2 border border-neutral-300 text-center font-mono">{citCount}</td>
+                          <td className="p-2 border border-neutral-300 text-center font-mono">{repCount}</td>
+                          <td className="p-2 border border-neutral-300 text-center font-mono">{reqCount}</td>
+                          <td className="p-2 border border-neutral-300 text-center font-bold text-emerald-700">
+                            {lgu.is_active ? 'ACTIVE' : 'INACTIVE'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Itemized Audit Log Table */}
+            <div className="mb-8">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-900 mb-2 border-b border-neutral-200 pb-1">
+                Itemized Audit Entry Log
+              </h2>
+              {(() => {
+                const list = printCategory === 'eservices'
+                  ? dbRequests.filter(r => printLgu === 'all' || r.lgu_id === printLgu)
+                  : printCategory === 'overall'
+                  ? dbReports.filter(r => printLgu === 'all' || r.lgu_id === printLgu)
+                  : dbReports.filter(r => (printLgu === 'all' || r.lgu_id === printLgu) && r.category === printCategory);
+
+                if (list.length === 0) {
+                  return (
+                    <p className="text-xs text-neutral-500 italic p-4 text-center border border-dashed border-neutral-300 rounded-lg">
+                      No entries recorded for this selection.
+                    </p>
+                  );
+                }
+
+                return (
+                  <table className="w-full text-[11px] text-left border-collapse border border-neutral-300">
+                    <thead>
+                      <tr className="bg-neutral-200 text-neutral-900 font-bold uppercase">
+                        <th className="p-2 border border-neutral-300">Ref #</th>
+                        <th className="p-2 border border-neutral-300">LGU</th>
+                        <th className="p-2 border border-neutral-300">Type / Category</th>
+                        <th className="p-2 border border-neutral-300">Location</th>
+                        <th className="p-2 border border-neutral-300">Date Filed</th>
+                        <th className="p-2 border border-neutral-300 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.slice(0, 45).map((rec: any, idx: number) => (
+                        <tr key={rec.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                          <td className="p-2 border border-neutral-300 font-mono font-bold">{rec.reference_number || rec.id.slice(0, 8)}</td>
+                          <td className="p-2 border border-neutral-300">{lgus.find(l => l.id === rec.lgu_id)?.name || rec.lgu_id}</td>
+                          <td className="p-2 border border-neutral-300 capitalize">{rec.category || rec.service_type || 'N/A'}</td>
+                          <td className="p-2 border border-neutral-300">{rec.barangay || rec.office_name || 'Central'}</td>
+                          <td className="p-2 border border-neutral-300">{new Date(rec.created_at).toLocaleDateString()}</td>
+                          <td className="p-2 border border-neutral-300 text-center font-semibold">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase ${
+                              ['Resolved', 'Released', 'Approved'].includes(rec.status)
+                                ? 'bg-emerald-100 text-emerald-800 font-bold'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {rec.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+
+            {/* Official Certification & Sign-off Section */}
+            <div className="pt-8 border-t-2 border-neutral-900 grid grid-cols-2 gap-12 mt-12">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-8">PREPARED & VERIFIED BY:</p>
+                <div className="border-b border-neutral-900 w-3/4 mb-1" />
+                <p className="text-xs font-bold text-neutral-900">SUPERADMIN OFFICER</p>
+                <p className="text-[10px] text-neutral-500">Agapp Municipal Control Center</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-8">CERTIFIED & NOTED BY:</p>
+                <div className="border-b border-neutral-900 w-3/4 mb-1" />
+                <p className="text-xs font-bold text-neutral-900">MUNICIPAL ADMINISTRATOR / HEAD OF OFFICE</p>
+                <p className="text-[10px] text-neutral-500">Local Government Unit Representative</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
