@@ -179,6 +179,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
   const [resolvedLgu, setResolvedLgu] = useState<any>(null);
   const [showAiWarningModal, setShowAiWarningModal] = useState(false);
   const [showRejectionScreen, setShowRejectionScreen] = useState(status === 'rejected');
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
 
   const getAiWarningDetails = (result: any) => {
     if (!result) return null;
@@ -520,11 +521,7 @@ export function VerifyIdentityScreen({ navigation }: any) {
       }
 
       await refreshProfile();
-      showToast(
-        'Submitted for review. Your ID and selfie have been securely uploaded. Your LGU will review your verification, usually within 1–2 business days.',
-        'success',
-      );
-      navigation.goBack();
+      setIsSubmittedSuccess(true);
     } catch (err: any) {
       showToast(`Submission failed: ${err?.message || 'Please try again.'}`, 'error');
     } finally {
@@ -544,6 +541,45 @@ export function VerifyIdentityScreen({ navigation }: any) {
       default:       return false;
     }
   };
+
+  // ── Success page dedicated screen ───────────────────────────────────────────
+  if (isSubmittedSuccess) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+        <MapBg T={T} isDarkMode={isDarkMode} />
+        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          <Image
+            source={require('../../assets/brand/stickers/2.png')}
+            style={{ width: 160, height: 160, marginBottom: 28 }}
+            resizeMode="contain"
+          />
+
+          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
+            Submission Successful!
+          </Text>
+          
+          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 32 }}>
+            Thank you! Your identity verification documents have been securely uploaded. The admin will review your request, which typically takes 1–2 business days.
+          </Text>
+
+          <TouchableOpacity
+            style={{
+              height: 52,
+              borderRadius: 999,
+              backgroundColor: '#292929',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+              marginBottom: 12,
+            }}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Got It</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   // ── Already verified / pending guard ───────────────────────────────────
   if (status === 'verified' || status === 'pending') {

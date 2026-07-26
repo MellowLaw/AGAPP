@@ -94,7 +94,7 @@ export function LguSelectScreen() {
               })()}
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: T.text }}>
-                  {lgu.name}
+                  {lgu.name ? lgu.name.replace(/municipality of\s+/i, '').trim() : ''}
                 </Text>
               </View>
               <ArrowRight2 size={18} color={T.textMuted} variant="Bold" />

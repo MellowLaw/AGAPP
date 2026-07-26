@@ -176,7 +176,7 @@ export function GuestLguDetectScreen() {
               Location Detected!
             </Text>
             <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 16, textAlign: 'center', marginTop: 12 }}>
-              You are in <Text style={{ fontFamily: 'Octarine-Bold', color: T.accent }}>{detectedLgu.name}</Text>
+              You are in <Text style={{ fontFamily: 'Octarine-Bold', color: T.accent }}>{detectedLgu.name ? detectedLgu.name.replace(/municipality of\s+/i, '').trim() : ''}</Text>
             </Text>
             <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, textAlign: 'center', marginTop: 8, fontSize: 14 }}>
               We'll customize your home feed with local news and announcements.
@@ -319,7 +319,9 @@ export function GuestLguDetectScreen() {
                     );
                   })()}
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: T.text }}>{lgu.name}</Text>
+                    <Text style={{ fontSize: 16, fontFamily: 'Octarine-Bold', color: T.text }}>
+                      {lgu.name ? lgu.name.replace(/municipality of\s+/i, '').trim() : ''}
+                    </Text>
                   </View>
                   <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.textMuted }}>›</Text>
                 </TouchableOpacity>
