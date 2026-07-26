@@ -150,22 +150,16 @@ export default function CitizensPage() {
 
     setSubmitting(true);
     try {
-      let nextStatus: 'active' | 'restricted' | 'banned' = 'active';
-      if (modalAction === 'ban') nextStatus = 'banned';
-      if (modalAction === 'restrict') nextStatus = 'restricted';
-
-      const { error } = await supabase
-        .from('users')
-        .update({
-          moderation_status: nextStatus,
-          moderation_reason: nextStatus === 'active' ? null : finalReason,
-          moderated_at: nextStatus === 'active' ? null : new Date().toISOString(),
-        })
-        .eq('id', selectedCitizen.id);
+      const { error } = await supabase.rpc('moderate_citizen', {
+        p_user_id: selectedCitizen.id,
+        p_action: modalAction,
+        p_reason: modalAction === 'reactivate' ? null : finalReason,
+      });
 
       if (error) throw error;
 
-      showToast(`Citizen ${selectedCitizen.name} is now ${nextStatus.toUpperCase()}.`, 'success');
+      const displayStatus = modalAction === 'ban' ? 'BANNED' : modalAction === 'restrict' ? 'RESTRICTED' : 'ACTIVE';
+      showToast(`Citizen ${selectedCitizen.name} is now ${displayStatus}.`, 'success');
       setSelectedCitizen(null);
       setModalAction(null);
       setReasonInput('');
