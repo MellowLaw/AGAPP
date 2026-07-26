@@ -645,13 +645,28 @@ export function HomeScreen({ navigation }: any) {
           {unreadCount > 0 && (
             <View style={{
               position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: T.accent,
-            }} />
+              top: 2,
+              right: 2,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: '#EF4444',
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: 4,
+              borderWidth: 1.5,
+              borderColor: T.bg,
+            }}>
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 10,
+                fontFamily: 'Octarine-Bold',
+                lineHeight: 12,
+                textAlign: 'center',
+              }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>

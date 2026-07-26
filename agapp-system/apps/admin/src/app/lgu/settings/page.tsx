@@ -478,15 +478,6 @@ export default function SettingsPage() {
                       onChange={(e: any) => setLguProvince(e.target.value)}
                     />
                   </div>
-                  
-                  <div>
-                    <Input
-                      label="LGU Seal / Logo URL"
-                      value={logoUrl}
-                      onChange={(e: any) => setLogoUrl(e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                    />
-                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <Input

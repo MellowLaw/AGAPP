@@ -1372,7 +1372,29 @@ export function ForumScreen({ navigation, route }: any) {
           >
             {['Archived', 'All', ...AVAILABLE_TAGS].map(tag => {
               const isSelected = selectedFilter === tag;
+              const isArchivedBtn = tag === 'Archived';
               const TagIcon = TAG_ICONS[tag] || SearchNormal1;
+
+              // Distinct Amber accent for Archived button to stand out from regular palette
+              let btnBg = isSelected ? T.text : T.card;
+              let btnBorderColor = T.border;
+              let iconColor = isSelected ? T.bg : T.textMuted;
+              let textColor = isSelected ? T.bg : T.text;
+
+              if (isArchivedBtn) {
+                if (isSelected) {
+                  btnBg = '#D97706'; // Vibrant Amber 600
+                  btnBorderColor = '#B45309';
+                  iconColor = '#FFFFFF';
+                  textColor = '#FFFFFF';
+                } else {
+                  btnBg = isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7'; // Warm Amber Tint
+                  btnBorderColor = isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#FDE68A';
+                  iconColor = '#D97706';
+                  textColor = isDarkMode ? '#FBBF24' : '#B45309';
+                }
+              }
+
               return (
                 <TouchableOpacity
                   key={tag}
@@ -1383,15 +1405,15 @@ export function ForumScreen({ navigation, route }: any) {
                     paddingHorizontal: 16,
                     paddingVertical: 8,
                     borderRadius: 999, // Pill layout
-                    borderWidth: isSelected ? 0 : 1,
-                    borderColor: T.border,
-                    backgroundColor: isSelected ? T.text : T.card,
+                    borderWidth: 1,
+                    borderColor: btnBorderColor,
+                    backgroundColor: btnBg,
                     gap: 6,
                   }}
                 >
-                  <TagIcon size={14} color={isSelected ? T.bg : T.textMuted} variant="Bold" />
-                  <Text style={{ fontSize: 13, fontFamily: 'Inter-Medium', color: isSelected ? T.bg : T.text }}>
-                    {tag === 'Archived' ? 'Archived' : `#${tag}`}
+                  <TagIcon size={14} color={iconColor} variant="Bold" />
+                  <Text style={{ fontSize: 13, fontFamily: 'Octarine-Bold', color: textColor }}>
+                    {isArchivedBtn ? 'Archived' : `#${tag}`}
                   </Text>
                 </TouchableOpacity>
               );
