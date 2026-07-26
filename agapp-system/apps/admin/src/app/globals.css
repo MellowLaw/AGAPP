@@ -54,6 +54,34 @@ body {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
+/*
+  Theme switching.
+
+  Only <body> used to carry a transition, so on a dark/light toggle the page
+  background eased while every card, border and sidebar surface snapped — which
+  read as a slow, uneven fade. This class is added to <html> for the duration of
+  the switch only (see ThemeContext.toggleTheme), so all themed surfaces
+  cross-fade together and nothing is left with a permanent global transition
+  that would blunt component hover/focus states the rest of the time.
+*/
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 200ms ease, border-color 200ms ease,
+              color 200ms ease, fill 200ms ease, stroke 200ms ease !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: none !important;
+  }
+}
+
 .display-font {
   font-family: var(--font-serif), serif !important;
   font-style: italic;

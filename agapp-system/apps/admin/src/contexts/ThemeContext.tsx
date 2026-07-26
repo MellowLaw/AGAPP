@@ -27,14 +27,34 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
+  // Kept so a rapid double-toggle doesn't let the first timer strip the class
+  // out from under the second switch.
+  const transitionTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const toggleTheme = () => {
     setIsDark((prev) => {
       const next = !prev;
-      document.documentElement.classList.toggle('dark', next);
+      const root = document.documentElement;
+
+      // Cross-fade every themed surface together for the duration of the
+      // switch, then drop the class so it can't interfere with normal
+      // component transitions. See `.theme-transition` in globals.css.
+      root.classList.add('theme-transition');
+      if (transitionTimer.current) clearTimeout(transitionTimer.current);
+      transitionTimer.current = setTimeout(() => {
+        root.classList.remove('theme-transition');
+        transitionTimer.current = null;
+      }, 220);
+
+      root.classList.toggle('dark', next);
       localStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
       return next;
     });
   };
+
+  useEffect(() => () => {
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>

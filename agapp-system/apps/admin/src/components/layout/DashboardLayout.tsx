@@ -24,6 +24,19 @@ interface DashboardLayoutProps {
   heroSubtitle?: string;
 }
 
+interface BrandPalette {
+  color: string;
+  secondaryColor: string;
+  customIconColor: string | null;
+  customDarkBg: string | null;
+}
+
+// The LGU's brand colours don't change when you flip the theme, but resolving
+// them costs up to three Supabase round-trips. Cached at module scope, keyed by
+// what actually determines them, so toggling dark/light repaints from memory
+// instead of waiting on the network. See the effect below for why that matters.
+let brandCache: { key: string; palette: BrandPalette } | null = null;
+
 // No standalone header bar — the sidebar owns logo/profile/notifications
 // (see Sidebar.tsx), and PageHeader renders inline at the top of each page's
 // own content instead of a separate sticky chrome element.
@@ -73,15 +86,27 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       return `#${rs}${gs}${bs}`;
     };
 
+    const cacheKey = `${role}|${lguParam ?? ''}`;
+
     const updateThemeAccent = async () => {
+      // Paint the theme's base background FIRST, before any await. This inline
+      // style on :root overrides the `.dark` class rule in globals.css, so the
+      // class flipped instantly while the background sat on the old colour
+      // until the Supabase calls below resolved — that was the slow fade.
+      // A custom per-LGU dark background (if any) refines this a moment later.
+      document.documentElement.style.setProperty('--bg-base', isDark ? '#292929' : '#fffcf5');
+
       let color = '#d62a53'; // fallback pink
       let secondaryColor = '#ffffff'; // fallback white
       let customIconColor: string | null = null;
       let customDarkBg: string | null = null;
-      
+
       if (role === 'super-admin') {
         color = isDark ? '#fffcf5' : '#292929';
         secondaryColor = color;
+      } else if (brandCache?.key === cacheKey) {
+        // Already resolved — repaint synchronously so a theme toggle is instant.
+        ({ color, secondaryColor, customIconColor, customDarkBg } = brandCache.palette);
       } else {
         // First try fetching based on logged-in user profile LGU connection
         const { data: { user } } = await supabase.auth.getUser();
@@ -130,6 +155,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           if (flags?.iconColor) customIconColor = flags.iconColor;
           if (flags?.darkBgColor) customDarkBg = flags.darkBgColor;
         }
+      }
+
+      // Remember what we resolved so the next theme toggle repaints from
+      // memory rather than re-running the queries above.
+      if (role !== 'super-admin') {
+        brandCache = { key: cacheKey, palette: { color, secondaryColor, customIconColor, customDarkBg } };
       }
 
       // Adjust color contrasts for accessibility
