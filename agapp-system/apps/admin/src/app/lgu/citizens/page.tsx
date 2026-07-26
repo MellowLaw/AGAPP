@@ -49,7 +49,34 @@ interface CitizenAppeal {
   citizen_moderation_reason?: string;
 }
 
+// ── Predefined moderation reasons ──────────────────────────────────────────
+
+const RESTRICT_PRESETS = [
+  'Posting inappropriate or offensive content in public forum',
+  'Multiple user reports for disruptive community behavior',
+  'Spamming service requests or community board',
+  'Falsified resident verification details',
+  'Misuse of municipal eServices',
+  'Other (specify below)',
+];
+
+const BAN_PRESETS = [
+  'Severe violation of municipal community standards',
+  'Harassment or abusive language towards LGU staff or citizens',
+  'Fraudulent activity or identity theft attempt',
+  'Repeated violations after previous restriction',
+  'Unauthorized or malicious platform activity',
+  'Other (specify below)',
+];
+
 export default function CitizensPage() {
+  const searchParams = useSearchParams();
+  const { showToast, ToastContainer } = useToast();
+
+  // Load LGU Name & ID (Derive cleanly from URL params matching Verifications page)
+  const lguNameParam = searchParams.get('lguName') || searchParams.get('lgu') || 'Liliw, Laguna';
+  const lguId = useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
+
   const [citizens, setCitizens] = useState<CitizenUser[]>([]);
   const [appeals, setAppeals] = useState<CitizenAppeal[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
@@ -59,25 +86,14 @@ export default function CitizensPage() {
   // Modals state
   const [selectedCitizen, setSelectedCitizen] = useState<CitizenUser | null>(null);
   const [modalAction, setModalAction] = useState<'ban' | 'restrict' | 'reactivate' | null>(null);
-  const [reasonInput, setReasonInput] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [customReason, setCustomReason] = useState('');
 
   const [selectedAppeal, setSelectedAppeal] = useState<CitizenAppeal | null>(null);
   const [appealAction, setAppealAction] = useState<'approve' | 'deny' | null>(null);
   const [appealResponseInput, setAppealResponseInput] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-
-  const searchParams = useSearchParams();
-  const { showToast, ToastContainer } = useToast();
-
-  // Load LGU Name & ID
-  const [lguName, setLguName] = useState('LILIW');
-  const lguId = useMemo(() => lguIdFromName(lguName), [lguName]);
-
-  useEffect(() => {
-    const raw = searchParams.get('lgu') || searchParams.get('lguName') || 'LILIW';
-    setLguName(raw);
-  }, [searchParams]);
 
   // Tab param in URL
   useEffect(() => {
@@ -88,7 +104,7 @@ export default function CitizensPage() {
   }, [searchParams]);
 
   // Fetch Data
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     setLoading(true);
     try {
       // 1. Citizens in this LGU
@@ -133,20 +149,24 @@ export default function CitizensPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [lguId]);
 
   useEffect(() => {
     fetchData();
-  }, [lguId]);
+  }, [fetchData]);
 
   // Moderation action submit
   const handleModerateSubmit = async () => {
     if (!selectedCitizen || !modalAction) return;
 
-    const finalReason = reasonInput.trim() || (
-      modalAction === 'ban' ? 'Account banned by municipal administrator' :
-      modalAction === 'restrict' ? 'Account restricted by municipal administrator' : ''
-    );
+    let finalReason = '';
+    if (modalAction !== 'reactivate') {
+      finalReason = (selectedPreset === 'Other (specify below)' ? customReason.trim() : selectedPreset) || customReason.trim();
+      if (!finalReason) {
+        showToast('Please select or enter a reason for this moderation action.', 'error');
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -162,7 +182,8 @@ export default function CitizensPage() {
       showToast(`Citizen ${selectedCitizen.name} is now ${displayStatus}.`, 'success');
       setSelectedCitizen(null);
       setModalAction(null);
-      setReasonInput('');
+      setSelectedPreset(null);
+      setCustomReason('');
       fetchData();
     } catch (err: any) {
       showToast(`Action failed: ${err.message}`, 'error');
@@ -171,31 +192,25 @@ export default function CitizensPage() {
     }
   };
 
-  // Appeal review submit
+  // Appeal review submit via resolve_citizen_appeal RPC
   const handleAppealReviewSubmit = async () => {
     if (!selectedAppeal || !appealAction) return;
+
+    if (appealAction === 'deny' && !appealResponseInput.trim()) {
+      showToast('Please provide an admin response note when denying an appeal.', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const isApprove = appealAction === 'approve';
-      const { error: appErr } = await supabase
-        .from('citizen_appeals')
-        .update({
-          status: isApprove ? 'approved' : 'denied',
-          admin_response: appealResponseInput.trim() || null,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', selectedAppeal.id);
+      const { error } = await supabase.rpc('resolve_citizen_appeal', {
+        p_appeal_id: selectedAppeal.id,
+        p_action: appealAction,
+        p_response: appealResponseInput.trim() || null,
+      });
 
-      if (appErr) throw appErr;
-
-      if (isApprove) {
-        const { error: modErr } = await supabase.rpc('moderate_citizen', {
-          p_user_id: selectedAppeal.user_id,
-          p_action: 'reactivate',
-          p_reason: null,
-        });
-        if (modErr) throw modErr;
-      }
+      if (error) throw error;
 
       showToast(`Appeal ${isApprove ? 'APPROVED (user reactivated)' : 'DENIED'}.`, 'success');
       setSelectedAppeal(null);
@@ -234,14 +249,14 @@ export default function CitizensPage() {
   }, [citizens, searchQuery, activeTab]);
 
   return (
-    <DashboardLayout role="lgu-admin" title="Citizens & Moderation" lguName={lguName}>
+    <DashboardLayout role="lgu-admin" title="Citizens & Moderation" lguName={lguNameParam}>
       <ToastContainer />
       <div className="space-y-6">
         
         {/* Header bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary">Citizens & Moderation</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary">Citizens &amp; Moderation</h1>
             <p className="text-sm text-text-muted mt-1">
               Manage registered municipal citizens, issue account restrictions, and review moderation appeals.
             </p>
@@ -325,7 +340,7 @@ export default function CitizensPage() {
                 }`}
               >
                 <Forbidden2 className="w-4 h-4" />
-                Restricted & Banned ({restrictedCount})
+                Restricted &amp; Banned ({restrictedCount})
               </button>
 
               <button
@@ -374,7 +389,7 @@ export default function CitizensPage() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-border text-xs font-semibold uppercase text-text-muted">
-                        <th className="py-3 px-4">Citizen Name & Email</th>
+                        <th className="py-3 px-4">Citizen Name &amp; Email</th>
                         <th className="py-3 px-4">Verified Barangay</th>
                         <th className="py-3 px-4">ID Verification</th>
                         <th className="py-3 px-4">Moderation Status</th>
@@ -410,15 +425,15 @@ export default function CitizensPage() {
                             <div className="flex items-center justify-end gap-2">
                               {c.moderation_status === 'active' ? (
                                 <>
-                                  <Button size="sm" variant="secondary" onClick={() => { setSelectedCitizen(c); setModalAction('restrict'); setReasonInput(''); }}>
+                                  <Button size="sm" variant="secondary" onClick={() => { setSelectedCitizen(c); setModalAction('restrict'); setSelectedPreset(null); setCustomReason(''); }}>
                                     Restrict
                                   </Button>
-                                  <Button size="sm" variant="danger" onClick={() => { setSelectedCitizen(c); setModalAction('ban'); setReasonInput(''); }}>
+                                  <Button size="sm" variant="danger" onClick={() => { setSelectedCitizen(c); setModalAction('ban'); setSelectedPreset(null); setCustomReason(''); }}>
                                     Ban
                                   </Button>
                                 </>
                               ) : (
-                                <Button size="sm" variant="secondary" onClick={() => { setSelectedCitizen(c); setModalAction('reactivate'); setReasonInput(''); }}>
+                                <Button size="sm" variant="secondary" onClick={() => { setSelectedCitizen(c); setModalAction('reactivate'); setSelectedPreset(null); setCustomReason(''); }}>
                                   Reactivate
                                 </Button>
                               )}
@@ -461,15 +476,22 @@ export default function CitizensPage() {
 
                       <div className="p-3 bg-surface-alt rounded-xl border border-border text-sm text-text-primary">
                         <p className="text-xs font-semibold text-text-muted uppercase mb-1">CITIZEN APPEAL MESSAGE:</p>
-                        "{ap.message}"
+                        &quot;{ap.message}&quot;
                       </div>
+
+                      {ap.admin_response && (
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-text-primary">
+                          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase mb-1">ADMIN DECISION NOTE:</p>
+                          {ap.admin_response}
+                        </div>
+                      )}
 
                       {ap.status === 'pending' && (
                         <div className="flex items-center gap-3 pt-1">
-                          <Button size="sm" onClick={() => { setSelectedAppeal(ap); setAppealAction('approve'); }}>
-                            Approve & Lift Restriction
+                          <Button size="sm" onClick={() => { setSelectedAppeal(ap); setAppealAction('approve'); setAppealResponseInput(''); }}>
+                            Approve &amp; Lift Restriction
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => { setSelectedAppeal(ap); setAppealAction('deny'); }}>
+                          <Button size="sm" variant="danger" onClick={() => { setSelectedAppeal(ap); setAppealAction('deny'); setAppealResponseInput(''); }}>
                             Deny Appeal
                           </Button>
                         </div>
@@ -500,7 +522,7 @@ export default function CitizensPage() {
 
             {(modalAction === 'ban' || modalAction === 'restrict') && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium">
-                ⚠️ <span className="font-bold">Are you sure you want to perform this action?</span> This will immediately change their status. Banned accounts are completely blocked from logging in or using the AGAPP mobile client.
+                ⚠️ <span className="font-bold">Are you sure you want to perform this action?</span> Banned accounts are completely blocked from logging in or using the AGAPP mobile client. Restricted accounts have restricted community features.
               </div>
             )}
 
@@ -511,22 +533,111 @@ export default function CitizensPage() {
             )}
 
             {(modalAction === 'ban' || modalAction === 'restrict') && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-text-muted">Reason for Moderation Action:</label>
-                <textarea
-                  placeholder="Enter clear reason for this citizen..."
-                  value={reasonInput}
-                  onChange={e => setReasonInput(e.target.value)}
-                  className="w-full p-3 text-sm rounded-xl border border-border bg-surface text-text-primary focus:outline-none"
-                  rows={3}
-                />
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase text-text-muted">Select Reason for Action:</label>
+
+                {/* Predefined Reasons Dropdown */}
+                <select
+                  value={selectedPreset || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setSelectedPreset(val || null);
+                    if (val !== 'Other (specify below)') {
+                      setCustomReason('');
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-border bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent font-medium cursor-pointer"
+                >
+                  <option value="" disabled>-- Select a predefined reason --</option>
+                  {(modalAction === 'ban' ? BAN_PRESETS : RESTRICT_PRESETS).map(preset => (
+                    <option key={preset} value={preset}>
+                      {preset}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Specific custom reason input */}
+                {(selectedPreset === 'Other (specify below)' || !selectedPreset) && (
+                  <div>
+                    <p className="text-xs text-text-muted mb-1 font-medium">
+                      {selectedPreset === 'Other (specify below)' ? 'Specify specific reason:' : 'Or enter custom reason:'}
+                    </p>
+                    <textarea
+                      placeholder="e.g. Repeated violation of community post guidelines..."
+                      value={customReason}
+                      onChange={e => setCustomReason(e.target.value)}
+                      className="w-full p-3 text-sm rounded-xl border border-border bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                      rows={3}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
             <div className="flex items-center justify-end gap-3 pt-2">
-              <Button variant="secondary" size="sm" onClick={() => { setSelectedCitizen(null); setModalAction(null); }}>Cancel</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setSelectedCitizen(null); setModalAction(null); setSelectedPreset(null); setCustomReason(''); }}>
+                Cancel
+              </Button>
               <Button variant={modalAction === 'ban' ? 'danger' : 'primary'} size="sm" onClick={handleModerateSubmit} disabled={submitting}>
                 {modalAction === 'reactivate' ? 'Confirm Reactivation' : 'Confirm Action'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* APPEAL REVIEW MODAL */}
+      {selectedAppeal && appealAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <Card className="w-full max-w-md p-6 space-y-4 bg-surface border border-border rounded-2xl shadow-2xl">
+            <h3 className="text-xl font-bold text-text-primary">
+              {appealAction === 'approve' ? 'Approve Appeal & Lift Restriction' : 'Deny Citizen Appeal'}
+            </h3>
+            <p className="text-sm text-text-muted">
+              Citizen: <span className="font-semibold text-text-primary">{selectedAppeal.citizen_name}</span> ({selectedAppeal.citizen_email})
+            </p>
+
+            <div className="p-3 bg-surface-alt rounded-xl border border-border text-sm text-text-primary">
+              <p className="text-xs font-semibold text-text-muted uppercase mb-1">CITIZEN APPEAL MESSAGE:</p>
+              &quot;{selectedAppeal.message}&quot;
+            </div>
+
+            {appealAction === 'approve' && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium">
+                ℹ️ <span className="font-bold">Approving this appeal</span> will immediately reactivate the citizen&apos;s account and lift all moderation restrictions.
+              </div>
+            )}
+
+            {appealAction === 'deny' && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium">
+                ⚠️ <span className="font-bold">Denying this appeal</span> will keep the account restricted or banned. Please provide a brief decision note.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase text-text-muted">
+                Admin Response Note {appealAction === 'deny' ? '(Required)' : '(Optional)'}:
+              </label>
+              <textarea
+                placeholder={appealAction === 'deny' ? 'Enter reason for denial...' : 'Optional note to citizen...'}
+                value={appealResponseInput}
+                onChange={e => setAppealResponseInput(e.target.value)}
+                className="w-full p-3 text-sm rounded-xl border border-border bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button variant="secondary" size="sm" onClick={() => { setSelectedAppeal(null); setAppealAction(null); setAppealResponseInput(''); }}>
+                Cancel
+              </Button>
+              <Button
+                variant={appealAction === 'deny' ? 'danger' : 'primary'}
+                size="sm"
+                onClick={handleAppealReviewSubmit}
+                disabled={submitting || (appealAction === 'deny' && !appealResponseInput.trim())}
+              >
+                {appealAction === 'approve' ? 'Confirm & Lift Restriction' : 'Confirm Denial'}
               </Button>
             </div>
           </Card>
