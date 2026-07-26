@@ -33,6 +33,8 @@ import { EmailOtpScreen } from '../screens/EmailOtpScreen';
 import { CitizenGuideScreen } from '../screens/CitizenGuideScreen';
 import { NewsScreen } from '../screens/NewsScreen';
 import { BannedScreen } from '../screens/BannedScreen';
+import { VerifiedGreetingScreen } from '../screens/VerifiedGreetingScreen';
+import { DeleteAccountScreen } from '../screens/DeleteAccountScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator();
@@ -294,6 +296,8 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             style={{ width: 90, height: 90 }}
             autoPlay
             loop
+            renderMode="HARDWARE"
+            resizeMode="contain"
           />
         </TouchableOpacity>
       )}
@@ -507,6 +511,8 @@ export function AppNavigator() {
             <Stack.Screen name="Assistant" component={ChatbotScreen} />
             <Stack.Screen name="LogoutConfirm" component={LogoutConfirmScreen} />
             <Stack.Screen name="SplashGreeting" component={SplashGreetingScreen} />
+            <Stack.Screen name="VerifiedGreeting" component={VerifiedGreetingScreen} />
+            <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
           </>
         )}
       </Stack.Navigator>

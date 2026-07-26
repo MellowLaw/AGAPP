@@ -86,6 +86,16 @@ export default function NewsPage() {
   const [editorTab, setEditorTab] = useState<'edit' | 'preview'>('edit');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Column Timeline and Planner state hooks
+  const [viewMode, setViewMode] = useState<'list' | 'columns' | 'planner'>('list');
+  const [plannerView, setPlannerView] = useState<'week' | 'month'>('month');
+  const [currentPlannerDate, setCurrentPlannerDate] = useState(new Date());
+  const [colsExpanded, setColsExpanded] = useState({
+    news: true,
+    announcement: true,
+    advisory: true,
+  });
+
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -514,6 +524,90 @@ export default function NewsPage() {
     setEditingAnnouncement(null);
   };
 
+  // Calendar grid and navigation helpers
+  const getDaysInMonthGrid = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(year, month, 0).getDate();
+
+    const grid = [];
+    
+    // Previous month filler days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      grid.push({
+        day: prevMonthTotalDays - i,
+        month: month === 0 ? 11 : month - 1,
+        year: month === 0 ? year - 1 : year,
+        isCurrentMonth: false,
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= totalDays; i++) {
+      grid.push({
+        day: i,
+        month,
+        year,
+        isCurrentMonth: true,
+      });
+    }
+
+    // Next month filler days
+    const remainingCells = 42 - grid.length;
+    for (let i = 1; i <= remainingCells; i++) {
+      grid.push({
+        day: i,
+        month: month === 11 ? 0 : month + 1,
+        year: month === 11 ? year + 1 : year,
+        isCurrentMonth: false,
+      });
+    }
+
+    return grid;
+  };
+
+  const getDaysInWeekGrid = (date: Date) => {
+    const currentDay = date.getDay();
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - currentDay); // Go to Sunday
+
+    const grid = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      grid.push({
+        day: d.getDate(),
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        isCurrentMonth: d.getMonth() === date.getMonth(),
+        dateObject: d,
+      });
+    }
+    return grid;
+  };
+
+  const getAnnouncementsForDate = (day: number, month: number, year: number) => {
+    return announcementsList.filter(ann => {
+      const dateStr = ann.status === 'scheduled' ? ann.scheduledForRaw : ann.publishedAtRaw;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
+    });
+  };
+
+  const changeMonth = (offset: number) => {
+    const nextDate = new Date(currentPlannerDate.getFullYear(), currentPlannerDate.getMonth() + offset, 1);
+    setCurrentPlannerDate(nextDate);
+  };
+
+  const changeWeek = (offset: number) => {
+    const nextDate = new Date(currentPlannerDate);
+    nextDate.setDate(currentPlannerDate.getDate() + (offset * 7));
+    setCurrentPlannerDate(nextDate);
+  };
+
   return (
     <DashboardLayout 
       role="lgu-admin" 
@@ -864,150 +958,391 @@ export default function NewsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {announcementsList.map((announcement) => (
-            <Card key={announcement.id}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-text-primary">{announcement.title}</h3>
-                    <Badge 
-                      variant={
-                        announcement.status === 'published' ? 'success' :
-                        announcement.status === 'scheduled' ? 'info' :
-                        announcement.status === 'archived' ? 'warning' :
-                        'default'
-                      }
+          {/* View Switcher Tabs */}
+          <div className="flex border-b border-theme mb-4 gap-4">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`pb-2 px-1 text-sm font-semibold border-b-2 transition-all ${
+                viewMode === 'list'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}
+            >
+              All Items
+            </button>
+            <button
+              onClick={() => setViewMode('columns')}
+              className={`pb-2 px-1 text-sm font-semibold border-b-2 transition-all ${
+                viewMode === 'columns'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Column Boards
+            </button>
+            <button
+              onClick={() => setViewMode('planner')}
+              className={`pb-2 px-1 text-sm font-semibold border-b-2 transition-all ${
+                viewMode === 'planner'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Planner Calendar
+            </button>
+          </div>
+
+          {viewMode === 'columns' ? (
+            <div className="flex gap-4 items-stretch min-h-[600px] overflow-x-auto pb-4">
+              {(['news', 'announcement', 'advisory'] as const).map((type) => {
+                const items = announcementsList.filter(a => a.type === type);
+                const isExpanded = colsExpanded[type];
+                const title = type === 'advisory' ? 'Advisories' : type === 'announcement' ? 'Announcements' : 'News';
+                const themeColorClass = type === 'advisory' ? 'bg-red-500/10 text-red-600 border-red-200 dark:border-red-900/50' : type === 'announcement' ? 'bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-900/50' : 'bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:border-indigo-900/50';
+                const cardTintClass = type === 'advisory' ? '!bg-red-50/80 dark:!bg-red-950/30 !border-red-300 dark:!border-red-800' : type === 'announcement' ? '!bg-amber-50/80 dark:!bg-amber-950/30 !border-amber-300 dark:!border-amber-800' : '';
+
+                if (!isExpanded) {
+                  return (
+                    <div
+                      key={type}
+                      className="w-14 bg-surface-alt border border-theme rounded-lg py-4 flex flex-col items-center justify-between cursor-pointer hover:bg-surface-alt/80 transition-all select-none"
+                      onClick={() => setColsExpanded(prev => ({ ...prev, [type]: true }))}
                     >
-                      {announcement.status}
-                    </Badge>
-                    <Badge 
-                      variant={announcement.isPublic ? 'success' : 'default'}
+                      <button className="text-text-muted hover:text-text-primary text-xs font-bold mb-2">▶</button>
+                      <span className="text-text-muted text-xs font-bold tracking-wider uppercase whitespace-nowrap rotate-90 my-auto">
+                        {title} ({items.length})
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={type} className="flex-1 min-w-[320px] bg-surface-alt border border-theme rounded-lg p-4 flex flex-col">
+                    <div className="flex items-center justify-between mb-4 border-b border-theme pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded-md ${themeColorClass}`}>
+                          {title}
+                        </span>
+                        <span className="text-xs text-text-muted font-bold">({items.length})</span>
+                      </div>
+                      <button
+                        onClick={() => setColsExpanded(prev => ({ ...prev, [type]: false }))}
+                        className="text-text-muted hover:text-text-primary text-xs font-bold"
+                      >
+                        ◀ Collapse
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[700px] pr-1">
+                      {items.map((announcement) => (
+                        <Card key={announcement.id} className={cardTintClass} padding="sm">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-semibold text-sm text-text-primary truncate">{announcement.title}</h4>
+                              <div className="flex gap-1 shrink-0">
+                                <Badge size="xs" variant={announcement.status === 'published' ? 'success' : announcement.status === 'scheduled' ? 'info' : 'warning'}>
+                                  {announcement.status}
+                                </Badge>
+                              </div>
+                            </div>
+                            <p className="text-xs text-text-muted line-clamp-2">{announcement.content}</p>
+                            <div className="flex items-center justify-between text-[11px] text-text-muted mt-2 border-t border-theme/40 pt-2">
+                              <span>
+                                {announcement.status === 'scheduled' ? 'Sched: ' : 'Posted: '}
+                                {announcement.status === 'scheduled' ? announcement.scheduledFor : announcement.publishedAt}
+                              </span>
+                              <div className="flex gap-1">
+                                <button onClick={() => handleEdit(announcement)} className="text-text-muted hover:text-text-primary">
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => handleDelete(announcement.id)} className="text-red-500 hover:text-red-700">
+                                  <Trash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                      {items.length === 0 && (
+                        <div className="text-center py-8 text-xs text-text-muted">
+                          No {title.toLowerCase()} posted.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : viewMode === 'planner' ? (
+            <div className="space-y-4">
+              <Card>
+                {/* Planner Header */}
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-theme pb-4">
+                  <div className="flex items-center gap-2 bg-surface-alt p-1 rounded-md border border-theme">
+                    <button
+                      onClick={() => setPlannerView('week')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                        plannerView === 'week' ? 'bg-indigo-600 text-white' : 'text-text-muted hover:text-text-primary'
+                      }`}
                     >
-                      {announcement.isPublic ? 'Public' : 'Private'}
-                    </Badge>
-                    <Badge variant={announcement.type === 'advisory' ? 'error' : announcement.type === 'announcement' ? 'info' : 'default'}>
-                      {announcement.type === 'advisory' ? 'Advisory' : announcement.type === 'announcement' ? 'Announcement' : 'News'}
-                    </Badge>
-                    {announcement.isFeatured && (
-                      <Badge variant="warning">
-                        ⭐ Featured
-                      </Badge>
-                    )}
+                      Week
+                    </button>
+                    <button
+                      onClick={() => setPlannerView('month')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                        plannerView === 'month' ? 'bg-indigo-600 text-white' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      Month
+                    </button>
                   </div>
-                  
-                  <p className="text-text-muted text-sm mb-3 line-clamp-2">{announcement.content}</p>
-                  
-                  <div className="flex items-center gap-4 text-sm text-text-muted">
-                    {announcement.status === 'published' && (
-                      <>
-                        <span className="flex items-center gap-1">
-                          <Clock variant="Bold" className="w-4 h-4" />
-                          Published {announcement.publishedAt}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye variant="Bold" className="w-4 h-4" />
-                          {announcement.views} views
-                        </span>
-                      </>
-                    )}
-                    {announcement.status === 'scheduled' && (
-                      <span className="flex items-center gap-1">
-                        <Calendar variant="Bold" className="w-4 h-4" />
-                        Scheduled for {announcement.scheduledFor}
-                      </span>
-                    )}
-                    {announcement.attachments > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Paperclip variant="Bold" className="w-4 h-4" />
-                        {announcement.attachments} attachment{announcement.attachments > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {(announcement.type === 'announcement' || announcement.type === 'advisory') && (
-                      <span className="text-xs text-text-muted">
-                        · {announcement.durationHours ? `Duration: ${announcement.durationHours}h` : 'Manual removal'}
-                        {announcement.expiresAt && ` (Expires: ${announcement.expiresAt})`}
-                      </span>
-                    )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => plannerView === 'month' ? changeMonth(-1) : changeWeek(-1)}
+                      className="p-1.5 border border-theme rounded-md hover:bg-surface-alt text-sm"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      onClick={() => setCurrentPlannerDate(new Date())}
+                      className="px-3 py-1 border border-theme rounded-md hover:bg-surface-alt text-xs font-semibold"
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => plannerView === 'month' ? changeMonth(1) : changeWeek(1)}
+                      className="p-1.5 border border-theme rounded-md hover:bg-surface-alt text-sm"
+                    >
+                      ▶
+                    </button>
                   </div>
+
+                  <h3 className="text-lg font-bold text-text-primary">
+                    {plannerView === 'month' ? (
+                      currentPlannerDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+                    ) : (
+                      `Week of ${currentPlannerDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+                    )}
+                  </h3>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-start gap-2 ml-4">
-                  {announcement.status === 'published' && (
-                    <Button 
-                      variant="secondary" 
-                      size="sm"
-                      onClick={async () => {
-                        const { data, error } = await supabase
-                          .from('news_announcements')
-                          .update({ status: 'archived' })
-                          .eq('id', announcement.id)
-                          .select('*')
-                          .single();
-                        if (error) {
-                          console.error(error);
-                          showToast('Failed to archive news', 'error');
-                        } else {
-                          setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
-                          showToast('News archived successfully', 'success');
-                        }
-                      }}
-                    >
-                      Archive
-                    </Button>
-                  )}
-                  {announcement.status === 'archived' && (
-                    <Button 
-                      variant="secondary" 
-                      size="sm"
-                      onClick={async () => {
-                        const { data, error } = await supabase
-                          .from('news_announcements')
-                          .update({ status: 'published', published_at: new Date().toISOString() })
-                          .eq('id', announcement.id)
-                          .select('*')
-                          .single();
-                        if (error) {
-                          console.error(error);
-                          showToast('Failed to publish news', 'error');
-                        } else {
-                          setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
-                          showToast('News published successfully', 'success');
-                        }
-                      }}
-                    >
-                      Publish
-                    </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => handleEdit(announcement)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => handleDelete(announcement.id)}
-                  >
-                    <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
-                  </Button>
+                {/* Grid Header days */}
+                <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-text-muted uppercase border-b border-theme pb-2 mb-2">
+                  <div>Sun</div>
+                  <div>Mon</div>
+                  <div>Tue</div>
+                  <div>Wed</div>
+                  <div>Thu</div>
+                  <div>Fri</div>
+                  <div>Sat</div>
                 </div>
-              </div>
-            </Card>
-          ))}
 
-          {!loading && !loadError && announcementsList.length === 0 && (
-            <Card>
-              <div className="text-center py-8">
-                <Book className="w-12 h-12 text-text-muted mx-auto mb-3" />
-                <p className="text-text-muted">No announcements yet</p>
-                <Button className="mt-4" onClick={() => setShowCreateForm(true)}>
-                  Create First Announcement
-                </Button>
-              </div>
-            </Card>
+                {/* Grid Days */}
+                <div className="grid grid-cols-7 gap-1">
+                  {(plannerView === 'month' ? getDaysInMonthGrid(currentPlannerDate) : getDaysInWeekGrid(currentPlannerDate)).map((cell, idx) => {
+                    const dayItems = getAnnouncementsForDate(cell.day, cell.month, cell.year);
+                    return (
+                      <div
+                        key={idx}
+                        className={`min-h-[110px] border border-theme rounded-md p-2 flex flex-col justify-between transition-all ${
+                          cell.isCurrentMonth ? 'bg-surface' : 'bg-surface-alt/40 opacity-50'
+                        }`}
+                      >
+                        <span className={`text-[11px] font-bold self-start ${
+                          cell.isCurrentMonth ? 'text-text-primary' : 'text-text-muted'
+                        }`}>
+                          {cell.day}
+                        </span>
+
+                        <div className="flex-1 overflow-y-auto mt-2 space-y-1.5 max-h-[75px] pr-0.5">
+                          {dayItems.map((item) => {
+                            const dateStr = item.status === 'scheduled' ? item.scheduledForRaw : item.publishedAtRaw;
+                            const timeStr = dateStr ? new Date(dateStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+                            
+                            let badgeBg = 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50';
+                            if (item.type === 'advisory') {
+                              badgeBg = 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50';
+                            } else if (item.type === 'announcement') {
+                              badgeBg = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50';
+                            }
+
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => handleEdit(item)}
+                                className={`flex items-center justify-between border rounded px-1.5 py-0.5 text-[10px] truncate cursor-pointer hover:opacity-80 transition-all ${badgeBg}`}
+                                title={`${item.title} (${item.type})`}
+                              >
+                                <span className="truncate max-w-[60%] font-semibold">{item.title}</span>
+                                <span className="shrink-0 font-bold ml-1">{timeStr}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {announcementsList.map((announcement) => (
+                <Card
+                  key={announcement.id}
+                  className={
+                    announcement.type === 'advisory'
+                      ? '!bg-red-50/80 dark:!bg-red-950/30 !border-red-300 dark:!border-red-800'
+                      : announcement.type === 'announcement'
+                      ? '!bg-amber-50/80 dark:!bg-amber-950/30 !border-amber-300 dark:!border-amber-800'
+                      : ''
+                  }
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-text-primary">{announcement.title}</h3>
+                        <Badge 
+                          variant={
+                            announcement.status === 'published' ? 'success' :
+                            announcement.status === 'scheduled' ? 'info' :
+                            announcement.status === 'archived' ? 'warning' :
+                            'default'
+                          }
+                        >
+                          {announcement.status}
+                        </Badge>
+                        <Badge 
+                          variant={announcement.isPublic ? 'success' : 'default'}
+                        >
+                          {announcement.isPublic ? 'Public' : 'Private'}
+                        </Badge>
+                        <Badge variant={announcement.type === 'advisory' ? 'error' : announcement.type === 'announcement' ? 'info' : 'default'}>
+                          {announcement.type === 'advisory' ? 'Advisory' : announcement.type === 'announcement' ? 'Announcement' : 'News'}
+                        </Badge>
+                        {announcement.isFeatured && (
+                          <Badge variant="warning">
+                            ⭐ Featured
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <p className="text-text-muted text-sm mb-3 line-clamp-2">{announcement.content}</p>
+                      
+                      <div className="flex items-center gap-4 text-sm text-text-muted">
+                        {announcement.status === 'published' && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Clock variant="Bold" className="w-4 h-4" />
+                              Published {announcement.publishedAt}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Eye variant="Bold" className="w-4 h-4" />
+                              {announcement.views} views
+                            </span>
+                          </>
+                        )}
+                        {announcement.status === 'scheduled' && (
+                          <span className="flex items-center gap-1">
+                            <Calendar variant="Bold" className="w-4 h-4" />
+                            Scheduled for {announcement.scheduledFor}
+                          </span>
+                        )}
+                        {announcement.attachments > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Paperclip variant="Bold" className="w-4 h-4" />
+                            {announcement.attachments} attachment{announcement.attachments > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {(announcement.type === 'announcement' || announcement.type === 'advisory') && (
+                          <span className="text-xs text-text-muted">
+                            · {announcement.durationHours ? `Duration: ${announcement.durationHours}h` : 'Manual removal'}
+                            {announcement.expiresAt && ` (Expires: ${announcement.expiresAt})`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-start gap-2 ml-4">
+                      {announcement.status === 'published' && (
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={async () => {
+                            const { data, error } = await supabase
+                              .from('news_announcements')
+                              .update({ status: 'archived' })
+                              .eq('id', announcement.id)
+                              .select('*')
+                              .single();
+                            if (error) {
+                              console.error(error);
+                              showToast('Failed to archive news', 'error');
+                            } else {
+                              setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
+                              showToast('News archived successfully', 'success');
+                            }
+                          }}
+                        >
+                          Archive
+                        </Button>
+                      )}
+                      {announcement.status === 'archived' && (
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={async () => {
+                            const { data, error } = await supabase
+                              .from('news_announcements')
+                              .update({ status: 'published', published_at: new Date().toISOString() })
+                              .eq('id', announcement.id)
+                              .select('*')
+                              .single();
+                            if (error) {
+                              console.error(error);
+                              showToast('Failed to publish news', 'error');
+                            } else {
+                              setAnnouncementsList(prev => prev.map(a => a.id === announcement.id ? mapAnnouncementRowToItem(data) : a));
+                              showToast('News published successfully', 'success');
+                            }
+                          }}
+                        >
+                          Publish
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEdit(announcement)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDelete(announcement.id)}
+                      >
+                        <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+
+              {!loading && !loadError && announcementsList.length === 0 && (
+                <Card>
+                  <div className="text-center py-8">
+                    <Book className="w-12 h-12 text-text-muted mx-auto mb-3" />
+                    <p className="text-text-muted">No announcements yet</p>
+                    <Button className="mt-4" onClick={() => setShowCreateForm(true)}>
+                      Create First Announcement
+                    </Button>
+                  </div>
+                </Card>
+              )}
+            </div>
           )}
         </div>
       )}

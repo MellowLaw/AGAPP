@@ -25,6 +25,65 @@ interface CatalogService {
   sort_order: number;
 }
 
+const PRESETS = [
+  {
+    office_name: 'BPLO',
+    name: 'Business Permit Renewal',
+    description: 'Apply for renewal of business permits and licensing to operate in the municipality.',
+    requirements: ['Completed application form', 'Barangay business clearance', 'Lease contract / Title proof', 'Certified list of gross sales', 'Fire Safety Inspection Certificate'],
+    fee_note: 'Variable based on gross sales (Calculated by assessor)',
+    processing_time: '1-3 working days',
+  },
+  {
+    office_name: 'BPLO',
+    name: 'New Business Permit',
+    description: 'Initial application for registration and permit of a new business establishment.',
+    requirements: ['DTI registration or SEC documents', 'Barangay business clearance', 'Lease contract / Title proof', 'Zoning clearance', 'Sanitary permit'],
+    fee_note: 'Calculated by BPLO assessor',
+    processing_time: '3-5 working days',
+  },
+  {
+    office_name: 'Barangay Office',
+    name: 'Barangay Clearance Certificate',
+    description: 'Document certifying that the resident is of good moral character and currently residing in the barangay.',
+    requirements: ['Community Tax Certificate (Cedula)', 'Proof of residency', 'One (1) valid photo ID'],
+    fee_note: 'Php 50.00',
+    processing_time: '1 hour / Same day',
+  },
+  {
+    office_name: 'Treasurer\'s Office',
+    name: 'Community Tax Certificate (Cedula)',
+    description: 'Issued to individuals or corporations upon payment of community tax.',
+    requirements: ['One (1) valid photo ID', 'Proof of income / Payslip (for employed)'],
+    fee_note: 'Based on annual income',
+    processing_time: '30 minutes / Same day',
+  },
+  {
+    office_name: 'Assessor\'s Office',
+    name: 'Real Property Tax Clearance',
+    description: 'Clearance certifying that all real property tax obligations for the declared property have been settled.',
+    requirements: ['Latest Tax Declaration copy', 'Official receipt of current tax payment', 'Valid photo ID'],
+    fee_note: 'Php 100.00 clearance fee',
+    processing_time: '1 working day',
+  },
+  {
+    office_name: 'Local Civil Registry (LCR)',
+    name: 'Certified Birth Certificate Copy',
+    description: 'Certified true copy of birth registry record.',
+    requirements: ['Accomplished request form', 'Valid ID of owner / requester', 'Authorization letter (if representative)'],
+    fee_note: 'Php 150.00',
+    processing_time: '1-2 working days',
+  },
+  {
+    office_name: 'MSWDO',
+    name: 'Crisis Assistance (AICS)',
+    description: 'Assistance to Individuals in Crisis Situations (AICS) providing medical, burial, educational, or transportation support.',
+    requirements: ['Certificate of Indigency', 'Barangay clearance', 'Medical abstract / Prescription (for medical)', 'Death certificate (for burial)'],
+    fee_note: 'Free / No fee',
+    processing_time: '1-2 working days',
+  }
+];
+
 export default function EservicesCatalogPage() {
   const params = useSearchParams();
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
@@ -48,6 +107,20 @@ export default function EservicesCatalogPage() {
   const [isActive, setIsActive] = useState(true);
   const [sortOrder, setSortOrder] = useState(0);
   const requirementInputRef = useRef<HTMLInputElement>(null);
+
+  const applyPreset = (preset: typeof PRESETS[number]) => {
+    setSelectedId(null);
+    setOfficeName(preset.office_name);
+    setName(preset.name);
+    setDescription(preset.description);
+    setRequirements(preset.requirements);
+    setNewRequirement('');
+    setFeeNote(preset.fee_note);
+    setProcessingTime(preset.processing_time);
+    setIsActive(true);
+    setSortOrder(services.length);
+    showToast(`Pre-filled: ${preset.name}`, 'info');
+  };
 
   const fetchServices = async () => {
     setLoading(true);
@@ -182,88 +255,108 @@ export default function EservicesCatalogPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form */}
-        <Card noBorder className="lg:col-span-1 shadow-sm">
-          <CardHeader title={selectedId ? 'Edit Service' : 'Add Service'} subtitle="Shown to citizens in the mobile app" />
-          <div className="space-y-4">
-            <Input label="Office" placeholder="BPLO" value={officeName} onChange={(e: any) => setOfficeName(e.target.value)} />
-            <Input label="Document / Service Name" placeholder="New Business Permit" value={name} onChange={(e: any) => setName(e.target.value)} />
-
-            <div>
-              <label className="block text-sm text-text-muted mb-1.5">Description</label>
-              <textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Short description shown on the citizen detail card…"
-                className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
-              />
+        {/* Left Column: Preset Templates + Form */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Preset Templates */}
+          <Card noBorder className="shadow-sm">
+            <CardHeader title="Quick Templates" subtitle="Select a preset to pre-fill the form" />
+            <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
+              {PRESETS.map((preset, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => applyPreset(preset)}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold bg-surface-alt hover:bg-indigo-500/10 hover:text-indigo-600 border border-theme rounded-md transition-all flex flex-col gap-0.5 focus:outline-none"
+                >
+                  <span className="text-text-primary font-bold">{preset.name}</span>
+                  <span className="text-text-faint">{preset.office_name} · Req: {preset.requirements.length}</span>
+                </button>
+              ))}
             </div>
+          </Card>
 
-            <div>
-              <label className="block text-sm text-text-muted mb-1.5">Requirements Checklist</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  ref={requirementInputRef}
-                  type="text"
-                  value={newRequirement}
-                  onChange={(e) => setNewRequirement(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRequirement(); } }}
-                  placeholder="e.g. Valid ID"
-                  className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+          {/* Form */}
+          <Card noBorder className="shadow-sm">
+            <CardHeader title={selectedId ? 'Edit Service' : 'Add Service'} subtitle="Shown to citizens in the mobile app" />
+            <div className="space-y-4">
+              <Input label="Office" placeholder="BPLO" value={officeName} onChange={(e: any) => setOfficeName(e.target.value)} />
+              <Input label="Document / Service Name" placeholder="New Business Permit" value={name} onChange={(e: any) => setName(e.target.value)} />
+
+              <div>
+                <label className="block text-sm text-text-muted mb-1.5">Description</label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Short description shown on the citizen detail card…"
+                  className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
                 />
-                <Button variant="secondary" size="sm" onClick={addRequirement}>
-                  <Add className="w-4 h-4" />
-                </Button>
               </div>
-              <ul className="space-y-1">
-                {requirements.map((req, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 text-sm bg-surface-alt rounded-md px-3 py-1.5">
-                    <span className="text-text-primary">{req}</span>
-                    <button onClick={() => removeRequirement(i)} className="text-text-faint hover:text-red-600 dark:text-red-400">
-                      <CloseCircle className="w-3.5 h-3.5" />
-                    </button>
-                  </li>
-                ))}
-                {requirements.length === 0 && (
-                  <li className="text-xs text-text-faint italic">No requirements added yet.</li>
+
+              <div>
+                <label className="block text-sm text-text-muted mb-1.5">Requirements Checklist</label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    ref={requirementInputRef}
+                    type="text"
+                    value={newRequirement}
+                    onChange={(e) => setNewRequirement(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRequirement(); } }}
+                    placeholder="e.g. Valid ID"
+                    className="flex-1 px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:border-accent"
+                  />
+                  <Button variant="secondary" size="sm" onClick={addRequirement}>
+                    <Add className="w-4 h-4" />
+                  </Button>
+                </div>
+                <ul className="space-y-1">
+                  {requirements.map((req, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-sm bg-surface-alt rounded-md px-3 py-1.5">
+                      <span className="text-text-primary">{req}</span>
+                      <button onClick={() => removeRequirement(i)} className="text-text-faint hover:text-red-600 dark:text-red-400">
+                        <CloseCircle className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                  {requirements.length === 0 && (
+                    <li className="text-xs text-text-faint italic">No requirements added yet.</li>
+                  )}
+                </ul>
+              </div>
+
+              <Input label="Fee Note" placeholder="Pay at the Municipal Hall" value={feeNote} onChange={(e: any) => setFeeNote(e.target.value)} />
+              <Input label="Processing Time" placeholder="3-5 working days" value={processingTime} onChange={(e: any) => setProcessingTime(e.target.value)} />
+              <Input label="Sort Order" type="number" value={String(sortOrder)} onChange={(e: any) => setSortOrder(parseInt(e.target.value, 10) || 0)} />
+
+              <label className="flex items-center gap-2 text-sm text-text-primary">
+                <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+                Active (visible to citizens)
+              </label>
+
+              <div className="pt-4 border-t border-theme flex gap-2">
+                <Button onClick={handleSave} disabled={saving} className="flex-1">
+                  {saving ? 'Saving…' : selectedId ? 'Save Changes' : 'Add Service'}
+                </Button>
+                {selectedId && (
+                  <>
+                    <Button variant="secondary" disabled={saving} onClick={resetForm}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={saving}
+                      onClick={() => {
+                        const s = services.find(x => x.id === selectedId);
+                        if (s) setDeleteTarget(s);
+                      }}
+                    >
+                      <Trash variant="Bold" className="w-4 h-4" />
+                    </Button>
+                  </>
                 )}
-              </ul>
+              </div>
             </div>
-
-            <Input label="Fee Note" placeholder="Pay at the Municipal Hall" value={feeNote} onChange={(e: any) => setFeeNote(e.target.value)} />
-            <Input label="Processing Time" placeholder="3-5 working days" value={processingTime} onChange={(e: any) => setProcessingTime(e.target.value)} />
-            <Input label="Sort Order" type="number" value={String(sortOrder)} onChange={(e: any) => setSortOrder(parseInt(e.target.value, 10) || 0)} />
-
-            <label className="flex items-center gap-2 text-sm text-text-primary">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active (visible to citizens)
-            </label>
-
-            <div className="pt-4 border-t border-theme flex gap-2">
-              <Button onClick={handleSave} disabled={saving} className="flex-1">
-                {saving ? 'Saving…' : selectedId ? 'Save Changes' : 'Add Service'}
-              </Button>
-              {selectedId && (
-                <>
-                  <Button variant="secondary" disabled={saving} onClick={resetForm}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="danger"
-                    disabled={saving}
-                    onClick={() => {
-                      const s = services.find(x => x.id === selectedId);
-                      if (s) setDeleteTarget(s);
-                    }}
-                  >
-                    <Trash variant="Bold" className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         {/* List */}
         <Card noBorder className="lg:col-span-2 shadow-sm" padding="sm">

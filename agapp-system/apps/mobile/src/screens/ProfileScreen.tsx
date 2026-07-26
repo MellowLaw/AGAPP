@@ -27,6 +27,9 @@ import {
   Camera,
   Sms,
   Notification,
+  User,
+  Lock,
+  InfoCircle,
 } from 'iconsax-react-native';
 
 const ICON_SIZE = 26; // no more icon-circle backdrop, so icons need to read on their own
@@ -53,9 +56,90 @@ export function ProfileScreen({ navigation }: any) {
   const [emailSaving, setEmailSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // New settings states
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editName, setEditName] = useState(profile?.name || '');
+  const [editBarangay, setEditBarangay] = useState(profile?.barangay || '');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+
+  const [helpCenterOpen, setHelpCenterOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [developerInfoOpen, setDeveloperInfoOpen] = useState(false);
+
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => setGpsEnabled(status === 'granted'));
+    ImagePicker.getCameraPermissionsAsync().then(({ status }) => setCameraEnabled(status === 'granted'));
   }, []);
+
+  // Update input defaults when profile changes
+  useEffect(() => {
+    if (profile) {
+      setEditName(profile.name || '');
+      setEditBarangay(profile.barangay || '');
+    }
+  }, [profile]);
+
+  const handleToggleCamera = async () => {
+    if (cameraEnabled) {
+      Linking.openSettings();
+      return;
+    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    setCameraEnabled(status === 'granted');
+  };
+
+  const handleEditProfile = async () => {
+    if (!editName.trim()) {
+      showToast('Name cannot be empty.', 'error');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ name: editName.trim(), barangay: editBarangay.trim() })
+        .eq('id', profile.id);
+      if (error) throw error;
+      await refreshProfile();
+      showToast('Profile updated successfully.', 'success');
+      setEditProfileOpen(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update profile.', 'error');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      showToast('Password changed successfully.', 'success');
+      setChangePasswordOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to change password.', 'error');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const handleToggleGps = async () => {
     if (gpsEnabled) {
@@ -409,25 +493,26 @@ export function ProfileScreen({ navigation }: any) {
 
         {(() => {
           const ALL_SETTINGS_ITEMS = [
-            { category: 'Account', label: 'Account Verification', icon: ShieldTick, iconType: 'iconsax' as const, cta: statusLabel(status), textStyle: { color: rowStatusColor }, onPress: goToVerify, keywords: ['verify', 'verification', 'identity', 'id', 'status', 'account'] },
-            { category: 'Account', label: 'Change email', icon: Sms, iconType: 'iconsax' as const, onPress: openEmailModal, keywords: ['email', 'change email', 'address', 'mail', 'account'] },
-            { category: 'Account', label: 'Change profile picture', icon: Camera, iconType: 'iconsax' as const, onPress: handleChangeAvatar, disabled: avatarUploading, keywords: ['avatar', 'picture', 'photo', 'image', 'profile picture', 'camera', 'account'] },
-            { category: 'Account', label: 'History', icon: Clock, iconType: 'iconsax' as const, onPress: openHistory, keywords: ['history', 'logs', 'past', 'requests', 'reports', 'activities', 'account'] },
+            { category: 'Account Settings', label: 'Edit Profile', icon: User, iconType: 'iconsax' as const, onPress: () => setEditProfileOpen(true), keywords: ['edit', 'profile', 'name', 'barangay', 'update'] },
+            { category: 'Account Settings', label: 'Change Profile Picture', icon: Camera, iconType: 'iconsax' as const, onPress: handleChangeAvatar, disabled: avatarUploading, keywords: ['avatar', 'picture', 'photo', 'image', 'profile picture', 'camera', 'account'] },
+            { category: 'Account Settings', label: 'Change Password', icon: Lock, iconType: 'iconsax' as const, onPress: () => setChangePasswordOpen(true), keywords: ['password', 'change password', 'security', 'credential'] },
+            { category: 'Account Settings', label: 'Change Email', icon: Sms, iconType: 'iconsax' as const, onPress: openEmailModal, keywords: ['email', 'change email', 'address', 'mail', 'account'] },
+            { category: 'Account Settings', label: 'Account Verification', icon: ShieldTick, iconType: 'iconsax' as const, cta: statusLabel(status), textStyle: { color: rowStatusColor }, onPress: goToVerify, keywords: ['verify', 'verification', 'identity', 'id', 'status', 'account'] },
+            { category: 'Account Settings', label: 'History', icon: Clock, iconType: 'iconsax' as const, onPress: openHistory, keywords: ['history', 'logs', 'past', 'requests', 'reports', 'activities', 'account'] },
 
-            { category: 'Preferences', label: 'Appearance', icon: 'color-palette-outline', iconType: 'ionicons' as const, isToggle: true, toggleValue: isDarkMode, onPress: () => setIsDarkMode(!isDarkMode), keywords: ['appearance', 'dark mode', 'theme', 'light mode', 'style', 'color', 'preferences'] },
-            { category: 'Preferences', label: 'GPS Access', icon: LocationIcon, iconType: 'iconsax' as const, isToggle: true, toggleValue: gpsEnabled, onPress: handleToggleGps, keywords: ['gps', 'location', 'map', 'permission', 'tracking', 'access', 'preferences'] },
-            { category: 'Preferences', label: 'Push Notifications', icon: Notification, iconType: 'iconsax' as const, isToggle: true, toggleValue: pushEnabled, onPress: handleTogglePush, keywords: ['push', 'notifications', 'alerts', 'preferences'] },
+            { category: 'System Permissions', label: 'Push Notifications', icon: Notification, iconType: 'iconsax' as const, isToggle: true, toggleValue: pushEnabled, onPress: handleTogglePush, keywords: ['push', 'notifications', 'alerts', 'preferences'] },
+            { category: 'System Permissions', label: 'Location Permissions', icon: LocationIcon, iconType: 'iconsax' as const, isToggle: true, toggleValue: gpsEnabled, onPress: handleToggleGps, keywords: ['gps', 'location', 'map', 'permission', 'tracking', 'access', 'preferences'] },
+            { category: 'System Permissions', label: 'Camera Permissions', icon: Camera, iconType: 'iconsax' as const, isToggle: true, toggleValue: cameraEnabled, onPress: handleToggleCamera, keywords: ['camera', 'photo', 'permission', 'access', 'preferences'] },
 
-            { category: 'Support', label: 'Facebook', icon: 'facebook', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().facebook), keywords: ['facebook', 'social', 'contact', 'support', 'lgu'] },
-            { category: 'Support', label: 'YouTube', icon: 'youtube', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().youtube), keywords: ['youtube', 'video', 'channel', 'support', 'lgu'] },
-            { category: 'Support', label: 'X (formerly Twitter)', icon: 'x-logo', iconType: 'custom_x' as const, onPress: () => Linking.openURL('https://x.com'), keywords: ['x', 'twitter', 'social', 'support', 'lgu'] },
-            { category: 'Support', label: getSocialLinks().websiteLabel, icon: 'globe', iconType: 'feather' as const, onPress: () => Linking.openURL(getSocialLinks().website), keywords: ['website', 'lgu website', 'web', 'gov', 'link', 'support'] },
-            { category: 'Support', label: 'About Us', icon: 'heart', iconType: 'feather' as const, onPress: () => setInfoModal('security'), keywords: ['about us', 'about', 'info', 'app', 'support', 'lgu'] },
+            { category: 'Help & Support', label: 'Help Center', icon: InfoCircle, iconType: 'iconsax' as const, onPress: () => setHelpCenterOpen(true), keywords: ['help', 'support', 'contact', 'lgu', 'phone', 'municipal'] },
+            { category: 'Help & Support', label: 'Frequently Asked Questions', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setFaqOpen(true), keywords: ['faq', 'questions', 'frequently asked questions', 'help', 'support'] },
 
-            { category: 'Legal', label: 'Terms and Conditions', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('terms'), keywords: ['terms', 'conditions', 'legal', 'agreement', 'rules'] },
-            { category: 'Legal', label: 'Privacy Policy', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('terms'), keywords: ['privacy', 'policy', 'data', 'legal', 'gdpr', 'safety'] },
+            { category: 'About', label: 'Terms & Conditions', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('terms'), keywords: ['terms', 'conditions', 'legal', 'agreement', 'rules'] },
+            { category: 'About', label: 'Privacy Policy', icon: DocumentText, iconType: 'iconsax' as const, onPress: () => setInfoModal('privacy'), keywords: ['privacy', 'policy', 'data', 'legal', 'gdpr', 'safety'] },
+            { category: 'About', label: 'Developer Information', icon: InfoCircle, iconType: 'iconsax' as const, onPress: () => setDeveloperInfoOpen(true), keywords: ['developer', 'info', 'build', 'team', 'version', 'about'] },
 
-            { category: 'Logout', label: 'Logout', icon: Logout, iconType: 'iconsax' as const, isLogout: true, onPress: handleLogout, keywords: ['logout', 'sign out', 'exit', 'leave'] }
+            { category: 'Danger Zone', label: 'Delete Account', icon: Warning2, iconType: 'iconsax' as const, textStyle: { color: '#DC2626' }, onPress: () => navigation.navigate('DeleteAccount'), keywords: ['delete', 'account', 'remove', 'danger', 'erase'] },
+            { category: 'Danger Zone', label: 'Logout', icon: Logout, iconType: 'iconsax' as const, isLogout: true, onPress: handleLogout, keywords: ['logout', 'sign out', 'exit', 'leave'] }
           ];
 
           const filtered = searchQuery.trim() === '' ? ALL_SETTINGS_ITEMS : ALL_SETTINGS_ITEMS.filter(item =>
@@ -524,7 +609,7 @@ export function ProfileScreen({ navigation }: any) {
           }
 
           // Otherwise, render grouped by categories
-          const categories = ['Account', 'Preferences', 'Support', 'Legal', 'Logout'];
+          const categories = ['Account Settings', 'System Permissions', 'Help & Support', 'About', 'Danger Zone'];
 
           return categories.map(cat => {
             const catItems = filtered.filter(item => item.category === cat);
@@ -532,11 +617,9 @@ export function ProfileScreen({ navigation }: any) {
 
             return (
               <React.Fragment key={cat}>
-                {cat !== 'Logout' && (
-                  <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
-                    {cat}
-                  </Text>
-                )}
+                <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 16, color: T.text, marginTop: 16, marginBottom: 10, paddingLeft: 4 }}>
+                  {cat}
+                </Text>
                 <View style={{
                   backgroundColor: T.card,
                   borderWidth: 1,
@@ -544,7 +627,6 @@ export function ProfileScreen({ navigation }: any) {
                   borderRadius: 24,
                   padding: 6,
                   marginBottom: 12,
-                  marginTop: cat === 'Logout' ? 16 : 0,
                 }}>
                   {catItems.map((item, index) => (
                     <React.Fragment key={item.label}>
@@ -676,7 +758,7 @@ export function ProfileScreen({ navigation }: any) {
               borderBottomColor: T.border,
             }}>
               <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>
-                {infoModal === 'terms' ? 'Terms & Conditions' : infoModal === 'security' ? 'About Us & Security' : 'History'}
+                {infoModal === 'terms' ? 'Terms & Conditions' : infoModal === 'privacy' ? 'Privacy Policy' : infoModal === 'security' ? 'About Us & Security' : 'History'}
               </Text>
               <TouchableOpacity onPress={() => setInfoModal(null)}>
                 <CloseSquare size={22} color={T.textMuted} variant="Bold" />
@@ -704,6 +786,16 @@ export function ProfileScreen({ navigation }: any) {
                   parties. You may contact your LGU's office to request access, correction,
                   or deletion of your data, subject to what the law and recordkeeping
                   requirements allow.
+                </Text>
+              ) : infoModal === 'privacy' ? (
+                <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 22 }}>
+                  <Text style={{ fontFamily: 'Octarine-Bold' }}>Privacy Policy (RA 10173 Compliance){'\n'}</Text>
+                  AGAPP is committed to protecting your privacy in compliance with the Data Privacy Act of 2012 (RA 10173).{'\n\n'}
+                  • We collect government-issued IDs and selfies solely to verify citizen identities.{'\n'}
+                  • These verification documents are processed only by LGU administrators and are deleted immediately after a decision is made.{'\n'}
+                  • Your declared address, email, and name are retained only for official municipal registry records and to facilitate local government digital services.{'\n'}
+                  • We employ industry-standard encryption to protect your data, and we never share or sell your personal details to third parties.{'\n\n'}
+                  By using this application, you consent to the collection and processing of your personal information as detailed in this policy.
                 </Text>
               ) : infoModal === 'security' ? (
                 <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 22 }}>
@@ -753,6 +845,233 @@ export function ProfileScreen({ navigation }: any) {
                 ))
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={editProfileOpen} transparent animationType="slide" onRequestClose={() => setEditProfileOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setEditProfileOpen(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NAME</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              style={{
+                height: 48,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: T.border,
+                backgroundColor: T.bg,
+                color: T.text,
+                fontFamily: 'Inter-Medium',
+                paddingHorizontal: 16,
+                fontSize: 14,
+                marginBottom: 16,
+              }}
+            />
+
+            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>BARANGAY</Text>
+            <TextInput
+              value={editBarangay}
+              onChangeText={setEditBarangay}
+              style={{
+                height: 48,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: T.border,
+                backgroundColor: T.bg,
+                color: T.text,
+                fontFamily: 'Inter-Medium',
+                paddingHorizontal: 16,
+                fontSize: 14,
+                marginBottom: 24,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={handleEditProfile}
+              disabled={editSaving}
+              activeOpacity={0.9}
+              style={{
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#292929',
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: editSaving ? 0.6 : 1,
+              }}
+            >
+              {editSaving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal visible={changePasswordOpen} transparent animationType="slide" onRequestClose={() => setChangePasswordOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Change Password</Text>
+              <TouchableOpacity onPress={() => setChangePasswordOpen(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NEW PASSWORD</Text>
+            <TextInput
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              style={{
+                height: 48,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: T.border,
+                backgroundColor: T.bg,
+                color: T.text,
+                fontFamily: 'Inter-Medium',
+                paddingHorizontal: 16,
+                fontSize: 14,
+                marginBottom: 16,
+              }}
+            />
+
+            <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>CONFIRM NEW PASSWORD</Text>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              style={{
+                height: 48,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: T.border,
+                backgroundColor: T.bg,
+                color: T.text,
+                fontFamily: 'Inter-Medium',
+                paddingHorizontal: 16,
+                fontSize: 14,
+                marginBottom: 24,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={handleChangePassword}
+              disabled={passwordSaving}
+              activeOpacity={0.9}
+              style={{
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#292929',
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: passwordSaving ? 0.6 : 1,
+              }}
+            >
+              {passwordSaving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Update Password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Help Center Modal */}
+      <Modal visible={helpCenterOpen} transparent animationType="slide" onRequestClose={() => setHelpCenterOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '75%', backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Help Center</Text>
+              <TouchableOpacity onPress={() => setHelpCenterOpen(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 22 }}>
+                Need help or facing issues with the AGAPP app? Reach out to us through our municipal hall office channels:{'\n\n'}
+                <Text style={{ fontFamily: 'Octarine-Bold' }}>Office Hours:{'\n'}</Text>
+                Monday to Friday, 8:00 AM – 5:00 PM{'\n\n'}
+                <Text style={{ fontFamily: 'Octarine-Bold' }}>Municipal Hall Offices:{'\n'}</Text>
+                • Mayor's Office: General concerns & program feedback.{'\n'}
+                • Treasurer's Office: eServices payments & business permits.{'\n'}
+                • DRRMO: Safety reports & emergency concerns.{'\n'}
+                • MSWDO: Social welfare applications and verification assistance.{'\n\n'}
+                You can also visit our official LGU website or Facebook page linked under settings for online queries.
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* FAQ Modal */}
+      <Modal visible={faqOpen} transparent animationType="slide" onRequestClose={() => setFaqOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%', backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Frequently Asked Questions</Text>
+              <TouchableOpacity onPress={() => setFaqOpen(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ gap: 18 }}>
+                <View>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 4 }}>Q: How long does account verification take?</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>A: Verification requests are usually reviewed by your LGU admin within 1 to 2 business days.</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: T.border, opacity: 0.3 }} />
+                <View>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 4 }}>Q: Who can view my submitted government ID?</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>A: Your government ID is highly private. Only authorized LGU staff can view it for identity verification. It is deleted immediately after a decision is made.</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: T.border, opacity: 0.3 }} />
+                <View>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 4 }}>Q: Why was my verification rejected?</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>A: Rejections usually happen if the uploaded ID photo is blurry, your selfie does not match the ID, or your declared address is invalid. Check the rejection reason in your profile and re-submit.</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: T.border, opacity: 0.3 }} />
+                <View>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 4 }}>Q: Can I edit reports after submitting?</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>A: No. Once reports are filed to your local government unit, they are final to ensure transaction integrity. You can track their resolution status in the app.</Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Developer Information Modal */}
+      <Modal visible={developerInfoOpen} transparent animationType="slide" onRequestClose={() => setDeveloperInfoOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Developer Information</Text>
+              <TouchableOpacity onPress={() => setDeveloperInfoOpen(false)}>
+                <CloseSquare size={22} color={T.textMuted} variant="Bold" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 16, marginBottom: 4 }}>AGAPP Mobile Client</Text>
+              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, marginBottom: 16 }}>Version 1.0.0 (Production Build)</Text>
+              <Text style={{ fontFamily: 'Inter-Medium', color: T.text, textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 }}>
+                Designed and built by the Local Government Digital Innovation Group. Supporting citizen transparency, eServices governance, and community coordination.
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>

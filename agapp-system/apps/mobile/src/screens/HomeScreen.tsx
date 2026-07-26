@@ -453,6 +453,25 @@ export function HomeScreen({ navigation }: any) {
     consumePendingGreeting();
   }, [profile?.id]);
 
+  // Verification success greeting — shown ONCE when a verified user first opens the app/account
+  useEffect(() => {
+    const checkVerificationGreeting = async () => {
+      if (!profile?.id || profile.verification_status !== 'verified') return;
+      try {
+        const storageKey = `hasSeenVerificationGreeting_${profile.id}`;
+        const hasSeen = await AsyncStorage.getItem(storageKey);
+        if (hasSeen === 'true') return;
+        
+        // Mark as seen immediately so it doesn't fire again
+        await AsyncStorage.setItem(storageKey, 'true');
+        navigation.navigate('VerifiedGreeting');
+      } catch (err) {
+        console.warn('[HomeScreen] Failed checking verification greeting flag:', err);
+      }
+    };
+    checkVerificationGreeting();
+  }, [profile?.id, profile?.verification_status]);
+
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Citizen';
 
   const nextCarousel = () => {

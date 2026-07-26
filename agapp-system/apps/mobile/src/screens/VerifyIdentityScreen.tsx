@@ -545,151 +545,157 @@ export function VerifyIdentityScreen({ navigation }: any) {
   // ── Success page dedicated screen ───────────────────────────────────────────
   if (isSubmittedSuccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
         <MapBg T={T} isDarkMode={isDarkMode} />
-        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <Image
-            source={require('../../assets/brand/stickers/2.png')}
-            style={{ width: 160, height: 160, marginBottom: 28 }}
-            resizeMode="contain"
-          />
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+            <Image
+              source={require('../../assets/brand/stickers/2.png')}
+              style={{ width: 160, height: 160, marginBottom: 28 }}
+              resizeMode="contain"
+            />
 
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
-            Submission Successful!
-          </Text>
-          
-          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 32 }}>
-            Thank you! Your identity verification documents have been securely uploaded. The admin will review your request, which typically takes 1–2 business days.
-          </Text>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
+              Submission Successful!
+            </Text>
+            
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 32 }}>
+              Thank you! Your identity verification documents have been securely uploaded. The admin will review your request, which typically takes 1–2 business days.
+            </Text>
 
-          <TouchableOpacity
-            style={{
-              height: 52,
-              borderRadius: 999,
-              backgroundColor: '#292929',
-              justifyContent: 'center',
-              alignItems: 'center',
-              width: '100%',
-              marginBottom: 12,
-            }}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Got It</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
+            <TouchableOpacity
+              style={{
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#292929',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%',
+                marginBottom: 12,
+              }}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Got It</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   // ── Already verified / pending guard ───────────────────────────────────
   if (status === 'verified' || status === 'pending') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
         <MapBg T={T} isDarkMode={isDarkMode} />
-        <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{
-            width: 80, height: 80, borderRadius: 40,
-            backgroundColor: status === 'verified' ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)',
-            justifyContent: 'center', alignItems: 'center', marginBottom: 24,
-          }}>
-            {status === 'verified'
-              ? <TickCircle size={44} color={isDarkMode ? '#4ADE80' : '#166534'} variant="Bold" />
-              : <Warning2   size={44} color={isDarkMode ? '#FBBF24' : '#854D0E'} variant="Bold" />}
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{
+              width: 80, height: 80, borderRadius: 40,
+              backgroundColor: status === 'verified' ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)',
+              justifyContent: 'center', alignItems: 'center', marginBottom: 24,
+            }}>
+              {status === 'verified'
+                ? <TickCircle size={44} color={isDarkMode ? '#4ADE80' : '#166534'} variant="Bold" />
+                : <Warning2   size={44} color={isDarkMode ? '#FBBF24' : '#854D0E'} variant="Bold" />}
+            </View>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
+              {status === 'verified' ? 'Already Verified' : 'Verification Pending'}
+            </Text>
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 32 }}>
+              {status === 'verified'
+                ? 'Your identity has been verified. You can now use all city services and report community issues.'
+                : 'Your verification request is currently under review by your LGU admin. This usually takes 1–2 business days.'}
+            </Text>
+            <TouchableOpacity
+              style={{ height: 52, borderRadius: 999, backgroundColor: '#292929', justifyContent: 'center', alignItems: 'center', width: '100%' }}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
-            {status === 'verified' ? 'Already Verified' : 'Verification Pending'}
-          </Text>
-          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 32 }}>
-            {status === 'verified'
-              ? 'Your identity has been verified. You can now use all city services and report community issues.'
-              : 'Your verification request is currently under review by your LGU admin. This usually takes 1–2 business days.'}
-          </Text>
-          <TouchableOpacity
-            style={{ height: 52, borderRadius: 999, backgroundColor: '#292929', justifyContent: 'center', alignItems: 'center', width: '100%' }}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   // ── Rejected verification dedicated screen ──────────────────────────────
   if (showRejectionScreen) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
         <MapBg T={T} isDarkMode={isDarkMode} />
-        <View style={[styles.header, { borderBottomColor: T.border }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ArrowLeft2 size={30} color={T.text} variant="Outline" />
-          </TouchableOpacity>
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Verify Identity</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <Image
-            source={require('../../assets/brand/stickers/3.png')}
-            style={{ width: 140, height: 140, marginBottom: 24 }}
-            resizeMode="contain"
-          />
-
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
-            Requirements Not Met
-          </Text>
-          
-          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 24 }}>
-            Sorry, you didn't meet the requirements for account verification in {resolvedLgu?.name || selectedLgu?.name || 'the municipality'}.
-          </Text>
-
-          <View style={{
-            width: '100%',
-            backgroundColor: '#FEF2F2',
-            borderWidth: 1,
-            borderColor: '#FCA5A5',
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 32,
-          }}>
-            <Text style={{ color: '#991B1B', fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 4 }}>
-              REASON FROM LGU ADMIN
-            </Text>
-            <Text style={{ color: '#B91C1C', fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 18 }}>
-              {profile?.rejection_reason || 'No specific reason provided by the administrator. Please make sure your uploaded ID is clear and your selfie matches the ID.'}
-            </Text>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={[styles.header, { borderBottomColor: T.border }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+            </TouchableOpacity>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Verify Identity</Text>
+            <View style={{ width: 24 }} />
           </View>
 
-          <TouchableOpacity
-            style={{
-              height: 52,
-              borderRadius: 999,
-              backgroundColor: '#292929',
-              justifyContent: 'center',
-              alignItems: 'center',
-              width: '100%',
-              marginBottom: 12,
-            }}
-            onPress={() => setShowRejectionScreen(false)}
-          >
-            <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Re-submit Verification</Text>
-          </TouchableOpacity>
+          <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+            <Image
+              source={require('../../assets/brand/stickers/3.png')}
+              style={{ width: 140, height: 140, marginBottom: 24 }}
+              resizeMode="contain"
+            />
 
-          <TouchableOpacity
-            style={{
-              height: 52,
-              borderRadius: 999,
-              backgroundColor: 'transparent',
-              justifyContent: 'center',
-              alignItems: 'center',
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 24, textAlign: 'center', marginBottom: 12 }}>
+              Requirements Not Met
+            </Text>
+            
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 24 }}>
+              Sorry, you didn't meet the requirements for account verification in {resolvedLgu?.name || selectedLgu?.name || 'the municipality'}.
+            </Text>
+
+            <View style={{
               width: '100%',
-            }}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
+              backgroundColor: '#FEF2F2',
+              borderWidth: 1,
+              borderColor: '#FCA5A5',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 32,
+            }}>
+              <Text style={{ color: '#991B1B', fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 4 }}>
+                REASON FROM LGU ADMIN
+              </Text>
+              <Text style={{ color: '#B91C1C', fontFamily: 'Inter-Medium', fontSize: 14, lineHeight: 18 }}>
+                {profile?.rejection_reason || 'No specific reason provided by the administrator. Please make sure your uploaded ID is clear and your selfie matches the ID.'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#292929',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%',
+                marginBottom: 12,
+              }}
+              onPress={() => setShowRejectionScreen(false)}
+            >
+              <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Re-submit Verification</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%',
+              }}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={{ color: T.text, fontFamily: 'Octarine-Bold', fontSize: 15 }}>Go Back</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -719,84 +725,86 @@ export function VerifyIdentityScreen({ navigation }: any) {
     ];
 
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
         <MapBg T={T} isDarkMode={isDarkMode} />
-        <View style={[styles.header, { borderBottomColor: T.border }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ArrowLeft2 size={30} color={T.text} variant="Outline" />
-          </TouchableOpacity>
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Verify Identity</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 200 }} showsVerticalScrollIndicator={false}>
-          {/* Icon */}
-          <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 28 }}>
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: T.accentSoft, justifyContent: 'center', alignItems: 'center' }}>
-              <Lock size={36} color={T.accent} variant="Bold" />
-            </View>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={[styles.header, { borderBottomColor: T.border }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ArrowLeft2 size={30} color={T.text} variant="Outline" />
+            </TouchableOpacity>
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Verify Identity</Text>
+            <View style={{ width: 24 }} />
           </View>
 
-          <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 26, marginBottom: 6 }}>Privacy Notice</Text>
-          <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 20, marginBottom: 28 }}>
-            Before we can verify your identity, please review how your personal data will be handled.
-          </Text>
-
-          {bulletItems.map(({ Icon, title, body }, i) => (
-            <View key={i} style={{ flexDirection: 'row', gap: 14, marginBottom: 22 }}>
-              <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: T.accentSoft, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
-                <Icon size={19} color={T.accent} variant="Bold" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 3 }}>{title}</Text>
-                <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>{body}</Text>
+          <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 200 }} showsVerticalScrollIndicator={false}>
+            {/* Icon */}
+            <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 28 }}>
+              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: T.accentSoft, justifyContent: 'center', alignItems: 'center' }}>
+                <Lock size={36} color={T.accent} variant="Bold" />
               </View>
             </View>
-          ))}
 
-          <View style={{ borderTopWidth: 1, borderTopColor: T.border, paddingTop: 18, marginTop: 4 }}>
-            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, lineHeight: 17 }}>
-              This data collection is carried out under the authority of RA 10173 (Data Privacy Act of 2012) for legitimate LGU identity verification purposes. You may withdraw consent by deleting your account at any time.
+            <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 26, marginBottom: 6 }}>Privacy Notice</Text>
+            <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 20, marginBottom: 28 }}>
+              Before we can verify your identity, please review how your personal data will be handled.
             </Text>
+
+            {bulletItems.map(({ Icon, title, body }, i) => (
+              <View key={i} style={{ flexDirection: 'row', gap: 14, marginBottom: 22 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: T.accentSoft, justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                  <Icon size={19} color={T.accent} variant="Bold" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 14, marginBottom: 3 }}>{title}</Text>
+                  <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 13, lineHeight: 18 }}>{body}</Text>
+                </View>
+              </View>
+            ))}
+
+            <View style={{ borderTopWidth: 1, borderTopColor: T.border, paddingTop: 18, marginTop: 4 }}>
+              <Text style={{ fontFamily: 'Inter-Medium', color: T.textMuted, fontSize: 12, lineHeight: 17 }}>
+                This data collection is carried out under the authority of RA 10173 (Data Privacy Act of 2012) for legitimate LGU identity verification purposes. You may withdraw consent by deleting your account at any time.
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Consent footer */}
+          <View style={[styles.consentFooter, { backgroundColor: 'transparent', borderTopColor: T.border }]}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}
+              onPress={() => setConsentChecked(c => !c)}
+              activeOpacity={0.8}
+            >
+              <View style={{
+                width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                borderColor: consentChecked ? T.accent : T.border,
+                backgroundColor: consentChecked ? T.accentSoft : 'transparent',
+                justifyContent: 'center', alignItems: 'center', flexShrink: 0, marginTop: 1,
+              }}>
+                {consentChecked && <Check size={13} color={T.accent} variant="Bold" />}
+              </View>
+              <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 13, lineHeight: 18, flex: 1 }}>
+                I have read and understood the privacy notice. I consent to the collection and processing of my government-issued ID and selfie for identity verification by the Municipality of {lguName}.
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                height: 52, borderRadius: 999,
+                backgroundColor: consentChecked ? T.text : T.chip,
+                justifyContent: 'center', alignItems: 'center',
+              }}
+              onPress={() => consentChecked && setConsentAccepted(true)}
+              disabled={!consentChecked}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: consentChecked ? T.bg : T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 15 }}>
+                Continue to Verification
+              </Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-
-        {/* Consent footer */}
-        <View style={[styles.consentFooter, { backgroundColor: T.bg, borderTopColor: T.border }]}>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}
-            onPress={() => setConsentChecked(c => !c)}
-            activeOpacity={0.8}
-          >
-            <View style={{
-              width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-              borderColor: consentChecked ? T.accent : T.border,
-              backgroundColor: consentChecked ? T.accentSoft : 'transparent',
-              justifyContent: 'center', alignItems: 'center', flexShrink: 0, marginTop: 1,
-            }}>
-              {consentChecked && <Check size={13} color={T.accent} variant="Bold" />}
-            </View>
-            <Text style={{ fontFamily: 'Inter-Medium', color: T.text, fontSize: 13, lineHeight: 18, flex: 1 }}>
-              I have read and understood the privacy notice. I consent to the collection and processing of my government-issued ID and selfie for identity verification by the Municipality of {lguName}.
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              height: 52, borderRadius: 999,
-              backgroundColor: consentChecked ? T.text : T.chip,
-              justifyContent: 'center', alignItems: 'center',
-            }}
-            onPress={() => consentChecked && setConsentAccepted(true)}
-            disabled={!consentChecked}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: consentChecked ? T.bg : T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 15 }}>
-              Continue to Verification
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -817,9 +825,10 @@ export function VerifyIdentityScreen({ navigation }: any) {
 
   // ── Main verification form ──────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
       <MapBg T={T} isDarkMode={isDarkMode} />
-      <View style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: T.border }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -1352,7 +1361,8 @@ export function VerifyIdentityScreen({ navigation }: any) {
           />
         )}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
