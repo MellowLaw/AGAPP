@@ -12,8 +12,28 @@ import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
 import { lguIdFromName } from '@/lib/lgu';
 import { listRegions, provincesOfRegion, citiesOfProvince } from '@/data/ph-locations';
-import { Add, Eye, CloseCircle, DocumentDownload, ArrowLeft, ArrowRight, TickCircle, Location, Colorfilter, UserAdd, ClipboardText } from 'iconsax-react';
+import { Add, Eye, CloseCircle, DocumentDownload, ArrowLeft, ArrowRight, TickCircle, Location, Colorfilter, UserAdd, ClipboardText, Key } from 'iconsax-react';
 import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
+
+function generateStrongPassword(length = 16): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=';
+  const uppers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lowers = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*()_+-=';
+
+  let pass = '';
+  pass += uppers[Math.floor(Math.random() * uppers.length)];
+  pass += lowers[Math.floor(Math.random() * lowers.length)];
+  pass += numbers[Math.floor(Math.random() * numbers.length)];
+  pass += symbols[Math.floor(Math.random() * symbols.length)];
+
+  for (let i = 4; i < length; i++) {
+    pass += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return pass.split('').sort(() => Math.random() - 0.5).join('');
+}
 
 interface Lgu {
   id: string;
@@ -312,6 +332,7 @@ export default function SuperLgusPage() {
   const duplicateId = !!wizardId && existingIds.has(wizardId);
   const locationComplete = !!wizard.region && !!wizard.province && !!wizard.city;
   const canProceedLocation = locationComplete && !duplicateId;
+  const canProceedStep3 = wizard.adminName.trim().length > 0 && wizard.adminEmail.trim().length > 0 && wizard.adminPassword.length >= 8;
 
   const openWizard = () => {
     setWizard(EMPTY_WIZARD);
@@ -902,44 +923,35 @@ export default function SuperLgusPage() {
           </Card>
         </>
       )}
-
       {/* Add-LGU Onboarding Wizard */}
       <AnimatePresence>
         {wizardOpen && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-50 bg-surface flex flex-col p-6 md:p-10 overflow-y-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={closeWizard}
           >
-            <motion.div
-              className="w-full max-w-2xl bg-surface rounded-2xl border border-theme p-6 overflow-y-auto max-h-[92vh]"
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              transition={{ duration: 0.18 }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col justify-between py-2">
               {/* Header */}
-              <div className="flex justify-between items-start border-b border-theme pb-3 mb-5">
+              <div className="flex justify-between items-start border-b border-theme pb-4 mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-text-primary">Add a new LGU</h3>
-                  <p className="text-sm text-text-muted mt-0.5">
+                  <h3 className="text-2xl font-bold text-text-primary">Add a new LGU</h3>
+                  <p className="text-sm text-text-muted mt-1">
                     Step {wizard.step} of 4 — {WIZARD_STEPS[wizard.step - 1].label}
                   </p>
                 </div>
                 <button
                   onClick={closeWizard}
                   disabled={creating}
-                  className="text-text-faint hover:text-accent font-bold disabled:opacity-40"
+                  className="text-text-faint hover:text-accent text-2xl font-bold disabled:opacity-40"
                 >
                   ✕
                 </button>
               </div>
 
               {/* Progress indicator */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-8">
                 {WIZARD_STEPS.map((s, i) => {
                   const StepIcon = s.icon;
                   const done = wizard.step > s.n;
@@ -948,7 +960,7 @@ export default function SuperLgusPage() {
                     <React.Fragment key={s.n}>
                       <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                         <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-colors ${
+                          className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
                             done
                               ? 'bg-accent border-accent text-accent-contrast'
                               : active
@@ -956,14 +968,14 @@ export default function SuperLgusPage() {
                               : 'border-theme text-text-muted bg-surface-alt'
                           }`}
                         >
-                          {done ? <TickCircle className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
+                          {done ? <TickCircle className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                         </div>
-                        <span className={`text-[11px] font-semibold ${active || done ? 'text-text-primary' : 'text-text-muted'}`}>
+                        <span className={`text-xs font-semibold ${active || done ? 'text-text-primary' : 'text-text-muted'}`}>
                           {s.label}
                         </span>
                       </div>
                       {i < WIZARD_STEPS.length - 1 && (
-                        <div className={`flex-1 h-0.5 mx-1 mb-4 rounded ${wizard.step > s.n ? 'bg-accent' : 'bg-theme'}`} />
+                        <div className={`flex-1 h-0.5 mx-2 mb-4 rounded ${wizard.step > s.n ? 'bg-accent' : 'bg-theme'}`} />
                       )}
                     </React.Fragment>
                   );
@@ -971,10 +983,10 @@ export default function SuperLgusPage() {
               </div>
 
               {/* Step body */}
-              <div className="min-h-[240px]">
+              <div className="flex-1 py-4">
                 {/* STEP 1 — Location */}
                 {wizard.step === 1 && (
-                  <div className="space-y-5">
+                  <div className="space-y-5 max-w-2xl mx-auto">
                     <p className="text-sm text-text-muted">
                       Choose where this LGU is located. We use the official Philippine
                       region → province → city/municipality hierarchy.
@@ -1038,7 +1050,7 @@ export default function SuperLgusPage() {
 
                 {/* STEP 2 — Branding */}
                 {wizard.step === 2 && (
-                  <div className="space-y-5">
+                  <div className="space-y-5 max-w-3xl mx-auto">
                     <p className="text-sm text-text-muted">
                       Set the LGU&apos;s brand colors and which features are enabled. You can change
                       all of this later from the Configure panel.
@@ -1210,12 +1222,11 @@ export default function SuperLgusPage() {
                   </div>
                 )}
 
-                {/* STEP 3 — First admin (optional) */}
+                {/* STEP 3 — First admin */}
                 {wizard.step === 3 && (
-                  <div className="space-y-5">
+                  <div className="space-y-5 max-w-2xl mx-auto">
                     <p className="text-sm text-text-muted">
-                      Optionally create the first LGU administrator account. You can skip this and
-                      add staff later from the LGU&apos;s Settings page.
+                      Create the initial LGU administrator account for this municipality.
                     </p>
                     <div>
                       <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Full Name</label>
@@ -1228,7 +1239,7 @@ export default function SuperLgusPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Email</label>
+                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Email Address</label>
                       <input
                         type="email"
                         value={wizard.adminEmail}
@@ -1238,12 +1249,26 @@ export default function SuperLgusPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Temporary Password</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-semibold text-text-muted uppercase">Temporary Password</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPass = generateStrongPassword(16);
+                            patchWizard({ adminPassword: newPass });
+                            showToast('Generated a strong temporary password!', 'info');
+                          }}
+                          className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          Generate Strong Password
+                        </button>
+                      </div>
                       <input
                         type="text"
                         value={wizard.adminPassword}
                         onChange={(e) => patchWizard({ adminPassword: e.target.value })}
-                        placeholder="At least 8 characters"
+                        placeholder="At least 8 characters or click Generate"
                         className="w-full px-3 py-2 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
                       />
                       <p className="text-xs text-text-faint mt-1.5">
@@ -1258,7 +1283,7 @@ export default function SuperLgusPage() {
 
                 {/* STEP 4 — Review & Create */}
                 {wizard.step === 4 && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-w-3xl mx-auto">
                     <p className="text-sm text-text-muted">Review the details below, then create the LGU.</p>
                     <div className="rounded-xl border border-theme divide-y divide-theme overflow-hidden">
                       <ReviewRow label="Region" value={wizard.region} />
@@ -1300,7 +1325,7 @@ export default function SuperLgusPage() {
                       <ReviewRow label="Onboarding Fee" value={wizard.onboardingFeePaid ? 'Paid' : 'Unpaid'} />
                       <ReviewRow
                         label="First Admin"
-                        value={wizard.adminEmail.trim() ? `${wizard.adminName.trim() || '(no name)'} — ${wizard.adminEmail.trim()}` : 'None (skipped)'}
+                        value={wizard.adminEmail.trim() ? `${wizard.adminName.trim() || '(no name)'} — ${wizard.adminEmail.trim()}` : 'None'}
                       />
                     </div>
                     {duplicateId && (
@@ -1313,32 +1338,30 @@ export default function SuperLgusPage() {
               </div>
 
               {/* Footer nav */}
-              <div className="flex items-center justify-between mt-6 border-t border-theme pt-4">
+              <div className="flex items-center justify-between mt-8 border-t border-theme pt-5">
                 <Button variant="secondary" onClick={wizard.step === 1 ? closeWizard : goBack} disabled={creating}>
                   {wizard.step === 1 ? 'Cancel' : (<><ArrowLeft variant="Linear" className="w-4 h-4 mr-1" /> Back</>)}
                 </Button>
 
                 <div className="flex items-center gap-2">
-                  {wizard.step === 3 && (
-                    <Button variant="ghost" onClick={goNext} disabled={creating}>
-                      Skip
-                    </Button>
-                  )}
                   {wizard.step < 4 ? (
                     <Button
                       onClick={goNext}
-                      disabled={wizard.step === 1 && !canProceedLocation}
+                      disabled={
+                        (wizard.step === 1 && !canProceedLocation) ||
+                        (wizard.step === 3 && !canProceedStep3)
+                      }
                     >
                       Next <ArrowRight variant="Linear" className="w-4 h-4 ml-1" />
                     </Button>
                   ) : (
-                    <Button onClick={handleCreateLgu} disabled={creating || !canProceedLocation}>
+                    <Button onClick={handleCreateLgu} disabled={creating || !canProceedLocation || !canProceedStep3}>
                       {creating ? 'Creating…' : (<><TickCircle className="w-4 h-4 mr-1" /> Create LGU</>)}
                     </Button>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
