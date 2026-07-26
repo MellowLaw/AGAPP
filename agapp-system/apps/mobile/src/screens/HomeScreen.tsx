@@ -907,11 +907,12 @@ export function HomeScreen({ navigation }: any) {
                         marginBottom: 8,
                       }}
                     >
-                      {/* Only these quick-action icons react to the LGU's
-                          customized icon color (falls back to the nav accent
-                          when not separately set) — everything else in the
-                          app stays on theme tokens by design. */}
-                      <action.icon size={36} color={T.iconAccent} variant="Bold" />
+                      {/* In dark mode, use T.accentSoft (the same colour as the
+                          floating tab-bar's active pill) so quick-action icons
+                          match the nav bar and stay clearly visible on the dark
+                          tile background. In light mode, the LGU's full-opacity
+                          iconAccent reads fine on white tiles. */}
+                      <action.icon size={36} color={isDarkMode ? T.accentSoft : T.iconAccent} variant="Bold" />
                     </TouchableOpacity>
                     <Text style={{
                       fontFamily: 'Inter-Medium',

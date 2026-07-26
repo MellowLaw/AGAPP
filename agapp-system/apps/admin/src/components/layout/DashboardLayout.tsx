@@ -58,32 +58,31 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { isDark } = useTheme();
 
   useEffect(() => {
-    const adjustColorContrast = (hex: string, forDark: boolean): string => {
+    const adjustColorContrast = (hex: string, forDark: boolean, targetLuminance = 0.80): string => {
       const clean = hex.replace('#', '');
       if (clean.length !== 6) return hex;
       let r = parseInt(clean.slice(0, 2), 16);
       let g = parseInt(clean.slice(2, 4), 16);
       let b = parseInt(clean.slice(4, 6), 16);
 
-      // Relative luminance calculation
+      // Perceived luminance
       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-      if (forDark && luminance < 0.45) {
-        // Lighten dark colors for dark mode (blend 50% with white)
-        r = Math.min(255, Math.floor(r + (255 - r) * 0.5));
-        g = Math.min(255, Math.floor(g + (255 - g) * 0.5));
-        b = Math.min(255, Math.floor(b + (255 - b) * 0.5));
+      if (forDark && luminance < 0.72) {
+        // Lift toward white until we reach targetLuminance so icons/accents
+        // are clearly readable on a dark background without losing their hue.
+        const mix = Math.min(1, (targetLuminance - luminance) / (1 - luminance + 0.001));
+        r = Math.round(r + (255 - r) * mix);
+        g = Math.round(g + (255 - g) * mix);
+        b = Math.round(b + (255 - b) * mix);
       } else if (!forDark && luminance > 0.75) {
-        // Darken very bright colors for light mode (blend 40% with dark grey)
+        // Darken very bright colours for light mode so they don't wash out.
         r = Math.max(0, Math.floor(r * 0.6));
         g = Math.max(0, Math.floor(g * 0.6));
         b = Math.max(0, Math.floor(b * 0.6));
       }
 
-      const rs = r.toString(16).padStart(2, '0');
-      const gs = g.toString(16).padStart(2, '0');
-      const bs = b.toString(16).padStart(2, '0');
-      return `#${rs}${gs}${bs}`;
+      return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
     };
 
     const cacheKey = `${role}|${lguParam ?? ''}`;

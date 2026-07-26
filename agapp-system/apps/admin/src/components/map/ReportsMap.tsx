@@ -6,6 +6,7 @@ import { Marker, Popup, useMap } from 'react-leaflet';
 import { LeafletMap } from './LeafletMap';
 import { makePinIcon, STATUS_COLORS } from './markers';
 import type { ReportPin } from './types';
+import { ClickableImage } from '../ui/ClickableImage';
 
 // Refits the viewport whenever the pin set changes (e.g. the super admin
 // switches the LGU filter tab, or a different report is selected).
@@ -33,6 +34,10 @@ interface ReportsMapProps {
   /** When provided, popups get an "Open report" link. Omit for view-only mode (super admin). */
   getDetailHref?: (report: ReportPin) => string;
   showLegend?: boolean;
+  title?: string;
+  collapsible?: boolean;
+  allowFullScreen?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 function makePulsingDotIcon(color: string, size = 32): L.DivIcon {
@@ -55,7 +60,17 @@ function makePulsingDotIcon(color: string, size = 32): L.DivIcon {
   });
 }
 
-export function ReportsMap({ reports, center, className = 'h-96', getDetailHref, showLegend = true }: ReportsMapProps) {
+export function ReportsMap({
+  reports,
+  center,
+  className = 'h-96',
+  getDetailHref,
+  showLegend = true,
+  title = 'GIS Incident Reports Map',
+  collapsible = true,
+  allowFullScreen = true,
+  defaultCollapsed = false,
+}: ReportsMapProps) {
   const icons = useMemo(() => {
     const byStatus: Record<string, L.DivIcon> = {};
     for (const [status, color] of Object.entries(STATUS_COLORS)) byStatus[status] = makePulsingDotIcon(color);
@@ -65,7 +80,14 @@ export function ReportsMap({ reports, center, className = 'h-96', getDetailHref,
 
   return (
     <div className={`relative ${className}`}>
-      <LeafletMap center={center} className="h-full">
+      <LeafletMap
+        center={center}
+        className="h-full"
+        title={title}
+        collapsible={collapsible}
+        allowFullScreen={allowFullScreen}
+        defaultCollapsed={defaultCollapsed}
+      >
         <FitToPins pins={reports} />
         {reports.map((r) => (
           <Marker key={r.id} position={[r.lat, r.lng]} icon={icons[r.status] || fallbackIcon}>
@@ -83,11 +105,13 @@ export function ReportsMap({ reports, center, className = 'h-96', getDetailHref,
                   {r.barangay} · {r.date}
                 </p>
                 {r.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <ClickableImage
                     src={r.photoUrl}
-                    alt="Report evidence"
-                    className="mt-2 rounded-md max-h-24 w-full object-cover"
+                    alt={`Report ${r.refNumber} evidence`}
+                    modalTitle={`Report Evidence - ${r.refNumber}`}
+                    modalSubtitle={`${r.category} • ${r.barangay}`}
+                    containerClassName="mt-2 rounded-md max-h-24 w-full"
+                    className="max-h-24 w-full object-cover rounded-md"
                   />
                 )}
                 {getDetailHref && (

@@ -46,6 +46,36 @@ export default function SettingsPage() {
   const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [iconColor, setIconColor] = useState('#d62a53');
   const [darkBgColor, setDarkBgColor] = useState('#292929');
+  const [overrideMode, setOverrideMode] = useState<'light' | 'dark'>('light');
+
+  // Compute contrast-adjusted dark mode colors based on light mode colors
+  const autoDarkPrimary = useMemo(() => {
+    const clean = (primaryColor || '#d62a53').replace('#', '');
+    if (clean.length !== 6) return primaryColor;
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum >= 0.72) return primaryColor;
+    const mix = Math.min(1, (0.80 - lum) / (1 - lum + 0.001));
+    const lift = (c: number) => Math.round(c + (255 - c) * mix);
+    return `#${[lift(r), lift(g), lift(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  }, [primaryColor]);
+
+  const autoDarkIcon = useMemo(() => {
+    const baseIcon = iconColor || primaryColor || '#d62a53';
+    const clean = baseIcon.replace('#', '');
+    if (clean.length !== 6) return baseIcon;
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum >= 0.72) return baseIcon;
+    const mix = Math.min(1, (0.80 - lum) / (1 - lum + 0.001));
+    const lift = (c: number) => Math.round(c + (255 - c) * mix);
+    return `#${[lift(r), lift(g), lift(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  }, [iconColor, primaryColor]);
+
   const [facebookUrl, setFacebookUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [twitterUrl, setTwitterUrl] = useState('');
@@ -583,86 +613,185 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
-              {/* Left Column: Theme Override Colors (xl:col-span-5) */}
-              <div className="xl:col-span-5 flex">
+              {/* Left Column: Theme Override Colors (xl:col-span-4) */}
+              <div className="xl:col-span-4 flex">
                 <Card className="w-full">
                   <CardHeader title="Theme Override Colors" subtitle="Set custom palette override hex colors for your LGU" />
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={primaryColor}
-                            onChange={(e) => setPrimaryColor(e.target.value)}
-                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={primaryColor}
-                            onChange={(e) => setPrimaryColor(e.target.value)}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={secondaryColor}
-                            onChange={(e) => setSecondaryColor(e.target.value)}
-                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={secondaryColor}
-                            onChange={(e) => setSecondaryColor(e.target.value)}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                  <div className="p-5 space-y-6">
+                    <div>
+                      <p className="text-xs font-bold text-text-faint uppercase tracking-wider mb-2.5">Theme Mode View</p>
+                    
+                    {/* Mode selector tab */}
+                    <div className="flex bg-surface-alt p-1 rounded-lg border border-theme mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setOverrideMode('light')}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
+                          overrideMode === 'light' ? 'bg-surface text-text-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Light Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOverrideMode('dark')}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
+                          overrideMode === 'dark' ? 'bg-surface text-text-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Dark Mode
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Icon Color</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={iconColor}
-                            onChange={(e) => setIconColor(e.target.value)}
-                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={iconColor}
-                            onChange={(e) => setIconColor(e.target.value)}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                    {overrideMode === 'light' ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={darkBgColor}
-                            onChange={(e) => setDarkBgColor(e.target.value)}
-                            className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={darkBgColor}
-                            onChange={(e) => setDarkBgColor(e.target.value)}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
-                          />
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={secondaryColor}
+                                onChange={(e) => setSecondaryColor(e.target.value)}
+                                className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={secondaryColor}
+                                onChange={(e) => setSecondaryColor(e.target.value)}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Quick Action Icons Color</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={iconColor}
+                                onChange={(e) => setIconColor(e.target.value)}
+                                className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={iconColor}
+                                onChange={(e) => setIconColor(e.target.value)}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Nav Active Pill (Indicator)</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Nav Active Icon & Label Color</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="color"
+                              value={secondaryColor}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={secondaryColor}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-text-muted mb-3 italic">
+                          Accent & icon colors automatically adjust based on contrast rules to ensure readability on dark backgrounds.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Auto Primary (Dark)</label>
+                            <div className="flex gap-1.5 items-center">
+                              <div className="w-8 h-8 border border-theme rounded p-0.5" style={{ backgroundColor: autoDarkPrimary }} />
+                              <input
+                                type="text"
+                                readOnly
+                                value={autoDarkPrimary}
+                                className="w-full px-2 py-1 bg-surface-alt border border-theme rounded text-xs font-mono text-text-muted cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Auto Icon (Dark)</label>
+                            <div className="flex gap-1.5 items-center">
+                              <div className="w-8 h-8 border border-theme rounded p-0.5" style={{ backgroundColor: autoDarkIcon }} />
+                              <input
+                                type="text"
+                                readOnly
+                                value={autoDarkIcon}
+                                className="w-full px-2 py-1 bg-surface-alt border border-theme rounded text-xs font-mono text-text-muted cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="color"
+                              value={darkBgColor}
+                              onChange={(e) => setDarkBgColor(e.target.value)}
+                              className="w-8 h-8 border border-theme rounded p-0.5 cursor-pointer bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={darkBgColor}
+                              onChange={(e) => setDarkBgColor(e.target.value)}
+                              className="w-full px-2 py-1 bg-surface border border-theme rounded text-xs font-mono text-text-primary focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                     {/* Logo Upload Section */}
                     <div className="pt-5 border-t border-theme">
@@ -697,13 +826,15 @@ export default function SettingsPage() {
                 </Card>
               </div>
 
-              {/* Right Column: Predefined Palettes & Preview (xl:col-span-7) */}
-              <Card className="xl:col-span-7 flex flex-col justify-between">
+              {/* Right Column: Predefined Palettes & Preview (xl:col-span-8) */}
+              <Card className="xl:col-span-8 flex flex-col justify-between">
                 <ColorPaletteSelector
                   primaryColor={primaryColor}
                   secondaryColor={secondaryColor}
                   iconColor={iconColor}
                   darkBgColor={darkBgColor}
+                  activeMode={overrideMode}
+                  onModeChange={setOverrideMode}
                   onChange={({ primaryColor: p, secondaryColor: s, iconColor: i, darkBgColor: d }) => {
                     setPrimaryColor(p);
                     setSecondaryColor(s);

@@ -107,6 +107,36 @@ export default function SuperLgusPage() {
   const [wizard, setWizard] = useState<WizardState>(EMPTY_WIZARD);
   const [creating, setCreating] = useState(false);
   const [selectedLguForEdit, setSelectedLguForEdit] = useState<Lgu | null>(null);
+  const [superOverrideMode, setSuperOverrideMode] = useState<'light' | 'dark'>('light');
+
+  const autoSuperDarkPrimary = useMemo(() => {
+    const p = selectedLguForEdit?.primary_color || '#ffffff';
+    const clean = p.replace('#', '');
+    if (clean.length !== 6) return p;
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum >= 0.72) return p;
+    const mix = Math.min(1, (0.80 - lum) / (1 - lum + 0.001));
+    const lift = (c: number) => Math.round(c + (255 - c) * mix);
+    return `#${[lift(r), lift(g), lift(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  }, [selectedLguForEdit?.primary_color]);
+
+  const autoSuperDarkIcon = useMemo(() => {
+    const ic = selectedLguForEdit?.icon_color || selectedLguForEdit?.primary_color || '#ffffff';
+    const clean = ic.replace('#', '');
+    if (clean.length !== 6) return ic;
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum >= 0.72) return ic;
+    const mix = Math.min(1, (0.80 - lum) / (1 - lum + 0.001));
+    const lift = (c: number) => Math.round(c + (255 - c) * mix);
+    return `#${[lift(r), lift(g), lift(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  }, [selectedLguForEdit?.icon_color, selectedLguForEdit?.primary_color]);
+
   const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -468,8 +498,8 @@ export default function SuperLgusPage() {
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
             
-            {/* Left Column: All Settings Inputs (xl:col-span-5) */}
-            <div className="xl:col-span-5 flex">
+            {/* Left Column: All Settings Inputs (xl:col-span-4) */}
+            <div className="xl:col-span-4 flex">
               <Card className="w-full flex flex-col justify-between">
                 <CardHeader title="LGU Configuration" subtitle="Geographic defaults, active feature flags, and custom branding color values" />
                 <div className="space-y-6 flex-1 flex flex-col justify-between">
@@ -562,95 +592,193 @@ export default function SuperLgusPage() {
 
                   {/* Brand color input pickers */}
                   <div className="pt-4 border-t border-theme">
-                    <p className="text-xs font-bold text-text-faint uppercase tracking-wider mb-2.5">Branding Override Colors</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={selectedLguForEdit.primary_color || '#ffffff'}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={selectedLguForEdit.primary_color || ''}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={selectedLguForEdit.secondary_color || '#ffffff'}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={selectedLguForEdit.secondary_color || ''}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
-                          />
-                        </div>
-                      </div>
+                    <p className="text-xs font-bold text-text-faint uppercase tracking-wider mb-2.5">Theme Override Colors</p>
+
+                    {/* Mode selector tab */}
+                    <div className="flex bg-surface-alt p-1 rounded-lg border border-theme mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setSuperOverrideMode('light')}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
+                          superOverrideMode === 'light' ? 'bg-surface text-text-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Light Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSuperOverrideMode('dark')}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all ${
+                          superOverrideMode === 'dark' ? 'bg-surface text-text-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Dark Mode
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Icon Override</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
-                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={selectedLguForEdit.icon_color || ''}
-                            placeholder={selectedLguForEdit.primary_color}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
-                          />
+                    {superOverrideMode === 'light' ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Primary Color</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={selectedLguForEdit.primary_color || '#ffffff'}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                                className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={selectedLguForEdit.primary_color || ''}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Secondary Color</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={selectedLguForEdit.secondary_color || '#ffffff'}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                                className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={selectedLguForEdit.secondary_color || ''}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="color"
-                            value={selectedLguForEdit.dark_bg_color || '#292929'}
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
-                            className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
-                          />
-                          <input
-                            type="text"
-                            value={selectedLguForEdit.dark_bg_color || ''}
-                            placeholder="#292929"
-                            onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
-                            className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
-                          />
+
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Quick Action Icons</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
+                                className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={selectedLguForEdit.icon_color || ''}
+                                placeholder={selectedLguForEdit.primary_color}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, icon_color: e.target.value })}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Nav Active Pill (Indicator)</label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="color"
+                                value={selectedLguForEdit.primary_color || '#ffffff'}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                                className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={selectedLguForEdit.primary_color || ''}
+                                onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, primary_color: e.target.value })}
+                                className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+
+                        <div className="mt-3">
+                          <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Nav Active Icon & Label Color</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="color"
+                              value={selectedLguForEdit.secondary_color || '#ffffff'}
+                              onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                              className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={selectedLguForEdit.secondary_color || ''}
+                              onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, secondary_color: e.target.value })}
+                              className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-text-muted mb-3 italic">
+                          Accent & icon colors automatically adjust based on contrast rules to ensure readability on dark backgrounds.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Auto Primary (Dark)</label>
+                            <div className="flex gap-1.5 items-center">
+                              <div className="w-8 h-8 border border-theme rounded-lg p-0.5" style={{ backgroundColor: autoSuperDarkPrimary }} />
+                              <input
+                                type="text"
+                                readOnly
+                                value={autoSuperDarkPrimary}
+                                className="w-full px-2 py-1 bg-surface-alt border border-theme rounded-md text-xs font-mono text-text-muted cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Auto Icon (Dark)</label>
+                            <div className="flex gap-1.5 items-center">
+                              <div className="w-8 h-8 border border-theme rounded-lg p-0.5" style={{ backgroundColor: autoSuperDarkIcon }} />
+                              <input
+                                type="text"
+                                readOnly
+                                value={autoSuperDarkIcon}
+                                className="w-full px-2 py-1 bg-surface-alt border border-theme rounded-md text-xs font-mono text-text-muted cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="block text-xs font-semibold text-text-muted uppercase mb-1">Dark BG Override</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="color"
+                              value={selectedLguForEdit.dark_bg_color || '#292929'}
+                              onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
+                              className="w-8 h-8 border border-theme rounded-lg p-0.5 cursor-pointer bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={selectedLguForEdit.dark_bg_color || ''}
+                              placeholder="#292929"
+                              onChange={(e) => setSelectedLguForEdit({ ...selectedLguForEdit, dark_bg_color: e.target.value })}
+                              className="w-full px-2 py-1 bg-surface border border-theme rounded-md text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
             </div>
 
-            {/* Right Column: Predefined Palettes & Preview (xl:col-span-7) */}
-            <Card className="xl:col-span-7 flex flex-col justify-between">
+            {/* Right Column: Predefined Palettes & Preview (xl:col-span-8) */}
+            <Card className="xl:col-span-8 flex flex-col justify-between">
               <div className="flex-1 flex flex-col justify-between">
                 <ColorPaletteSelector
                   primaryColor={selectedLguForEdit.primary_color || '#ffffff'}
                   secondaryColor={selectedLguForEdit.secondary_color || '#ffffff'}
                   iconColor={selectedLguForEdit.icon_color || selectedLguForEdit.primary_color || '#ffffff'}
                   darkBgColor={selectedLguForEdit.dark_bg_color || '#292929'}
+                  activeMode={superOverrideMode}
+                  onModeChange={setSuperOverrideMode}
                   onChange={({ primaryColor, secondaryColor, iconColor, darkBgColor }) =>
                     setSelectedLguForEdit({
                       ...selectedLguForEdit,

@@ -26,6 +26,26 @@ export function softenColor(hex: string, amount = 0.45): string {
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// In dark mode, icon/accent colours that look vivid on white become hard to see
+// against a dark background — they share similar saturation and darkness so they
+// blend in. This lifts luminance to at least ~75% (toward white) while keeping
+// the hue, so icons stay recognisably on-brand but read clearly on dark surfaces.
+export function lightenForDark(hex: string): string {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return hex;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  // Already bright enough — return as-is to avoid washing out light palettes.
+  if (luminance >= 0.72) return hex;
+  // How far we need to push toward white to reach the target luminance.
+  const target = 0.80;
+  const mix = Math.min(1, (target - luminance) / (1 - luminance + 0.001));
+  const lift = (c: number) => Math.round(c + (255 - c) * mix);
+  return `#${[lift(r), lift(g), lift(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
 // Picks ink or cream depending on how light/dark `hex` itself is — NOT the
 // app's light/dark theme mode. Use this for any text/icon drawn ON TOP of an
 // accent-colored fill (e.g. the tab bar's active pill): an LGU can pick a

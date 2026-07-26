@@ -14,6 +14,7 @@ import { lguIdFromName } from '@/lib/lgu';
 import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
 import { timeAgo } from '@/lib/timeAgo';
 import { ReportsMap } from '@/components/map';
+import { ClickableImage } from '@/components/ui/ClickableImage';
 import { Danger, Location, User, Calendar, TickSquare, CloseCircle, Refresh, SearchNormal1, Filter, DocumentDownload } from 'iconsax-react';
 
 type ReportStatus = 'submitted' | 'under_review' | 'in_progress' | 'resolved' | 'rejected';
@@ -512,9 +513,12 @@ export default function ReportsPage() {
                 {/* Photo */}
                 <div className="aspect-video bg-surface-alt rounded-lg overflow-hidden flex items-center justify-center">
                   {selectedReport.photoUrl ? (
-                    <img 
+                    <ClickableImage 
                       src={selectedReport.photoUrl} 
-                      alt="Report evidence" 
+                      alt={`Report ${selectedReport.id} evidence`} 
+                      modalTitle={`Report Evidence - ${selectedReport.id}`}
+                      modalSubtitle={`${selectedReport.category} • ${selectedReport.location}`}
+                      containerClassName="w-full h-full"
                       className="w-full h-full object-cover"
                     />
                   ) : (

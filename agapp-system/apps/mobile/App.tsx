@@ -94,12 +94,13 @@ const DEFAULT_ACCENT = '#F2E863';
 // a circular import between the mobile app and packages/shared.
 function AccentSync() {
   const { session, selectedLgu, guestLgu } = useAuth();
-  const { setAccent, setIconAccent, setDarkBg, isDarkMode } = useTheme();
+  const { setAccent, setSecondaryAccent, setIconAccent, setDarkBg, isDarkMode } = useTheme();
 
   useEffect(() => {
     if (!session) {
       // Stripped monochrome shell for guest users
       setAccent(isDarkMode ? '#FFFCF5' : '#292929');
+      setSecondaryAccent(null);
       setIconAccent(null);
       setDarkBg(null);
       return;
@@ -107,6 +108,7 @@ function AccentSync() {
     const lgu = selectedLgu;
     if (!lgu?.id) {
       setAccent(DEFAULT_ACCENT);
+      setSecondaryAccent(null);
       setIconAccent(null);
       setDarkBg(null);
       return;
@@ -114,22 +116,24 @@ function AccentSync() {
     // Always re-fetch from DB to pick up any admin color changes without needing a re-login.
     supabase
       .from('lgus')
-      .select('primary_color, icon_color, dark_bg_color')
+      .select('primary_color, secondary_color, icon_color, dark_bg_color')
       .eq('id', lgu.id)
       .single()
       .then(({ data, error }) => {
         if (data && !error) {
           setAccent(data.primary_color || lgu?.primary_color || lgu?.color || DEFAULT_ACCENT);
+          setSecondaryAccent(data.secondary_color || lgu?.secondary_color || null);
           setIconAccent(data.icon_color || null);
           setDarkBg(data.dark_bg_color || null);
         } else {
           // Fallback to cached value if network is unavailable
           setAccent(lgu?.primary_color || lgu?.color || DEFAULT_ACCENT);
+          setSecondaryAccent(lgu?.secondary_color || null);
           setIconAccent(null);
           setDarkBg(null);
         }
       });
-  }, [selectedLgu, guestLgu, session, isDarkMode, setAccent, setIconAccent, setDarkBg]);
+  }, [selectedLgu, guestLgu, session, isDarkMode, setAccent, setSecondaryAccent, setIconAccent, setDarkBg]);
 
   return null;
 }
