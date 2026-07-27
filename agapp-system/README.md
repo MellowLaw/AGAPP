@@ -239,7 +239,7 @@ cd apps/mobile && npx expo start --clear
 - **Only the API's two endpoints exist:** `POST /api/chatbot/ask` and the guarded
   `POST /api/reports/verify-image`. Every other feature (reports, services, forum,
   facilities, notifications…) is the client apps talking straight to Supabase, with
-  Postgres RLS as the real security/multi-tenancy boundary — not the NestJS layer.
+  Postgres RLS as the real security/LGU data separation boundary — not the NestJS layer.
 - **`@supabase/supabase-js` version differs across apps** — mobile is on `2.108`,
   admin/api on `2.43`. Don't assume a newer client API is available everywhere.
 - **Realtime subscriptions need their table in the `supabase_realtime` publication.**
@@ -268,7 +268,7 @@ Recharts · Leaflet (`react-leaflet`) · Supabase JS
 **Shared** — TypeScript types, built once via `npm run build:shared`; re-run it after
 any edit under `packages/shared`.
 
-**Database** — Supabase (Postgres + PostGIS), Row-Level Security on every tenant table.
+**Database** — Supabase (Postgres + PostGIS), Row-Level Security on every LGU-scoped table.
 
 ---
 

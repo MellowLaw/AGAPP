@@ -1,5 +1,5 @@
 -- AGAPP Database Schema for Supabase
--- Core Multi-Tenant LGU, Citizen, Reporting, and Chatbot Schema
+-- Core Schema — LGUs, Citizens, Reporting, and Chatbot
 
 -- Enable spatial extension
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS lgu_facilities CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS lgus CASCADE;
 
--- 1. LGU TENANTS TABLE
+-- 1. LGUs TABLE
 CREATE TABLE lgus (
     id text PRIMARY KEY, -- e.g. 'liliw-laguna'
     name text NOT NULL,
@@ -782,7 +782,7 @@ CREATE POLICY "Allow LGU admins/personnel to view and modify service requests" O
 
 -- ── Insert-forgery guards (2026-07-06, sweep §1) ──────────────────────────
 -- The citizen INSERT policies above only check `auth.uid() = citizen_id`, so a
--- hand-rolled REST insert (bypassing the app) could forge status, tenant
+-- hand-rolled REST insert (bypassing the app) could forge status, LGU
 -- (lgu_id), identity (citizen_name), and lifecycle columns (Resolved status;
 -- claim_code / released_* on requests). These BEFORE INSERT triggers FORCE
 -- those fields to safe values on real client inserts. Forcing (not rejecting)

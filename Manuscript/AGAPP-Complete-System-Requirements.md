@@ -62,7 +62,7 @@ This section details the actual implementation status of AGAPP.
   - PDF Generation backend ready for certificate requests.
 
 - **Database (supabase/)**
-  - `schema.sql` defines the full multi-tenant schema with PostGIS geofencing helper `verify_geofence()`, a forum profanity checking trigger, and Row-Level Security (RLS) policies.
+  - `schema.sql` defines the full multi-LGU schema with PostGIS geofencing helper `verify_geofence()`, a forum profanity checking trigger, and Row-Level Security (RLS) policies.
   - `seed.sql` contains initial municipalities, users, FAQ entries, and sample reports.
   - `storage_setup.sql` configures Supabase Storage buckets for reports and services documents.
 

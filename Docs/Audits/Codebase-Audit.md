@@ -482,7 +482,7 @@ full-app token migration — see the honest gap noted at the end.
   Buckets/policies were verified fine — the bug was purely client-side.
 - **Admin forum: comment threads now visible + moderatable** — count was
   hardcoded 0 and threads were invisible; posts now expand to show comments
-  with Approve/Delete on flagged ones. **Cross-tenant RLS hole fixed in
+  with Approve/Delete on flagged ones. **Cross-LGU RLS hole fixed in
   passing:** `forum_comments` policies checked only `role='LGU_ADMIN'` with no
   LGU scoping (any admin could moderate any LGU's comments) and the INSERT
   policy's `OR auth.uid() IS NOT NULL` let any user comment as anyone. Both
@@ -844,7 +844,7 @@ deleted 2026-06-30; the PDF generator followed 2026-07-03.)_
 - **Mobile / Field Officer** — Expo SDK 54, React Native 0.81, React 19, React Navigation v7, `expo-camera`, `expo-location`, `expo-secure-store`, `react-native-maps`, Supabase JS v2
 - **Admin** — Next.js 14 (App Router), Tailwind + `framer-motion`, `@supabase/ssr` (browser + server clients; middleware route guard), `leaflet` + `react-leaflet@4` + CartoDB tiles (theme-aware light/dark) for maps. Class-based dark mode via `contexts/ThemeContext.tsx` + semantic CSS-var tokens; chrome = hover-expand `Sidebar` (with nav badges) + inline `PageHeader` + real notification bell — see the 2026-07-04 blocks. The React 18/19 `next build` clash is resolved via root pins + `stubs/*` hoist-blockers (see CLAUDE.md Gotchas — don't remove them).
 - **API** — NestJS 10, Supabase JS, `@mistralai/mistralai` (chatbot) + `@google/generative-ai` (forum moderation), `expo-server-sdk`, zod, class-validator (`pdf-lib` removed 2026-07-03)
-- **DB** — Supabase Postgres + PostGIS (pgvector removed 2026-06-30); RLS on all tenant tables; realtime publication covers `notifications, reports, service_requests, forum_posts, forum_comments, verification_requests`
+- **DB** — Supabase Postgres + PostGIS (pgvector removed 2026-06-30); RLS on all LGU-scoped tables; realtime publication covers `notifications, reports, service_requests, forum_posts, forum_comments, verification_requests`
 - **Shared** — `@agapp/shared` TypeScript interfaces + zod schemas (built once, consumed by api; declared but unused in mobile)
 
 ---
@@ -891,7 +891,7 @@ deleted 2026-06-30; the PDF generator followed 2026-07-03.)_
 
 ### 🗄️ Supabase backend — solid
 - Tables: `lgus, users, offices, reports, service_requests, lgu_services, forum_posts, forum_comments, audit_logs, news_announcements, notifications, chatbot_faqs, lgu_facilities, verification_requests` (_`faq_embeddings` dropped 2026-06-30_)
-- RLS policies on every tenant table
+- RLS policies on every LGU-scoped table
 - PostGIS `verify_geofence()` function (20 km)
 - Profanity trigger (`trg_moderate_forum` + comment variant)
 - Storage buckets (`report-photos`, `service-attachments`) with policies

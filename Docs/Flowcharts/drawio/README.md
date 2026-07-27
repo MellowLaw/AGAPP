@@ -10,6 +10,10 @@ away from `/lgu/*` and include charts for `/personnel/dashboard` and
 | `01-Citizen-App.drawio` | 17 | Mobile app — guest, sign-up, tabs, services, reports, forum, profile, verification, moderation |
 | `02-LGU-Admin.drawio` | 15 | Admin panel for an LGU Admin / Personnel, per-module |
 | `03-Super-Admin.drawio` | 8 | Cross-LGU console, analytics and LGU onboarding |
+| `04-Use-Case-Diagrams.drawio` | 7 | UML use case diagram per actor, plus the actor inheritance overview |
+| `05-System-Architecture.drawio` | 1 | Four-layer system architecture with verified integration paths |
+
+Caption text for every page of all five files is in `FIGURE-DESCRIPTIONS.md`.
 
 Every page is **850 × 1100 px = 8.5in × 11in (short bond, portrait)**, one chart per
 page, so File → Export as → PDF gives one chart per sheet.
@@ -50,6 +54,8 @@ the next build.
 
 ```bash
 cd _build
+python spec_usecases.py     # -> ../04-Use-Case-Diagrams.drawio
+python spec_architecture.py # -> ../05-System-Architecture.drawio
 python spec_citizen.py      # -> ../01-Citizen-App.drawio
 python spec_lgu_admin.py    # -> ../02-LGU-Admin.drawio
 python spec_super_admin.py  # -> ../03-Super-Admin.drawio

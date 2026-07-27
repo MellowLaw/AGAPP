@@ -13,7 +13,7 @@
 - ✅ **`verify_geofence` confirmed DEAD** — grep across the whole repo: only its own
   definition (`schema.sql:588`) + a patch that recreates it. Zero call sites (no trigger,
   policy, `.rpc()`, or client ref). The 15 km check is client-side JS only, as suspected.
-- ✅ **§1 insert-forgery — status/tenant/identity/pickup half FIXED live** (migration
+- ✅ **§1 insert-forgery — status/LGU/identity/pickup half FIXED live** (migration
   `guard_citizen_insert_forgery`): BEFORE INSERT forcing triggers on `reports` +
   `service_requests` pin `citizen_id`/`lgu_id`/`citizen_name`, force `status='Submitted'`,
   and null the lifecycle fields (Resolved/claim_code/released_* forgery). No-op for the
@@ -59,8 +59,8 @@ insert (bypassing the app entirely) and forge:
 
 - **`ml_verified=true, ml_confidence=0.99`** → fakes the AI-verification badge admins
   now trust for triage (undermines the whole ML feature we just shipped).
-- **`lgu_id` = another town** → injects reports/requests/posts into a different tenant's
-  queue (cross-tenant spam). Contrast `verification_requests`, which *does* pin
+- **`lgu_id` = another town** → injects reports/requests/posts into a different LGU's
+  queue (cross-LGU spam). Contrast `verification_requests`, which *does* pin
   `lgu_id = (SELECT lgu_id FROM users WHERE id = auth.uid())` — the correct pattern.
 - **`status='Resolved'`** (reports) or **`status='Released', claim_code=…, released_at=…`**
   (service_requests) → fabricates a completed pickup/resolution without ever going
@@ -88,7 +88,7 @@ Each verified against the policy text + a real client call site:
   match. → narrow to `citizen_id = auth.uid() OR <staff exists-check>`.
 - **`lgu_services` SELECT** (admin) — staff branch never checks the row's `lgu_id` vs the
   caller's; any staff of any LGU reads every LGU's full catalog incl. drafts. A Liliw
-  admin visiting `?lguName=Nagcarlan, Laguna` gets a real cross-tenant read
+  admin visiting `?lguName=Nagcarlan, Laguna` gets a real cross-LGU read
   (`eservices-catalog/page.tsx`). → add `AND lgu_id = get_current_user_lgu()`.
 - **`forum_posts` / `forum_comments` SELECT** — `USING (is_approved = true)` with no LGU
   scoping → cross-LGU read of approved posts/comments via the `?lguName=` param.
@@ -97,7 +97,7 @@ Each verified against the policy text + a real client call site:
   since news is public-facing, but inconsistent — decide explicitly).
 
 **Common root:** admin pages derive the target LGU from the editable `?lguName=` URL
-param, so cross-tenant reads are one URL edit away wherever the table's RLS doesn't also
+param, so cross-LGU reads are one URL edit away wherever the table's RLS doesn't also
 scope by `lgu_id`. Fix each policy's SELECT to scope by the caller's own `lgu_id`.
 
 ## §3 — MED/HIGH: correctness bugs
@@ -161,7 +161,7 @@ internal notes, attach resolution proof) remains the recommended build — and �
 (office-backed assignment, the assigned-office data model) feed directly into it.
 
 ## Suggested order of attack
-1. **§1** — the insert-forgery lockdown (one migration; protects the ML feature + tenancy).
+1. **§1** — the insert-forgery lockdown (one migration; protects the ML feature + LGU data separation).
 2. **§2** — LGU-scope the leaky SELECT policies (same migration or a sibling one).
 3. **§3** — the four correctness bugs (rating persistence, silent no-op updates, CSV
    injection, API fail-open) — mostly small client/route changes.

@@ -491,7 +491,7 @@ export default function SuperAdminDashboard() {
           <p className="text-sm font-serif italic text-accent mt-1">
             {selectedLgu
               ? `Status breakdown for ${lgus.find(l => l.id === selectedLgu)?.name || 'selected LGU'}`
-              : 'Status breakdown per LGU, across all tenants'}
+              : 'Status breakdown per LGU, across all LGUs'}
           </p>
         </div>
         <Card noBorder className="rounded-[20px]">
@@ -528,7 +528,7 @@ export default function SuperAdminDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="text-2xl font-bold text-text-primary">LGU Performance Leaderboard</h3>
-            <p className="text-sm font-serif italic text-accent mt-1">Summary of reporting workloads per active tenant</p>
+            <p className="text-sm font-serif italic text-accent mt-1">Summary of reporting workloads per active LGU</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" className="!bg-accent !text-accent-contrast !border-0 hover:opacity-90" onClick={() => {
@@ -706,7 +706,7 @@ export default function SuperAdminDashboard() {
               <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Active Municipalities</p>
                 <p className="text-xl font-mono font-bold text-neutral-900 mt-0.5">{lgus.length}</p>
-                <p className="text-[10px] text-neutral-500 mt-0.5">Tenants Operating</p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">LGUs Operating</p>
               </div>
 
               <div className="border border-neutral-300 rounded-xl p-3 bg-neutral-50">

@@ -1,6 +1,6 @@
 # AGAPP Development Roadmap & Tech Stack Transition
 
-This document provides a comprehensive roadmap for transforming the current web prototype of the **Automated Governance and Public Service Platform (AGAPP)** into the production-ready system proposed in the capstone manuscript. It outlines the architecture gap analysis, design constraints, tenant isolation strategies, and a step-by-step phased execution plan.
+This document provides a comprehensive roadmap for transforming the current web prototype of the **Automated Governance and Public Service Platform (AGAPP)** into the production-ready system proposed in the capstone manuscript. It outlines the architecture gap analysis, design constraints, LGU data separation strategies, and a step-by-step phased execution plan.
 
 > [!NOTE]
 > **The "Proposed Production Stack" below is a proposal, not a contract.** It reflects
@@ -20,12 +20,12 @@ This document provides a comprehensive roadmap for transforming the current web 
 
 ## 1. Core System Architecture & Scope
 
-AGAPP is designed as a multi-tenant platform for Philippine Local Government Units (LGUs), with the **Municipality of Liliw, Laguna** serving as the pilot LGU. 
+AGAPP is designed as a multi-LGU platform for Philippine Local Government Units (LGUs), with the **Municipality of Liliw, Laguna** serving as the pilot LGU. 
 
 > [!IMPORTANT]
 > **Key Architecture Constraints:**
 > - **No Online Payments**: In compliance with local LGU guidelines, all financial transactions are completed in-person at the Municipal Hall counter. The platform generates a pre-filled application PDF and a reference QR code. LGU personnel scan the QR code to retrieve and approve the transaction.
-> - **Multi-Tenant Isolation**: The database must use PostgreSQL Row-Level Security (RLS) to enforce data privacy between different LGUs (e.g., Liliw, Nagcarlan, Magdalena, Majayjay, and Pila) while utilizing a single shared database instance.
+> - **Multi-LGU Isolation**: The database must use PostgreSQL Row-Level Security (RLS) to enforce data privacy between different LGUs (e.g., Liliw, Nagcarlan, Magdalena, Majayjay, and Pila) while utilizing a single shared database instance.
 > - **On-Device ML**: Pothole detection runs completely on-device using a compressed TensorFlow Lite model, eliminating the need for expensive cloud-based GPU inference.
 
 ---
@@ -49,9 +49,9 @@ Below is the comparison between the **Current Prototype** and the **Proposed Pro
 
 ---
 
-## 3. Multi-Tenant Design Strategy (Database Level)
+## 3. Multi-LGU Design Strategy (Database Level)
 
-To allow multiple LGUs to share the platform while guaranteeing absolute data privacy, we will use a **Single Database, Shared Schema, Multi-Tenant** approach enforced by PostgreSQL Row-Level Security (RLS).
+To allow multiple LGUs to share the platform while guaranteeing absolute data privacy, we will use a **Single Database, Shared Schema, Multi-LGU** approach enforced by PostgreSQL Row-Level Security (RLS).
 
 ```mermaid
 graph TD
@@ -68,7 +68,7 @@ graph TD
     end
 
     subgraph PostgreSQL Database
-        TenantContext[Set tenant_id on Connection]
+        LGUContext[Set lgu_id on Connection]
         subgraph Tables with RLS Enforced
             T_Users[Users Table]
             T_Reports[Reports Table]
@@ -76,9 +76,9 @@ graph TD
         end
     end
 
-    C1 & A1 -->|liliw-tenant| Nest
-    C2 & A2 -->|nagcarlan-tenant| Nest
-    SA -->|global-tenant| Nest
+    C1 & A1 -->|liliw-LGU| Nest
+    C2 & A2 -->|nagcarlan-LGU| Nest
+    SA -->|global-LGU| Nest
     Nest --> TenantContext
     TenantContext --> T_Users & T_Reports & T_Services
 ```

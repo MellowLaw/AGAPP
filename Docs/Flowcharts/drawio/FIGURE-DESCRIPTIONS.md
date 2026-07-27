@@ -1,13 +1,22 @@
-# Figure Descriptions — AGAPP Flowcharts
+# Figure Descriptions — AGAPP Diagrams
 
-Manuscript-ready caption text for every page of the three `.drawio` files, in file
+Manuscript-ready caption text for every page of the five `.drawio` files, in file
 and page order.
 
-**Renumbering:** figures are numbered 1–40 here, one per chart page. Your manuscript
-almost certainly starts the flowcharts at a higher number (the reference example used
-"Figure 3" for the administrator's main interface). Apply a single offset — if your
-first flowchart is Figure 12, add 11 throughout. The order below matches the page order
-inside each file, so the offset stays constant.
+| Figures | File |
+|---|---|
+| 1–17 | `01-Citizen-App.drawio` |
+| 18–32 | `02-LGU-Admin.drawio` |
+| 33–40 | `03-Super-Admin.drawio` |
+| 41–47 | `04-Use-Case-Diagrams.drawio` |
+| 48 | `05-System-Architecture.drawio` |
+
+**Renumbering:** figures are numbered 1–48 here, one per page. Your manuscript almost
+certainly starts these at a higher number (the reference example used "Figure 3" for the
+administrator's main interface). Apply a single offset — if your first flowchart is
+Figure 12, add 11 throughout. The order below matches the page order inside each file, so
+the offset stays constant. If the use case diagrams belong in an earlier chapter than the
+flowcharts, renumber that block separately.
 
 **Connector vocabulary used in the prose**
 
@@ -399,13 +408,13 @@ actions. One branch activates or deactivates a municipality. A second decision b
 onboarding of a new municipality, continuing to (2A) the onboarding wizard. A third
 decision allows the branding or feature flags of an existing municipality to be edited and
 saved. Connector `AA` returns to the main interface. This screen is the point at which the
-platform's multi-tenant scope is administered.
+platform's multi-LGU scope is administered.
 
 ### Figure 37 — Onboarding a New LGU (Wizard)
 
 Figure 37 depicts the guided onboarding of a new municipality. Step one captures the
 location by region, province, and city. A decision point rejects a municipality that has
-already been onboarded, preventing a duplicate tenant. Step two captures branding, covering
+already been onboarded, preventing a duplicate LGU. Step two captures branding, covering
 colours, logo, and feature flags. A further decision offers the immediate creation of the
 municipality's first LGU administrator, whose name, email address, and temporary password
 are captured in step three; this step may be skipped. Step four presents a review, after
@@ -436,3 +445,120 @@ Figure 40 illustrates the logout sequence for the super administrator. A decisio
 requires confirmation; declining returns the user to the main interface through connector
 `AA`. On confirmation the session is ended and the authentication cookie cleared,
 terminating access to the platform console.
+
+---
+
+## 04-Use-Case-Diagrams.drawio
+
+Numbered 41–47 on the same sequential scheme; apply the same offset as the
+flowcharts.
+
+### Figure 41 — Actors and Inheritance
+
+Figure 41 presents the six actors of the AGAPP platform and the inheritance between
+them. A hollow triangle points from the specialised actor to the actor it inherits. The
+citizen actors form a chain: an Unverified Citizen performs every Guest use case in
+addition to its own, and a Verified Citizen in turn performs every Unverified Citizen use
+case. On the administrative side, an LGU Administrator inherits from LGU Personnel, since
+an administrator implicitly holds every section of the panel. The Super Administrator
+inherits from no other actor, as its scope is the platform as a whole rather than an
+individual municipality. This figure establishes the inheritance relied upon by the six
+diagrams that follow, each of which lists only the use cases specific to its actor.
+
+### Figure 42 — Use Case Diagram: Guest
+
+Figure 42 illustrates the use cases available to a Guest, an unauthenticated visitor to
+the citizen application. Within the system boundary the Guest may select or detect a
+municipality, browse news and announcements, read the community forum, view the citizen
+guide directory, view the facilities map, and view emergency contacts. Two further use
+cases allow the Guest to register an account or sign in. Reading municipal information is
+therefore unrestricted, while every contributing action prompts registration. This
+arrangement allows a resident to evaluate the service before committing to an account.
+
+### Figure 43 — Use Case Diagram: Unverified Citizen
+
+Figure 43 presents the use cases of an Unverified Citizen, an account that has been
+created but whose identity has not yet been confirmed. In addition to inheriting every
+Guest use case, this actor may submit identity verification — which includes providing
+consent for the processing of the identification document — view its own verification
+status, manage its profile photograph and email address, set notification preferences,
+receive notifications, ask the assistant, like a forum post, submit a moderation appeal,
+and delete its own account. Reporting an issue, applying for a service and posting to the
+forum remain unavailable until verification is approved. The moderation appeal applies
+only while the account is restricted or banned.
+
+### Figure 44 — Use Case Diagram: Verified Citizen
+
+Figure 44 illustrates the use cases of a Verified Citizen, whose identity has been
+confirmed by the municipality. In addition to inheriting every Unverified Citizen and
+Guest use case, this actor may report a community issue — which includes capturing a
+photograph and confirming the location — track a submitted report, rate a resolved
+report, apply for a municipal service, which includes uploading the required documents,
+track and claim a service request, post in the community forum, comment on a forum post,
+and withdraw its own report or request. A submission cooldown limits repeat reports, and
+forum contributions are published only after moderator approval. This actor represents the
+full extent of citizen participation in the platform.
+
+### Figure 45 — Use Case Diagram: LGU Personnel
+
+Figure 45 presents the use cases of LGU Personnel, the front-line staff of a municipality.
+The actor may sign in to the administrative panel and manage its own profile and
+preferences. The remaining use cases cover the operational work of the municipality:
+viewing the dashboard, triaging community issue reports, assigning a report to an office,
+processing service requests, issuing a claim code, releasing a claimed document, publishing
+news and advisories, moderating forum posts and comments, managing the facilities map, the
+citizen guide and the eServices catalogue, reviewing identity verifications, moderating
+citizen accounts, and reviewing a citizen appeal. Each of these is available only where the
+corresponding section has been granted to the account, so a given staff member performs a
+subset. Configuring the municipality and managing staff are never available to this actor.
+
+### Figure 46 — Use Case Diagram: LGU Administrator
+
+Figure 46 illustrates the use cases exclusive to an LGU Administrator, the officer
+responsible for a single municipality's presence on the platform. The actor may configure
+the municipality's branding, set its contact details, create a staff account — which
+includes granting sections to a personnel account — promote a staff member to
+administrator, deactivate a staff account, and set its own notification preferences.
+Because an administrator implicitly holds every section, this actor also inherits the full
+set of LGU Personnel use cases shown in the preceding figure. All use cases are confined to
+the administrator's own municipality.
+
+### Figure 47 — Use Case Diagram: Super Administrator
+
+Figure 47 presents the use cases of the Super Administrator, whose scope is every
+municipality onboarded to the platform. The actor may view the cross-LGU dashboard, export
+platform figures, view platform analytics, onboard a new municipality — which includes
+configuring its branding and feature flags and creating its first LGU administrator —
+activate or deactivate a municipality, and manage its own account settings. The Super
+Administrator does not triage reports, process service requests or moderate citizens; those
+responsibilities remain with each municipality's own staff, which keeps operational data
+under the control of the local government unit that owns it.
+
+---
+
+## 05-System-Architecture.drawio
+
+### Figure 48 — System Architecture
+
+Figure 48 presents the system architecture of the AGAPP platform in four groupings. The
+users' applications are the citizen mobile app and the LGU and super administrator web
+dashboard. The application services comprise the AGAPP API, which handles the chatbot, the
+report photo check, the face comparison used in identity verification, and the sending of
+push notifications; alongside it are the dashboard's own server-side actions, which create
+staff accounts and upload logos using an administrative key held on the server. Data and
+accounts are held on the managed Supabase platform, which provides data access, sign-in,
+file storage and live updates over a PostgreSQL database with PostGIS, where Row-Level
+Security ensures each LGU sees only its own records. The outside services are the Roboflow
+photo detection models, the Mistral language model used as the chatbot fallback, the Expo
+push notification service, and the national address lists used when a citizen enters an
+address.
+
+Two characteristics distinguish this arrangement from a conventional three-tier design.
+First, both applications read and write the database directly using a public key, so access
+is enforced by the database rather than by the API: Row-Level Security limits every request
+to the records belonging to the signed-in person's own LGU and role. Second, the API is not
+a gateway placed in front of the database. It handles only the four jobs that cannot be
+expressed as a database query, and the web dashboard does not use it at all. Face
+comparison runs on the API host itself and sends nothing outside, which keeps citizens'
+identification photographs within the system. The dashed connection marks a text-reading
+service that remains connected but is no longer used by any application.

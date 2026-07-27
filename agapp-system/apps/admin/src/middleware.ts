@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
   // The /lgu/* pages read their LGU from ?lguName= and fall back to a hardcoded
   // "Liliw, Laguna", so a staff member of any other LGU who arrives without the
   // param (direct link, or a redirect like the one above) would query the wrong
-  // tenant and see an empty page. Pin the param to the signed-in user's own LGU
+  // LGU and see an empty page. Pin the param to the signed-in user's own LGU
   // here, at the single choke point, instead of in all ~11 pages.
   if (lguName && (role === 'LGU_ADMIN' || role === 'LGU_PERSONNEL') && pathname.startsWith('/lgu')) {
     if (request.nextUrl.searchParams.get('lguName') !== lguName) {

@@ -1,6 +1,6 @@
 # AGAPP — Feasibility, Improvements, and Tech Stack Analysis
 
-> Scope: Multi-tenant SaaS platform for LGUs composed of **(1) Super Admin Dashboard**, **(2) LGU Admin Dashboard (tenant)**, and **(3) Citizen Mobile App**. Client: pilot municipality, with a roadmap to onboard other LGUs.
+> Scope: Multi-LGU SaaS platform for LGUs composed of **(1) Super Admin Dashboard**, **(2) LGU Admin Dashboard (LGU)**, and **(3) Citizen Mobile App**. Client: pilot municipality, with a roadmap to onboard other LGUs.
 > References: MyNaga App (EasybusPH), eGovPH Super App (DICT).
 
 ---
@@ -36,12 +36,12 @@ Legend: ✅ feasible as-is · ⚠️ feasible with caveats · 🔴 re-scope reco
 
 ## 2. Recommended Additional/Improved Features
 
-### 2.1 Platform & Multi-Tenancy (critical for your "scalable / sell to other LGUs" goal)
-- **Multi-tenant architecture** with `lgu_id` on every record; single codebase, one mobile app that **switches LGU context** on first launch (like eGovPH choosing an agency).
+### 2.1 Platform & LGU data separation (critical for your "scalable / sell to other LGUs" goal)
+- **Multi-LGU architecture** with `lgu_id` on every record; single codebase, one mobile app that **switches LGU context** on first launch (like eGovPH choosing an agency).
 - **Feature flags per LGU** — each LGU Admin can toggle modules on/off (e.g., some LGUs don't need pothole detection but want tourism).
 - **Theming per LGU** — logo, colors, banner, seal set from LGU Admin dashboard and fetched by the mobile app at runtime.
 - **Custom service builder** — no-code form builder so LGU Admins can add their *own* unique services (e.g., "Senior Citizen Medicine Request") without developer intervention. This directly answers your "unique services per LGU" requirement.
-- **Tenant onboarding workflow** — Super Admin can provision a new LGU, create the first LGU Admin, set subscription tier.
+- **LGU onboarding workflow** — Super Admin can provision a new LGU, create the first LGU Admin, set subscription tier.
 
 ### 2.2 Citizen-Facing Additions
 - **Unified Citizen Profile / Digital ID wallet** — one-time KYC (PhilSys/National ID optional), reused across all service requests. Inspired by eGovPH SSO.
@@ -67,7 +67,7 @@ Legend: ✅ feasible as-is · ⚠️ feasible with caveats · 🔴 re-scope reco
 - **Tenant lifecycle management** — provision, suspend, **billing tier**. A *billing tier* is the subscription plan assigned to each LGU (e.g., **Free Pilot / Standard / Premium**), differing in features such as max admin seats, advanced analytics, custom branding, and ML modules (pothole detector). Tiers are enforced by **feature flags** on each `lgu_id`. For the capstone, this can be stubbed as *Free Pilot vs. Paid* just to demonstrate the architecture; real pricing is set when the platform is offered to other LGUs.
 - **Global content templates** — push "default service catalog" to new LGUs.
 - **Feature catalog & pricing plans.**
-- **System health monitoring** — uptime, error rates, storage usage per tenant.
+- **System health monitoring** — uptime, error rates, storage usage per LGU.
 - **Compliance dashboard** — DPA consent records, data retention schedule, DSAR (Data Subject Access Request) queue.
 
 ### 2.5 Research/Capstone Differentiators
@@ -109,7 +109,7 @@ Legend: ✅ feasible as-is · ⚠️ feasible with caveats · 🔴 re-scope reco
 | Mobile app | **React Native + Expo (TypeScript)** | Flutter | One codebase iOS/Android, OTA updates, huge ecosystem, easy for a student team. |
 | Admin web apps | **Next.js 14 (App Router) + TypeScript + Tailwind + shadcn/ui** | SvelteKit, Nuxt | Fast dev, SSR, excellent DX, matches capstone expectations. |
 | Backend API | **NestJS (Node/TS)** *or* **FastAPI (Python)** | Django, Laravel | NestJS pairs naturally with TS stack; FastAPI if you want Python for ML features. |
-| Database | **PostgreSQL + PostGIS** (via Supabase or self-hosted) | MySQL | PostGIS is essential for geo-queries (reports, maps, heatmaps). Multi-tenancy via `lgu_id` + Row-Level Security. |
+| Database | **PostgreSQL + PostGIS** (via Supabase or self-hosted) | MySQL | PostGIS is essential for geo-queries (reports, maps, heatmaps). LGU data separation via `lgu_id` + Row-Level Security. |
 | Auth | **Supabase Auth** or **Auth.js + JWT** | Firebase Auth, Clerk | Email/phone OTP, social login, MFA; supports Row-Level Security directly. |
 | File storage | **Supabase Storage / Cloudflare R2 / AWS S3** | Firebase Storage | Stores report photos, IDs, documents; cheap + presigned URLs. |
 | Realtime | **Supabase Realtime** or **Socket.IO** | Pusher, Ably | For status updates, forum, admin notifications. |
@@ -172,7 +172,7 @@ Legend: ✅ feasible as-is · ⚠️ feasible with caveats · 🔴 re-scope reco
 | Layer | Tool | What to test |
 |---|---|---|
 | Unit | **Jest** (TS) / **Pytest** (if FastAPI) / **PHPUnit** (if Laravel) | Pure functions, validators, state machines (report status transitions), permission checks. |
-| Integration | **Supertest** (NestJS) / **Pytest + httpx** / **Laravel HTTP tests** | API endpoints with a test Postgres DB (Docker). Covers auth, tenant isolation (RLS), CRUD. |
+| Integration | **Supertest** (NestJS) / **Pytest + httpx** / **Laravel HTTP tests** | API endpoints with a test Postgres DB (Docker). Covers auth, LGU data separation (RLS), CRUD. |
 | E2E Web | **Playwright** | LGU Admin & Super Admin flows: login → create service → approve report → publish news. |
 | E2E Mobile | **Maestro** (easiest) or **Detox** | Citizen flows: register → file report → track status → receive push. |
 | Contract | **OpenAPI schema** + **Dredd** or **Schemathesis** | Ensures mobile and admin clients stay in sync with API. |
@@ -185,7 +185,7 @@ Legend: ✅ feasible as-is · ⚠️ feasible with caveats · 🔴 re-scope reco
 
 - **Environments:** `local` → `dev` → `staging` → `production`. Each has its own Postgres + object storage + API domain.
 - **Seed data:** a `seed.ts`/`seed.py` script that creates 1 Super Admin, 2 mock LGUs, 3 LGU Admins, 10 citizens, sample reports/news. Critical for demo + tests.
-- **Test tenants:** always run E2E against a dedicated `lgu_test` tenant so prod-like data is never touched.
+- **Test LGUs:** always run E2E against a dedicated `lgu_test` LGU so prod-like data is never touched.
 
 ### 4.3 CI Pipeline (GitHub Actions)
 
@@ -232,7 +232,7 @@ On merge to `main`: auto-deploy to `staging`. On tagged release: deploy to `prod
 ### 4.6 Demo Day Checklist (Capstone Defense)
 
 - [ ] Seed data loaded with realistic PH sample (Filipino names, Bicol addresses if piloting there).
-- [ ] 2 LGUs visible in Super Admin to prove multi-tenancy.
+- [ ] 2 LGUs visible in Super Admin to prove LGU data separation.
 - [ ] One end-to-end flow recorded as backup video (in case live demo fails).
 - [ ] Pothole model has a documented test set with precision/recall in your paper.
 - [ ] DPA compliance artifacts printed: Privacy Notice, PIA, DPO appointment letter (template).
@@ -246,7 +246,7 @@ On merge to `main`: auto-deploy to `staging`. On tagged release: deploy to `prod
 This is **not optional** — an LGU app collecting citizen PII must comply, and your adviser will likely check this.
 
 ### 5.1 Governance
-- Appoint a **Data Protection Officer (DPO)** per tenant LGU; the platform itself should also have a Super-Admin-level DPO contact. Register the DPO(s) with the **National Privacy Commission (NPC)**.
+- Appoint a **Data Protection Officer (DPO)** per LGU; the platform itself should also have a Super-Admin-level DPO contact. Register the DPO(s) with the **National Privacy Commission (NPC)**.
 - Maintain a **Privacy Management Program** and a **Privacy Impact Assessment (PIA)** per LGU deployment (NPC Advisory 2017-03).
 - Publish a clear **Privacy Notice / Policy** and **Terms of Service** accessible from the app's first-run and settings.
 
@@ -265,7 +265,7 @@ This is **not optional** — an LGU app collecting citizen PII must comply, and 
   - TLS 1.2+ everywhere; HSTS on web.
   - Encryption **at rest** (Postgres TDE / disk encryption / `pgcrypto` for sensitive columns like National ID).
   - Hashed passwords (`argon2id`).
-  - **Row-Level Security** to enforce tenant isolation.
+  - **Row-Level Security** to enforce LGU data separation.
   - Audit logs (append-only) for admin actions.
   - MFA for all admin roles.
   - Rate limiting & WAF (Cloudflare).
@@ -303,7 +303,7 @@ This is **not optional** — an LGU app collecting citizen PII must comply, and 
 ## 6. Suggested Next Steps
 
 1. **Lock feature scope** for capstone MVP (recommend: Service Directory, Citizen Guide, Emergency, News, Reports w/ Pothole ML, Tracking, Chatbot-FAQ, Maps, LGU Admin, Super Admin analytics). Defer e-payments and open forum to v2.
-2. **Draft multi-tenant data model** (`lgus`, `users`, `user_lgu_roles`, `services`, `reports`, `news`, `consents`, `audit_logs`). I can generate the ERD + initial Prisma/SQL schema on request.
+2. **Draft multi-LGU data model** (`lgus`, `users`, `user_lgu_roles`, `services`, `reports`, `news`, `consents`, `audit_logs`). I can generate the ERD + initial Prisma/SQL schema on request.
 3. **Set up monorepo** (pnpm workspaces): `apps/mobile` (Expo), `apps/admin-lgu` (Next.js), `apps/admin-super` (Next.js), `apps/api` (NestJS), `packages/ui`, `packages/types`.
 4. **Pilot with one LGU** → collect usage metrics via PostHog → iterate before offering to other LGUs.
 5. **Prepare compliance artifacts** early (Privacy Notice, PIA template, DPA checklist) — these are part of the defense.

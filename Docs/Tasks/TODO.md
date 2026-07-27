@@ -87,7 +87,7 @@
 ## 🟠 Next (high value)
 
 - [ ] **Finish sweep §1: move ML writes server-side** — the forcing triggers now stop
-      status/tenant/identity/pickup forgery, but `ml_verified`/`ml_confidence` are still
+      status/LGU/identity/pickup forgery, but `ml_verified`/`ml_confidence` are still
       written client-side and thus forgeable (a citizen can fake the AI-verified badge).
       Fix: have the `verify-image` API endpoint (service role) write them to the report
       after insert, and force them NULL on client inserts. Needs API + mobile flow change

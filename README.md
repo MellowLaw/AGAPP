@@ -1,6 +1,6 @@
 # AGAPP — Automated Governance and Public Service Platform
 
-A multi-tenant e-governance platform for Philippine LGUs (capstone/thesis project;
+A multi-LGU e-governance platform for Philippine LGUs (capstone/thesis project;
 pilot LGU: Liliw, Laguna). This is the top-level project folder — it holds the actual
 system plus everything around it (docs, the academic manuscript, design assets).
 
@@ -38,12 +38,12 @@ don't go looking for code in the wrong folder.
   town map, use a chatbot, and post in a community forum. Requires identity
   verification (ID photo + selfie, reviewed by LGU staff) before submitting anything.
 - **Admin web dashboard** (Next.js) — three roles: Super Admin (onboards LGUs across
-  the Philippines, cross-tenant analytics), LGU Admin (manages their town: reports,
+  the Philippines, cross-LGU analytics), LGU Admin (manages their town: reports,
   services, staff, forum moderation, citizen verification), LGU Personnel (front-line
   staff working the queue).
 - **API** (NestJS) — intentionally thin: only the chatbot endpoint and a guarded
   ML endpoint for photo verification. Every client app talks to Supabase directly;
-  Postgres Row-Level Security is the actual multi-tenant security boundary, not the API.
+  Postgres Row-Level Security is the actual multi-LGU security boundary, not the API.
 - **Supabase** (Postgres + PostGIS) — the shared backend for all three apps.
 
 For anything more specific than this — exact run commands, env var names, known

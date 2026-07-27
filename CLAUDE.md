@@ -4,9 +4,9 @@ Guidance for working in this repo. Keep it accurate; update when things change.
 
 ## What this is
 
-**AGAPP** (Automated Governance and Public Service Platform) — a multi-tenant
+**AGAPP** (Automated Governance and Public Service Platform) — a multi-LGU
 e-governance platform for Philippine LGUs (capstone/thesis project; pilot LGU:
-Liliw, Laguna). Multi-tenancy is by `lgu_id` with Postgres Row-Level Security.
+Liliw, Laguna). LGU data separation is by `lgu_id` with Postgres Row-Level Security.
 
 ## Repo layout
 

@@ -1,0 +1,535 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="UC0" name="Figure — Actors and Inheritance">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC0-t" value="Figure — Actors and Inheritance" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-83326" value="Guest" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="880" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-82019" value="Unverified Citizen" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="690" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-80002" value="Verified Citizen" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="500" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-70148" value="LGU Personnel" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="430" y="690" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-53907" value="LGU Administrator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="430" y="500" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-63393" value="Super Administrator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="690" y="500" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-g0" value="" style="endArrow=block;endFill=0;endSize=12;html=1;strokeColor=#000000;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="UC0-82019" target="UC0-83326">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-g1" value="" style="endArrow=block;endFill=0;endSize=12;html=1;strokeColor=#000000;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="UC0-80002" target="UC0-82019">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-g2" value="" style="endArrow=block;endFill=0;endSize=12;html=1;strokeColor=#000000;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="UC0-53907" target="UC0-70148">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC0-note" value="A hollow triangle points from the specialised actor to the one it inherits. An Unverified Citizen performs every Guest use case in addition to its own, and a Verified Citizen performs every Unverified Citizen use case. An LGU Administrator performs every LGU Personnel use case, since it implicitly holds all sections. The Super Administrator inherits from no one — its scope is the platform rather than a single municipality." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="990" width="770" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC1" name="Figure — Use Case Diagram: Guest">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC1-t" value="Figure — Use Case Diagram: Guest" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-box" value="AGAPP Citizen Application" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="636" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-actor" value="Guest" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="359" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc0" value="Select or detect a municipality" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc1" value="Browse news and announcements" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc2" value="Read the community forum" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc3" value="View the citizen guide directory" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc4" value="View the facilities map" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc5" value="View emergency contacts" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc6" value="Register an account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-uc7" value="Sign in" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-a7" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC1-actor" target="UC1-uc7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC1-note" value="A Guest is an unauthenticated visitor. Reading is unrestricted; every contributing action prompts sign-in or registration." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="728" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC2" name="Figure — Use Case Diagram: Unverified Citizen">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC2-t" value="Figure — Use Case Diagram: Unverified Citizen" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-box" value="AGAPP Citizen Application" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="784" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-actor" value="Unverified Citizen" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="433" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc0" value="Submit identity verification" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc1" value="Provide consent for ID processing" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc2" value="View own verification status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc3" value="Manage own profile photo and email" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc4" value="Set notification preferences" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc5" value="Receive notifications" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc6" value="Ask the assistant" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc7" value="Like a forum post" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a7" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc8" value="Submit a moderation appeal" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="714" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a8" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-uc9" value="Delete own account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="788" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-a9" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC2-actor" target="UC2-uc9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-i0" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC2-uc0" target="UC2-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC2-note" value="Inherits all Guest use cases. Reporting, applying for a service and posting to the forum remain unavailable until verification is approved. A moderation appeal applies only while the account is restricted or banned." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="876" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC3" name="Figure — Use Case Diagram: Verified Citizen">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC3-t" value="Figure — Use Case Diagram: Verified Citizen" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-box" value="AGAPP Citizen Application" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="784" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-actor" value="Verified Citizen" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="433" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc0" value="Report a community issue" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc1" value="Capture a photograph and location" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc2" value="Track a submitted report" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc3" value="Rate a resolved report" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc4" value="Apply for a municipal service" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc5" value="Upload required documents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc6" value="Track and claim a service request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc7" value="Post in the community forum" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a7" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc8" value="Comment on a forum post" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="714" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a8" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-uc9" value="Withdraw own report or request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="788" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-a9" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC3-actor" target="UC3-uc9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-i0" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC3-uc0" target="UC3-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-i1" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC3-uc4" target="UC3-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC3-note" value="Inherits all Unverified Citizen and Guest use cases. A submission cooldown limits repeat reports, and forum contributions are published only after moderator approval." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="876" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC4" name="Figure — Use Case Diagram: LGU Personnel">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC4-t" value="Figure — Use Case Diagram: LGU Personnel" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-box" value="AGAPP Administrative Panel" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="636" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-actor" value="LGU Personnel" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="359" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc0" value="Sign in to the admin panel" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc1" value="Manage own profile and preferences" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc2" value="View the LGU dashboard" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc3" value="Triage community issue reports" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc4" value="Assign a report to an office" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc5" value="Process service requests" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc6" value="Issue a claim code" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc7" value="Release a claimed document" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a7" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc8" value="Publish news and advisories" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a8" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc9" value="Moderate forum posts and comments" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a9" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc10" value="Manage the facilities map" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a10" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc11" value="Manage the citizen guide" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a11" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc12" value="Manage the eServices catalogue" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a12" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc13" value="Review identity verifications" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a13" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc14" value="Moderate citizen accounts" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="216" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a14" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-uc15" value="Review a citizen appeal" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="496" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-a15" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC4-actor" target="UC4-uc15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC4-note" value="Each use case above the first two is available only if the corresponding section has been granted to the account, so a given personnel member performs a subset. Configuring the municipality and managing staff are never available to this actor." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="728" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC5" name="Figure — Use Case Diagram: LGU Administrator">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC5-t" value="Figure — Use Case Diagram: LGU Administrator" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-box" value="AGAPP Administrative Panel" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="562" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-actor" value="LGU Administrator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="322" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc0" value="Configure municipality branding" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc1" value="Set municipality contact details" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc2" value="Create a staff account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc3" value="Grant sections to a personnel account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc4" value="Promote a staff member to administrator" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc5" value="Deactivate a staff account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-uc6" value="Set own notification preferences" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC5-actor" target="UC5-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-i0" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC5-uc2" target="UC5-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC5-note" value="Inherits every LGU Personnel use case, holding all sections implicitly. The use cases shown here are those exclusive to the administrator and are confined to the administrator's own municipality." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="654" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="UC6" name="Figure — Use Case Diagram: Super Administrator">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="UC6-t" value="Figure — Use Case Diagram: Super Administrator" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-box" value="AGAPP Platform Console" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=none;strokeColor=#000000;fontColor=#000000;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="80" width="620" height="636" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-actor" value="Super Administrator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="56" y="359" width="46" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc0" value="View the cross-LGU dashboard" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="122" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a0" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc1" value="Export platform figures" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="196" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a1" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc2" value="View platform analytics" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="270" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a2" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc3" value="Onboard a new municipality" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="344" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a3" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc4" value="Configure branding and feature flags" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="418" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a4" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc5" value="Create the first LGU administrator" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="492" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a5" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc6" value="Activate or deactivate a municipality" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="566" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a6" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-uc7" value="Manage own account settings" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="640" width="250" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-a7" value="" style="endArrow=none;html=1;strokeColor=#000000;edgeStyle=none;" edge="1" parent="1" source="UC6-actor" target="UC6-uc7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-i0" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC6-uc3" target="UC6-uc4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-i1" value="&amp;laquo;include&amp;raquo;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeColor=#000000;fontColor=#000000;fontSize=10;edgeStyle=none;" edge="1" parent="1" source="UC6-uc3" target="UC6-uc5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UC6-note" value="Scope is every onboarded municipality. The Super Administrator does not triage reports, process service requests or moderate citizens — those remain with the municipality's own staff." style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="728" width="770" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
