@@ -59,6 +59,7 @@ CREATE TABLE users (
     -- A badge count = rows newer than nav_seen[section]; opening that section
     -- writes now() and the badge clears.
     nav_seen jsonb NOT NULL DEFAULT '{}'::jsonb,
+    last_profile_update timestamp with time zone,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

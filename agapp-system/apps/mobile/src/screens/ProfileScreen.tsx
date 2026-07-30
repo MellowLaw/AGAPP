@@ -27,7 +27,6 @@ import {
   Camera,
   Sms,
   Notification,
-  User,
   Lock,
   InfoCircle,
   Danger,
@@ -57,12 +56,6 @@ export function ProfileScreen({ navigation }: any) {
   const [emailSaving, setEmailSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // New settings states
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [editName, setEditName] = useState(profile?.name || '');
-  const [editBarangay, setEditBarangay] = useState(profile?.barangay || '');
-  const [editSaving, setEditSaving] = useState(false);
-
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -79,14 +72,6 @@ export function ProfileScreen({ navigation }: any) {
     ImagePicker.getCameraPermissionsAsync().then(({ status }) => setCameraEnabled(status === 'granted'));
   }, []);
 
-  // Update input defaults when profile changes
-  useEffect(() => {
-    if (profile) {
-      setEditName(profile.name || '');
-      setEditBarangay(profile.barangay || '');
-    }
-  }, [profile]);
-
   const handleToggleCamera = async () => {
     if (cameraEnabled) {
       Linking.openSettings();
@@ -94,28 +79,6 @@ export function ProfileScreen({ navigation }: any) {
     }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     setCameraEnabled(status === 'granted');
-  };
-
-  const handleEditProfile = async () => {
-    if (!editName.trim()) {
-      showToast('Name cannot be empty.', 'error');
-      return;
-    }
-    setEditSaving(true);
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({ name: editName.trim(), barangay: editBarangay.trim() })
-        .eq('id', profile.id);
-      if (error) throw error;
-      await refreshProfile();
-      showToast('Profile updated successfully.', 'success');
-      setEditProfileOpen(false);
-    } catch (err: any) {
-      showToast(err?.message || 'Failed to update profile.', 'error');
-    } finally {
-      setEditSaving(false);
-    }
   };
 
   const handleChangePassword = async () => {
@@ -192,6 +155,7 @@ export function ProfileScreen({ navigation }: any) {
   // Fixed path per user ("{uid}/avatar.jpg") + upsert so re-uploads cleanly
   // overwrite the same storage object instead of accumulating orphaned files.
   const handleChangeAvatar = async () => {
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       showToast('We need access to your photos to set a profile picture.', 'error');
@@ -214,16 +178,7 @@ export function ProfileScreen({ navigation }: any) {
         return;
       }
 
-      const fileName = `${profile.id}/avatar.jpg`;
-      // Delete-then-insert instead of upsert:true. Supabase Storage's upsert
-      // runs an INSERT ... ON CONFLICT DO UPDATE under the hood, which hit
-      // "new row violates row-level security policy" in testing even though
-      // the ownership predicate itself checks out — report-photos/service-
-      // attachments never hit this because every upload there gets a unique
-      // timestamped filename and never conflicts. Plain delete + insert only
-      // exercises the DELETE/INSERT policies, which are the same simple,
-      // proven-working shape already used for report-photos.
-      await supabase.storage.from('profile-photos').remove([fileName]);
+      const fileName = `${profile.id}/${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from('profile-photos')
         .upload(fileName, arrayBuffer, { contentType: 'image/jpeg' });
@@ -526,7 +481,6 @@ export function ProfileScreen({ navigation }: any) {
 
         {(() => {
           const ALL_SETTINGS_ITEMS = [
-            { category: 'Account Settings', label: 'Edit Profile', icon: User, iconType: 'iconsax' as const, onPress: () => setEditProfileOpen(true), keywords: ['edit', 'profile', 'name', 'barangay', 'update'] },
             { category: 'Account Settings', label: 'Change Profile Picture', icon: Camera, iconType: 'iconsax' as const, onPress: handleChangeAvatar, disabled: avatarUploading, keywords: ['avatar', 'picture', 'photo', 'image', 'profile picture', 'camera', 'account'] },
             { category: 'Account Settings', label: 'Change Password', icon: Lock, iconType: 'iconsax' as const, onPress: () => setChangePasswordOpen(true), keywords: ['password', 'change password', 'security', 'credential'] },
             { category: 'Account Settings', label: 'Change Email', icon: Sms, iconType: 'iconsax' as const, onPress: openEmailModal, keywords: ['email', 'change email', 'address', 'mail', 'account'] },
@@ -895,86 +849,6 @@ export function ProfileScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Edit Profile Modal */}
-      <Modal visible={editProfileOpen} transparent animationType="slide" onRequestClose={() => setEditProfileOpen(false)}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-              <TouchableWithoutFeedback>
-                <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, maxHeight: '85%' }}>
-                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                      <Text style={{ fontFamily: 'Octarine-Bold', color: T.text, fontSize: 18 }}>Edit Profile</Text>
-                      <TouchableOpacity onPress={() => setEditProfileOpen(false)}>
-                        <CloseSquare size={22} color={T.textMuted} variant="Bold" />
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>NAME</Text>
-                    <TextInput
-                      value={editName}
-                      onChangeText={setEditName}
-                      style={{
-                        height: 48,
-                        borderRadius: 14,
-                        borderWidth: 1,
-                        borderColor: T.border,
-                        backgroundColor: T.bg,
-                        color: T.text,
-                        fontFamily: 'Inter-Medium',
-                        paddingHorizontal: 16,
-                        fontSize: 14,
-                        marginBottom: 16,
-                      }}
-                    />
-
-                    <Text style={{ color: T.textMuted, fontFamily: 'Octarine-Bold', fontSize: 11, marginBottom: 6 }}>BARANGAY</Text>
-                    <TextInput
-                      value={editBarangay}
-                      onChangeText={setEditBarangay}
-                      style={{
-                        height: 48,
-                        borderRadius: 14,
-                        borderWidth: 1,
-                        borderColor: T.border,
-                        backgroundColor: T.bg,
-                        color: T.text,
-                        fontFamily: 'Inter-Medium',
-                        paddingHorizontal: 16,
-                        fontSize: 14,
-                        marginBottom: 24,
-                      }}
-                    />
-
-                    <TouchableOpacity
-                      onPress={handleEditProfile}
-                      disabled={editSaving}
-                      activeOpacity={0.9}
-                      style={{
-                        height: 52,
-                        borderRadius: 999,
-                        backgroundColor: '#292929',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        opacity: editSaving ? 0.6 : 1,
-                      }}
-                    >
-                      {editSaving ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                      ) : (
-                        <Text style={{ color: '#FFFCF5', fontFamily: 'Octarine-Bold', fontSize: 15 }}>Save Changes</Text>
-                      )}
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Change Password Modal */}
       <Modal visible={changePasswordOpen} transparent animationType="slide" onRequestClose={() => setChangePasswordOpen(false)}>

@@ -63,8 +63,27 @@ CREATE POLICY "Allow users to delete own uploads"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (
-  bucket_id IN ('report-photos', 'service-attachments')
+  bucket_id IN ('report-photos', 'service-attachments', 'profile-photos')
   AND owner = auth.uid()
+);
+
+-- Create bucket for profile-photos
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'profile-photos',
+  'profile-photos',
+  true,
+  5242880, -- 5MB limit
+  ARRAY['image/jpeg', 'image/png', 'image/jpg', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Allow authenticated uploads to profile-photos"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'profile-photos'
+  AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 -- Create bucket for LGU facility images (Facilities Manager in admin)
