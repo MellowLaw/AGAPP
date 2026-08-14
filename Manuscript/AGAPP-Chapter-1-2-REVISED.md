@@ -77,7 +77,7 @@ The study specifically aims:
 
    i) Restricts each LGU to its own records, and each staff member to the modules assigned to them, through access control enforced in the database.
 
-3. To test the project using functionality testing, browser compatibility testing, and device compatibility testing;
+3. To test the functionality, browser compatibility, and mobile device compatibility of the platform;
 
 4. To evaluate the project using ISO/IEC 25010 and the System Usability Scale; and
 

@@ -323,7 +323,11 @@ export default function ReportsPage() {
 
   const handleAcknowledge = () =>
     applyStatusChange('under_review', 'acknowledge',
-      `Report ${selectedReport?.id} acknowledged!`);
+      `Report ${selectedReport?.id} marked as Under Review!`);
+
+  const handleSetInProgress = () =>
+    applyStatusChange('in_progress', 'set in progress',
+      `Report ${selectedReport?.id} marked as In Progress!`);
 
   const handleReassign = () => {
     if (!selectedReport) return;
@@ -662,31 +666,58 @@ export default function ReportsPage() {
                 ) : null}
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-4">
-                  {selectedReport.status === 'submitted' || selectedReport.status === 'under_review' ? (
+                <div className="flex gap-2 pt-4 flex-wrap items-center">
+                  {selectedReport.status !== 'resolved' && selectedReport.status !== 'rejected' && (
                     <>
-                      <Button variant="primary" onClick={handleAcknowledge}>
+                      {selectedReport.status === 'submitted' && (
+                        <Button variant="secondary" onClick={handleAcknowledge}>
+                          <TickSquare className="w-4 h-4 mr-1 text-accent" />
+                          Acknowledge
+                        </Button>
+                      )}
+                      
+                      {selectedReport.status !== 'in_progress' && (
+                        <Button variant="secondary" onClick={handleSetInProgress}>
+                          <Refresh className="w-4 h-4 mr-1 text-blue-500" />
+                          In Progress
+                        </Button>
+                      )}
+
+                      <Button variant="primary" onClick={handleResolve}>
                         <TickSquare className="w-4 h-4 mr-1" />
-                        Acknowledge
+                        Mark Resolved
                       </Button>
+
                       <Button variant="secondary" onClick={handleReassign}>
                         <Refresh className="w-4 h-4 mr-1" />
                         Reassign
                       </Button>
+
                       <Button variant="danger" onClick={handleReject}>
                         <CloseCircle className="w-4 h-4 mr-1" />
                         Reject
                       </Button>
                     </>
-                  ) : selectedReport.status === 'in_progress' ? (
-                    <Button variant="primary" onClick={handleResolve}>
-                      <TickSquare className="w-4 h-4 mr-1" />
-                      Mark Resolved
-                    </Button>
-                  ) : (
-                    <Button variant="secondary" disabled>
-                      Resolved
-                    </Button>
+                  )}
+
+                  {selectedReport.status === 'resolved' && (
+                    <div className="flex items-center gap-3">
+                      <Badge variant="success">Resolved</Badge>
+                      <Button variant="secondary" size="sm" onClick={handleSetInProgress}>
+                        <Refresh className="w-4 h-4 mr-1" />
+                        Re-open (In Progress)
+                      </Button>
+                    </div>
+                  )}
+
+                  {selectedReport.status === 'rejected' && (
+                    <div className="flex items-center gap-3">
+                      <Badge variant="error">Rejected</Badge>
+                      <Button variant="secondary" size="sm" onClick={handleAcknowledge}>
+                        <Refresh className="w-4 h-4 mr-1" />
+                        Re-open (Under Review)
+                      </Button>
+                    </div>
                   )}
                 </div>
               </motion.div>

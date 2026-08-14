@@ -20,7 +20,7 @@ import {
   Discover,
 } from 'iconsax-react-native';
 
-const REDIRECT_SCREEN_ALLOWLIST = ['ReportsTab', 'ServicesTab', 'Explore', 'Forum'];
+const REDIRECT_SCREEN_ALLOWLIST = ['ReportsTab', 'ServicesTab', 'MapTab', 'Explore', 'Forum', 'Profile'];
 
 const ThinkingIndicator = ({ T }: { T: any }) => {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -328,8 +328,9 @@ export function ChatbotScreen() {
                               width: '100%',
                             }}
                             onPress={() => {
-                              if (REDIRECT_SCREEN_ALLOWLIST.includes(m.redirect.screen)) {
-                                navigation.navigate(m.redirect.screen);
+                              const target = m.redirect.screen === 'MapTab' ? 'Explore' : m.redirect.screen;
+                              if (REDIRECT_SCREEN_ALLOWLIST.includes(m.redirect.screen) || REDIRECT_SCREEN_ALLOWLIST.includes(target)) {
+                                navigation.navigate(target);
                               }
                             }}
                             activeOpacity={0.85}

@@ -1,0 +1,119 @@
+@import 'leaflet/dist/leaflet.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Octarine-Bold';
+  src: url('/fonts/Octarine-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter-Medium';
+  src: url('/fonts/Inter-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --bg-base: #FFFCF5;
+    --bg-alt: #F7F3EA;
+    --surface: #FFFFFF;
+    --surface-alt: #FFFDF7;
+    --text-base: #292929;
+    --text-muted: #8A8781;
+    --text-faint: #B5B0A6;
+    --border-theme: #E9E4DA;
+    --chip: #F1ECE1;
+    --accent: #F2E863;
+    --accent-secondary: #1E3A8A;
+    --accent-contrast: #292929;
+    --accent-soft: #FEF9C3;
+    --accent-icon: #E11D48;
+  }
+
+  .dark {
+    --bg-base: #1C1917;
+    --bg-alt: #141210;
+    --surface: #292524;
+    --surface-alt: #23201E;
+    --text-base: #FFFCF5;
+    --text-muted: #A8A29E;
+    --text-faint: #78716C;
+    --border-theme: #3D3835;
+    --chip: #383330;
+    --accent: #F2E863;
+    --accent-secondary: #3B82F6;
+    --accent-contrast: #292929;
+    --accent-soft: #422006;
+    --accent-icon: #FF758F;
+  }
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-base);
+  font-family: 'Inter-Medium', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .font-heading {
+  font-family: 'Octarine-Bold', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(138, 135, 129, 0.2);
+  border-radius: 999px;
+}
+
+/* Print Styles: Isolate Official Receipt Document */
+@media print {
+  body {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide interactive web chrome on print */
+  nav, footer, header, aside, .bottom-nav, button, input, [role="button"], a[href^="/"] {
+    display: none !important;
+  }
+
+  /* Only display print area */
+  body * {
+    visibility: hidden;
+  }
+
+  #official-receipt-print-area, #official-receipt-print-area * {
+    visibility: visible;
+  }
+
+  #official-receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    border: 2px solid #292929 !important;
+  }
+}

@@ -155,7 +155,7 @@ export default function SuperAdminDashboard() {
         icon: People
       },
       {
-        label: 'Reports Seeded',
+        label: 'Reports',
         value: filteredLgus.reduce((sum, l) => sum + l.reports, 0).toString(),
         icon: Danger
       },
@@ -523,11 +523,11 @@ export default function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* LGU Performance Leaderboard */}
+      {/* LGU Performance */}
       <div className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <h3 className="text-2xl font-bold text-text-primary">LGU Performance Leaderboard</h3>
+            <h3 className="text-2xl font-bold text-text-primary">LGU Performance</h3>
             <p className="text-sm font-serif italic text-accent mt-1">Summary of reporting workloads per active LGU</p>
           </div>
           <div className="flex items-center gap-2">
@@ -538,7 +538,7 @@ export default function SuperAdminDashboard() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = 'lgu-leaderboard.csv';
+              a.download = 'lgu-performance.csv';
               a.click();
               URL.revokeObjectURL(url);
             }}>

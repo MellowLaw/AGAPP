@@ -12,6 +12,8 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:admin": "npm run dev --workspace=apps/admin",
     "dev:mobile": "cd apps/mobile && npx expo start",
+    "dev:citizen-web": "npm run dev --workspace=apps/citizen-web",
+    "build:citizen-web": "npm run build --workspace=apps/citizen-web",
     "install:all": "npm install",
     "build:all": "npm run build --workspaces --if-present",
     "build:shared": "npm run build --workspace=packages/shared"
