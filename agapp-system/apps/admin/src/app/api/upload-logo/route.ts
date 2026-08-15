@@ -32,6 +32,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing file or lguId' }, { status: 400 });
     }
 
+    // Check authorization: only SUPER_ADMIN or LGU_ADMIN of this specific LGU
+    const { data: callerProfile } = await supabaseUser
+      .from('users')
+      .select('role, lgu_id')
+      .eq('id', user.id)
+      .single();
+
+    const isSuperAdmin = callerProfile?.role === 'SUPER_ADMIN';
+    const isOwnLguAdmin = callerProfile?.role === 'LGU_ADMIN' && callerProfile.lgu_id === lguId;
+
+    if (!isSuperAdmin && !isOwnLguAdmin) {
+      return NextResponse.json({ error: 'Forbidden: Only the LGU Administrator of this municipality can upload logos.' }, { status: 403 });
+    }
+
+    // Validate file type & size (max 5MB)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Invalid file type. Only JPG, PNG, WEBP, and SVG images are allowed.' }, { status: 400 });
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File exceeds 5MB size limit.' }, { status: 400 });
+    }
+
     // 3. Upload using the service role client (bypasses RLS)
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseService = createClient(
@@ -40,7 +64,7 @@ export async function POST(req: NextRequest) {
     );
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
     const path = `${lguId}/logo-${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabaseService.storage

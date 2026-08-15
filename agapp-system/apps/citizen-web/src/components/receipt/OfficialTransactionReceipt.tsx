@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { InfoCircle } from 'iconsax-react';
 import { getLguLogo } from '../../contexts/LguContext';
 
 interface OfficialTransactionReceiptProps {
@@ -150,8 +151,9 @@ export function OfficialTransactionReceipt({ lgu, transaction }: OfficialTransac
 
       {/* Claim Instructions */}
       <div className="p-4 bg-stone-100/70 border border-stone-200 rounded-xl space-y-1 text-[10.5px] text-stone-700 leading-relaxed mb-6">
-        <span className="font-bold uppercase text-stone-900 text-[10px] block mb-1">
-          📌 Important Claim & Verification Guidelines:
+        <span className="font-bold uppercase text-stone-900 text-[10px] flex items-center gap-1.5 mb-1">
+          <InfoCircle variant="Bold" className="w-3.5 h-3.5 text-stone-700 shrink-0" />
+          <span>Important Claim &amp; Verification Guidelines:</span>
         </span>
         <p>1. <strong>Presentation of Stub:</strong> Present this printed receipt or digital copy on your smartphone to the Municipal Releasing Officer / Cashier.</p>
         <p>2. <strong>Identity Verification:</strong> Bring at least one (1) valid government-issued ID matching the registered applicant name.</p>

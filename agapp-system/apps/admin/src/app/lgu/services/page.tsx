@@ -12,7 +12,9 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
-import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload, Eye, DocumentText, FolderOpen, Warning2, InfoCircle } from 'iconsax-react';
+import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload, Eye, DocumentText, FolderOpen, Warning2, InfoCircle, Building } from 'iconsax-react';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { Skeleton, SkeletonDetailPane } from '@/components/ui/Skeleton';
 
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
 
@@ -79,10 +81,15 @@ const mapServiceRowToItem = (row: any): ServiceRequestItem => {
 };
 
 export default function ServicesPage() {
+  const { profile, effectiveRole, assignedOffice, loading: authLoading } = useAdminAuth();
+  const isPersonnel = effectiveRole === 'lgu-personnel';
+
   const [requestsList, setRequestsList] = useState<ServiceRequestItem[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequestItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [officeFilter, setOfficeFilter] = useState<string>(() => (isPersonnel && assignedOffice) ? assignedOffice : 'all');
+  const [allAvailableOffices, setAllAvailableOffices] = useState<string[]>([]);
   const { showToast, ToastContainer } = useToast();
   const pageSize = 10;
   const [page, setPage] = useState(1);
@@ -97,6 +104,12 @@ export default function ServicesPage() {
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
   const lguId = lguIdFromName(lguNameParam);
 
+  useEffect(() => {
+    if (isPersonnel && assignedOffice) {
+      setOfficeFilter(assignedOffice);
+    }
+  }, [isPersonnel, assignedOffice]);
+
   /**
    * `silent` (realtime listener + conflict path) skips the loading spinner and
    * never falls back to mapped[0], so a colleague's edit landing mid-review
@@ -105,11 +118,19 @@ export default function ServicesPage() {
   const fetchRequests = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!silent) setLoading(true);
     setLoadError(null);
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('service_requests')
       .select('*, lgu_services(requirements, fee_note, processing_time)')
-      .eq('lgu_id', lguId)
-      .order('created_at', { ascending: false });
+      .eq('lgu_id', lguId);
+
+    // If personnel is assigned to an office, lock query to that office
+    const activeOffice = isPersonnel && assignedOffice ? assignedOffice : officeFilter;
+    if (activeOffice && activeOffice !== 'all') {
+      query = query.eq('office_name', activeOffice);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error loading service requests', error);
@@ -123,6 +144,13 @@ export default function ServicesPage() {
 
     const mapped = (data || []).map(mapServiceRowToItem);
     setRequestsList(mapped);
+
+    // Collect available offices for admin filter dropdown
+    const distinctOffices = Array.from(new Set((data || []).map((r: any) => r.office_name).filter(Boolean))) as string[];
+    if (distinctOffices.length > 0) {
+      setAllAvailableOffices(prev => Array.from(new Set([...prev, ...distinctOffices])));
+    }
+
     setSelectedRequest(prev =>
       silent
         ? (prev ? mapped.find(r => r.dbId === prev.dbId) ?? null : null)
@@ -132,11 +160,11 @@ export default function ServicesPage() {
   };
 
   useEffect(() => {
-    fetchRequests();
-    // showToast is deliberately excluded — useToast() returns a new function
-    // reference on every render, so including it here would refetch in a loop.
+    if (!authLoading) {
+      fetchRequests();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lguId]);
+  }, [lguId, officeFilter, assignedOffice, isPersonnel, authLoading]);
 
   // Live refresh so a colleague's status change (or a new citizen application)
   // appears without a manual reload. service_requests is already in the
@@ -152,7 +180,7 @@ export default function ServicesPage() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lguId]);
+  }, [lguId, officeFilter, assignedOffice, isPersonnel]);
 
   // ── Print / DocumentDownload Document ─────────────────────────────────────────────
   const handlePrintDocument = (req: ServiceRequestItem) => {
@@ -392,8 +420,8 @@ export default function ServicesPage() {
         <div className="w-1/2 flex flex-col gap-4 h-full min-h-[600px]">
           {/* Search & Filter */}
           <Card padding="sm" noBorder>
-            <div className="flex gap-3 items-center">
-              <div className="flex-1 relative">
+            <div className="flex flex-wrap gap-2.5 items-center">
+              <div className="flex-1 min-w-[180px] relative">
                 <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
@@ -403,6 +431,27 @@ export default function ServicesPage() {
                   className="w-full pl-9 pr-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-primary/50 h-10"
                 />
               </div>
+
+              {/* Department Filter for Admin or Scoped Desk Badge for Personnel */}
+              {isPersonnel && assignedOffice ? (
+                <div className="px-3.5 py-2 bg-accent text-white rounded-md text-xs font-semibold flex items-center gap-1.5 h-10 whitespace-nowrap shadow-xs">
+                  <Building variant="Bold" className="w-4 h-4 text-white shrink-0" />
+                  <span>Desk:</span>
+                  <span className="font-bold">{assignedOffice}</span>
+                </div>
+              ) : (
+                <select
+                  value={officeFilter}
+                  onChange={(e) => { setOfficeFilter(e.target.value); setPage(1); }}
+                  className="px-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent h-10"
+                >
+                  <option value="all">All Departments</option>
+                  {allAvailableOffices.map((off) => (
+                    <option key={off} value={off}>{off}</option>
+                  ))}
+                </select>
+              )}
+
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -434,9 +483,19 @@ export default function ServicesPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
-              {loading && (
-                <div className="p-4 text-sm text-text-primary">Loading service requests…</div>
-              )}
+              {loading && Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="p-5 rounded-xl border border-theme bg-surface flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="space-y-2 pt-2 border-t border-theme/50">
+                    <Skeleton className="h-3.5 w-1/2" />
+                    <Skeleton className="h-3.5 w-2/3" />
+                  </div>
+                </div>
+              ))}
               {loadError && !loading && (
                 <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading requests: {loadError}</div>
               )}
@@ -484,15 +543,18 @@ export default function ServicesPage() {
 
         {/* Right Panel - Request Details */}
         <div className="w-1/2">
-          <Card noBorder className="rounded-[20px]">
-            {selectedRequest ? (
-              <motion.div
-                key={selectedRequest.id}
-                initial={{ opacity: 0, x: 15 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
+          {loading ? (
+            <SkeletonDetailPane />
+          ) : (
+            <Card noBorder className="rounded-[20px]">
+              {selectedRequest ? (
+                <motion.div
+                  key={selectedRequest.id}
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
                 {/* Header */}
                 <div className="flex items-start justify-between pb-4">
                   <div>
@@ -709,6 +771,7 @@ export default function ServicesPage() {
               </div>
             )}
           </Card>
+          )}
         </div>
       </div>
     </DashboardLayout>

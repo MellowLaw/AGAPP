@@ -21,7 +21,8 @@ import { STATUS_COLORS } from '@/components/map/colors';
 import type { LguRankingDatum } from '@/components/charts/LguRankingBarChart';
 import type { StatusBreakdownDatum } from '@/components/charts/StatusBreakdownChart';
 import { NeedsAttentionPanel, type NeedsAttentionData } from '@/components/charts/NeedsAttentionPanel';
-import { Building, People, Danger, DocumentText, Add, DocumentDownload, Printer } from 'iconsax-react';
+import { Building, People, Danger, DocumentText, Add, DocumentDownload, Printer, CloseCircle } from 'iconsax-react';
+import { SkeletonStats } from '@/components/ui/Skeleton';
 
 const LguRankingBarChart = dynamic(
   () => import('@/components/charts/LguRankingBarChart').then((m) => m.LguRankingBarChart),
@@ -322,31 +323,37 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <Card noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
-                  <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
-                    <Icon className="w-4 h-4 text-accent" variant="Bold" />
+      {loading ? (
+        <div className="mb-8">
+          <SkeletonStats count={4} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          {stats.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Card noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-semibold text-text-muted">{stat.label}</p>
+                    <div className="p-1.5 bg-surface-alt rounded-md border border-theme">
+                      <Icon className="w-4 h-4 text-accent" variant="Bold" />
+                    </div>
                   </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
-                </div>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
+                  <div className="mt-4">
+                    <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
+                  </div>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Quick Actions Panel */}
       <div className="mb-8">
@@ -390,7 +397,10 @@ export default function SuperAdminDashboard() {
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-neutral-950 transition-colors">
                 <Printer className="w-5 h-5" />
               </div>
-              <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors">Print PDF 🖨️</span>
+              <span className="text-[11px] font-mono text-text-muted group-hover:text-accent transition-colors flex items-center gap-1">
+                <span>Print PDF</span>
+                <Printer variant="Bold" className="w-3.5 h-3.5" />
+              </span>
             </div>
             <div>
               <p className="font-bold text-sm text-text-primary group-hover:text-accent transition-colors">Printable Reports</p>
@@ -640,9 +650,10 @@ export default function SuperAdminDashboard() {
               {/* Close Button */}
               <button
                 onClick={() => setShowPrintModal(false)}
-                className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition-colors"
+                className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition-colors flex items-center gap-1.5"
               >
-                Close ✕
+                <span>Close</span>
+                <CloseCircle className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

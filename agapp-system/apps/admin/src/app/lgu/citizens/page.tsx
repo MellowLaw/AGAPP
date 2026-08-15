@@ -14,6 +14,7 @@ import {
   Danger, Sms, Location, InfoCircle, ShieldTick, Warning2,
   Forbidden2, ShieldCross, MessageQuestion, Refresh, People,
 } from 'iconsax-react';
+import { Skeleton, SkeletonTable } from '@/components/ui/Skeleton';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -378,7 +379,7 @@ export default function CitizensPage() {
           {activeTab !== 'appeals' && (
             <div className="space-y-4 pt-2">
               {loading ? (
-                <div className="p-8 text-center text-text-muted font-medium">Loading citizen roster...</div>
+                <SkeletonTable rows={6} cols={6} />
               ) : filteredCitizens.length === 0 ? (
                 <div className="p-12 text-center text-text-muted">
                   <User className="w-12 h-12 mx-auto mb-3 text-text-faint" />
@@ -452,7 +453,24 @@ export default function CitizensPage() {
           {activeTab === 'appeals' && (
             <div className="space-y-4 pt-2">
               {loading ? (
-                <div className="p-8 text-center text-text-muted font-medium">Loading appeals queue...</div>
+                <div className="divide-y divide-border">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="py-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <Skeleton className="h-5 w-40" />
+                          <Skeleton className="h-3 w-56" />
+                        </div>
+                        <Skeleton className="h-6 w-28 rounded-full" />
+                      </div>
+                      <Skeleton className="h-16 w-full rounded-xl" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-44 rounded-xl" />
+                        <Skeleton className="h-8 w-28 rounded-xl" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : appeals.length === 0 ? (
                 <div className="p-12 text-center text-text-muted">
                   <MessageQuestion className="w-12 h-12 mx-auto mb-3 text-text-faint" />
@@ -521,14 +539,16 @@ export default function CitizensPage() {
             </p>
 
             {(modalAction === 'ban' || modalAction === 'restrict') && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium">
-                ⚠️ <span className="font-bold">Are you sure you want to perform this action?</span> Banned accounts are completely blocked from logging in or using the AGAPP mobile client. Restricted accounts have restricted community features.
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium flex items-start gap-2">
+                <Warning2 variant="Bold" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span><strong className="font-bold">Are you sure you want to perform this action?</strong> Banned accounts are completely blocked from logging in or using the AGAPP mobile client. Restricted accounts have restricted community features.</span>
               </div>
             )}
 
             {modalAction === 'reactivate' && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium">
-                ℹ️ <span className="font-bold">Are you sure you want to reactivate this account?</span> This will restore their status to active and grant full access to their mobile citizen account.
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium flex items-start gap-2">
+                <InfoCircle variant="Bold" className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                <span><strong className="font-bold">Are you sure you want to reactivate this account?</strong> This will restore their status to active and grant full access to their mobile citizen account.</span>
               </div>
             )}
 
@@ -603,14 +623,16 @@ export default function CitizensPage() {
             </div>
 
             {appealAction === 'approve' && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium">
-                ℹ️ <span className="font-bold">Approving this appeal</span> will immediately reactivate the citizen&apos;s account and lift all moderation restrictions.
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-xs text-green-600 dark:text-green-400 leading-relaxed font-medium flex items-start gap-2">
+                <InfoCircle variant="Bold" className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                <span><strong className="font-bold">Approving this appeal</strong> will immediately reactivate the citizen&apos;s account and lift all moderation restrictions.</span>
               </div>
             )}
 
             {appealAction === 'deny' && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium">
-                ⚠️ <span className="font-bold">Denying this appeal</span> will keep the account restricted or banned. Please provide a brief decision note.
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-600 dark:text-red-400 leading-relaxed font-medium flex items-start gap-2">
+                <Warning2 variant="Bold" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span><strong className="font-bold">Denying this appeal</strong> will keep the account restricted or banned. Please provide a brief decision note.</span>
               </div>
             )}
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Home, Briefcase, Danger, Scroll, DocumentText, Messages, Map, Call, TrendUp, User, ArrowUp2, ArrowDown2, TickCircle } from 'iconsax-react';
+import { Home, Briefcase, Danger, Scroll, DocumentText, Messages, Map, Call, TrendUp, User, ArrowUp2, ArrowDown2, TickCircle, Colorfilter } from 'iconsax-react';
 
 interface ColorPaletteSelectorProps {
   primaryColor: string;
@@ -178,7 +178,7 @@ export function ColorPaletteSelector({
         <div className="flex items-center justify-between p-4 bg-surface border border-theme rounded-2xl shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-bold text-sm">
-              🎨
+              <Colorfilter variant="Bold" className="w-5 h-5" />
             </div>
             <div>
               <h4 className="text-sm font-bold text-text-primary uppercase tracking-wider">
@@ -445,7 +445,7 @@ export function ColorPaletteSelector({
                     Magandang Hapon,
                   </div>
                   <div className="text-[11px] font-extrabold leading-tight" style={{ color: isPreviewDark ? '#FFFCF5' : '#292929' }}>
-                    Citizen! 🐻
+                    Citizen!
                   </div>
                 </div>
                 {/* LGU Seal circle */}

@@ -15,7 +15,9 @@ import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
 import { timeAgo } from '@/lib/timeAgo';
 import { ReportsMap } from '@/components/map';
 import { ClickableImage } from '@/components/ui/ClickableImage';
-import { Danger, Location, User, Calendar, TickSquare, CloseCircle, Refresh, SearchNormal1, Filter, DocumentDownload } from 'iconsax-react';
+import { Danger, Location, User, Calendar, TickSquare, CloseCircle, Refresh, SearchNormal1, Filter, DocumentDownload, Building } from 'iconsax-react';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { Skeleton, SkeletonDetailPane } from '@/components/ui/Skeleton';
 
 type ReportStatus = 'submitted' | 'under_review' | 'in_progress' | 'resolved' | 'rejected';
 
@@ -130,15 +132,33 @@ const mapReportRowToItem = (row: any): ReportItem => {
 };
 
 export default function ReportsPage() {
+  const { profile, effectiveRole, assignedOffice, loading: authLoading } = useAdminAuth();
+  const isPersonnel = effectiveRole === 'lgu-personnel';
+
   const [reportsList, setReportsList] = useState<ReportItem[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [officeFilter, setOfficeFilter] = useState<string>(() => (isPersonnel && assignedOffice) ? assignedOffice : 'all');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { showToast, ToastContainer } = useToast();
   const params = useSearchParams();
-  const offices = ['Engineering Office', 'Health Office', 'MDRRMO', 'Agriculture'];
+  const offices = [
+    'Engineering Office',
+    'Health Office',
+    'MDRRMO',
+    'Agriculture',
+    'MENRO / Sanitation',
+    'BPLO',
+    'Civil Registrar',
+    "Treasurer's Office",
+    "Assessor's Office",
+    'MSWDO',
+    'Barangay Affairs',
+    'Municipal Planning and Development Office',
+    'Office of the Building Official (OBO)',
+  ];
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignOffice, setAssignOffice] = useState(offices[0]);
   const pageSize = 10;
@@ -147,6 +167,12 @@ export default function ReportsPage() {
 
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
   const lguId = React.useMemo(() => lguIdFromName(lguNameParam), [lguNameParam]);
+
+  useEffect(() => {
+    if (isPersonnel && assignedOffice) {
+      setOfficeFilter(assignedOffice);
+    }
+  }, [isPersonnel, assignedOffice]);
 
   // Citizen legitimacy info for the selected report. RLS: an LGU admin can
   // read users in their own LGU, so this lookup works here; a null citizen_id
@@ -239,12 +265,49 @@ export default function ReportsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [lguId, fetchReports]);
 
+  const isCategoryForOffice = (dbCategory: string, office: string): boolean => {
+    const norm = (office || '').toLowerCase();
+    const cat = (dbCategory || '').toLowerCase();
+    if (norm.includes('engineer') || norm.includes('building') || norm.includes('public works') || norm.includes('obo')) {
+      return cat.includes('pothole') || cat.includes('drainage') || cat.includes('pole') || cat.includes('road') || cat.includes('structure');
+    }
+    if (norm.includes('health') || norm.includes('sanitation') || norm.includes('menro')) {
+      return cat.includes('garbage') || cat.includes('waste') || cat.includes('sanitation') || cat.includes('health') || cat.includes('septic');
+    }
+    if (norm.includes('mdrrmo') || norm.includes('disaster') || norm.includes('emergency')) {
+      return cat.includes('flood') || cat.includes('disaster') || cat.includes('accident') || cat.includes('hazard') || cat.includes('tree');
+    }
+    if (norm.includes('agriculture') || norm.includes('vet')) {
+      return cat.includes('animal') || cat.includes('pet') || cat.includes('crop') || cat.includes('livestock');
+    }
+    if (norm.includes('bplo') || norm.includes('licensing') || norm.includes('business')) {
+      return cat.includes('business') || cat.includes('permit') || cat.includes('vendor') || cat.includes('commercial');
+    }
+    if (norm.includes('barangay') || norm.includes('peace') || norm.includes('order')) {
+      return cat.includes('community') || cat.includes('dispute') || cat.includes('disturbance');
+    }
+    if (norm.includes('mswdo') || norm.includes('social')) {
+      return cat.includes('assistance') || cat.includes('welfare') || cat.includes('dweller');
+    }
+    return false;
+  };
+
   const filteredReports = reportsList.filter(r => {
     const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          r.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterStatus === 'all' || r.status === filterStatus;
-    return matchesSearch && matchesFilter;
+
+    let matchesOffice = true;
+    if (officeFilter !== 'all') {
+      if (officeFilter === 'unassigned') {
+        matchesOffice = !r.assignedOffice;
+      } else {
+        matchesOffice = r.assignedOffice === officeFilter || (!r.assignedOffice && isCategoryForOffice(r.dbCategory, officeFilter));
+      }
+    }
+
+    return matchesSearch && matchesFilter && matchesOffice;
   });
   const pageCount = Math.max(1, Math.ceil(filteredReports.length / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -410,8 +473,8 @@ export default function ReportsPage() {
         <div className="w-1/2 flex flex-col gap-4 h-full min-h-[600px]">
           {/* Search & Filter */}
           <Card padding="sm" noBorder>
-            <div className="flex gap-3 items-center">
-              <div className="flex-1 relative">
+            <div className="flex flex-wrap gap-2.5 items-center">
+              <div className="flex-1 min-w-[180px] relative">
                 <SearchNormal1 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
                 <input
                   type="text"
@@ -421,6 +484,32 @@ export default function ReportsPage() {
                   className="w-full pl-9 pr-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-primary/50 h-10"
                 />
               </div>
+
+              {/* Department Filter with Desk indicator */}
+              {isPersonnel && assignedOffice && (
+                <div className="px-3 py-2 bg-accent text-white rounded-md text-xs font-semibold flex items-center gap-1.5 h-10 whitespace-nowrap shadow-xs">
+                  <Building variant="Bold" className="w-3.5 h-3.5 text-white shrink-0" />
+                  <span>Desk:</span>
+                  <span className="font-bold">{assignedOffice}</span>
+                </div>
+              )}
+              <select
+                value={officeFilter}
+                onChange={(e) => { setOfficeFilter(e.target.value); setPage(1); }}
+                className="px-3 py-2 bg-surface-alt text-text-primary rounded-md text-sm border-0 focus:outline-none focus:ring-1 focus:ring-accent h-10"
+              >
+                <option value="all">All Departments ({reportsList.length})</option>
+                {isPersonnel && assignedOffice && (
+                  <option value={assignedOffice}>My Desk ({assignedOffice})</option>
+                )}
+                {offices
+                  .filter((off) => off !== assignedOffice)
+                  .map((off) => (
+                    <option key={off} value={off}>{off}</option>
+                  ))}
+                <option value="unassigned">Unassigned</option>
+              </select>
+
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -450,9 +539,19 @@ export default function ReportsPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
-              {loading && (
-                <div className="p-4 text-sm text-text-primary">Loading reports…</div>
-              )}
+              {loading && Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="p-5 rounded-xl border border-theme bg-surface flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="space-y-2 pt-2 border-t border-theme/50">
+                    <Skeleton className="h-3.5 w-1/2" />
+                    <Skeleton className="h-3.5 w-2/3" />
+                  </div>
+                </div>
+              ))}
               {loadError && !loading && (
                 <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading reports: {loadError}</div>
               )}
@@ -497,15 +596,18 @@ export default function ReportsPage() {
 
         {/* Right Panel - Report Details */}
         <div className="w-1/2">
-          <Card noBorder className="rounded-[20px]">
-            {selectedReport ? (
-              <motion.div
-                key={selectedReport.id}
-                initial={{ opacity: 0, x: 15 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
+          {loading ? (
+            <SkeletonDetailPane />
+          ) : (
+            <Card noBorder className="rounded-[20px]">
+              {selectedReport ? (
+                <motion.div
+                  key={selectedReport.id}
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
                 {/* Header */}
                 <div className="flex items-start justify-between pb-4">
                   <div>
@@ -727,6 +829,7 @@ export default function ReportsPage() {
               </div>
             )}
           </Card>
+          )}
         </div>
       </div>
       {assignOpen && (

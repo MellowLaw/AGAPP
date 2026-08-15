@@ -608,13 +608,17 @@ export function ServicesScreen({ route, navigation }: any) {
                   borderWidth: 1,
                   borderColor: 'rgba(245, 158, 11, 0.3)',
                 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <Danger size={14} variant="Bold" color={isDarkMode ? '#FBBF24' : '#D97706'} />
+                    <Text style={{ fontFamily: 'Octarine-Bold', fontSize: 12, color: isDarkMode ? '#FBBF24' : '#D97706' }}>In-Person Pickup Check:</Text>
+                  </View>
                   <Text style={{
                     fontFamily: 'Inter-Medium',
                     fontSize: 12,
                     color: isDarkMode ? '#FBBF24' : '#D97706',
                     lineHeight: 16,
                   }}>
-                    ⚠️ <Text style={{ fontFamily: 'Octarine-Bold' }}>In-Person Pickup Check:</Text> You must bring the physical original copies/photocopies of all required documents when claiming at the Municipal Hall counter.
+                    You must bring the physical original copies/photocopies of all required documents when claiming at the Municipal Hall counter.
                   </Text>
                 </View>
               </>

@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useNavBadges, NavSection } from './NavBadgeContext';
 import { lguIdFromName } from '@/lib/lgu';
 import type { AdminModule } from '@/lib/modules';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const ROLE_LABEL: Record<SidebarProps['role'], string> = {
   'lgu-admin': 'LGU Admin',
@@ -119,12 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   const params = useSearchParams();
   const lguParam = (lguName || params?.get('lguName') || '').toString();
 
-  const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
-  // Every /lgu/* page hardcodes role="lgu-admin" on DashboardLayout, so the
-  // prop can't be trusted once personnel share those pages — read the real
-  // role and grants from the session instead.
-  const [dbRole, setDbRole] = useState<string | null>(null);
-  const [modules, setModules] = useState<string[]>([]);
+  const { profile, effectiveRole, modules, signOut } = useAdminAuth();
   const { showToast, ToastContainer } = useToast();
   const { counts } = useNavBadges();
   const [lguLogo, setLguLogo] = useState<string | null>(null);
@@ -151,33 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
     fetchLguLogo();
   }, [lguParam]);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('name, email, role, module_permissions')
-          .eq('id', authUser.id)
-          .single();
-
-        setUserProfile({
-          name: profile?.name || authUser.user_metadata?.name || 'Admin User',
-          email: profile?.email || authUser.email || 'admin@lgu.gov.ph',
-        });
-        setDbRole(profile?.role ?? null);
-        setModules(profile?.module_permissions ?? []);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  const isPersonnel = dbRole === 'LGU_PERSONNEL';
-  const effectiveRole: SidebarProps['role'] =
-    dbRole === 'SUPER_ADMIN' ? 'super-admin'
-    : isPersonnel ? 'lgu-personnel'
-    : dbRole === 'LGU_ADMIN' ? 'lgu-admin'
-    : role;
+  const isPersonnel = effectiveRole === 'lgu-personnel';
 
   const navItems = React.useMemo(() => {
     if (effectiveRole === 'super-admin') return SUPER_ADMIN_NAV;
@@ -199,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     router.push('/');
   };
 
@@ -233,12 +203,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
             {lguLogo ? (
               <img src={lguLogo} alt="LGU Seal" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-accent">{initials(userProfile?.name || '?')}</span>
+              <span className="text-xs font-bold text-accent">{initials(profile?.name || '?')}</span>
             )}
           </div>
           <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <p className="text-sm font-semibold text-text-primary truncate">{userProfile?.name || 'Loading...'}</p>
-            <p className="text-xs font-mono text-text-muted truncate" title={userProfile?.email || ''}>{userProfile?.email || 'Please wait'}</p>
+            <p className="text-sm font-semibold text-text-primary truncate">{profile?.name || 'Admin User'}</p>
+            <p className="text-xs font-mono text-text-muted truncate" title={profile?.email || ''}>{profile?.email || ''}</p>
           </div>
         </div>
         <motion.button

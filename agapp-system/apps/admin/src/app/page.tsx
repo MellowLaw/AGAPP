@@ -21,7 +21,23 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEMO_ACCOUNTS = [
   { role: 'SUPER_ADMIN', label: 'Super Admin', email: 'superadmin@agapp.gov.ph' },
   { role: 'LGU_ADMIN', label: 'LGU Admin', email: 'admin@liliw.gov.ph' },
-  { role: 'LGU_PERSONNEL', label: 'LGU Personnel', email: 'personnel@liliw.gov.ph' },
+  { role: 'LGU_PERSONNEL', label: 'LGU Personnel (General)', email: 'personnel@liliw.gov.ph' },
+];
+
+const DEPARTMENT_STAFF_ACCOUNTS = [
+  { office: 'Civil Registrar', email: 'civilregistrar@liliw.gov.ph' },
+  { office: 'BPLO (Business Permits)', email: 'bplo@liliw.gov.ph' },
+  { office: "Treasurer's Office", email: 'treasurer@liliw.gov.ph' },
+  { office: 'Engineering Office', email: 'engineering@liliw.gov.ph' },
+  { office: 'MDRRMO (Disaster Risk / Emergency)', email: 'mdrrmo@liliw.gov.ph' },
+  { office: 'Health Office (RHU)', email: 'health@liliw.gov.ph' },
+  { office: "Assessor's Office", email: 'assessor@liliw.gov.ph' },
+  { office: 'MSWDO (Social Welfare)', email: 'mswdo@liliw.gov.ph' },
+  { office: 'Agriculture & Vet Office', email: 'agriculture@liliw.gov.ph' },
+  { office: 'MENRO / Sanitation', email: 'menro@liliw.gov.ph' },
+  { office: 'Barangay Affairs', email: 'barangayaffairs@liliw.gov.ph' },
+  { office: 'Planning & Dev (MPDO)', email: 'mpdo@liliw.gov.ph' },
+  { office: 'Building Official (OBO)', email: 'obo@liliw.gov.ph' },
 ];
 
 // Client-side brute-force friction: after this many failed attempts, lock
@@ -390,6 +406,31 @@ export default function UnifiedLoginPage() {
                   <span className="text-[13px] text-[#7a7771]">{acct.email}</span>
                 </button>
               ))}
+            </div>
+
+            {/* Department Desks Quick Selector */}
+            <div className="mt-4 pt-3 border-t border-[#e5e2d9]/60">
+              <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-[#a3a097] mb-2">
+                Department Desk Accounts (Liliw):
+              </label>
+              <div className="relative">
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setEmail(e.target.value);
+                    setPassword('password123');
+                  }}
+                  className="w-full h-11 px-3.5 border-[1.5px] border-[#e5e2d9] rounded-[10px] bg-[#fffcf5] text-[13px] font-semibold text-[#292929] outline-none focus:border-[#292929] transition-colors cursor-pointer"
+                >
+                  <option value="" disabled>Select Department Staff to Autofill…</option>
+                  {DEPARTMENT_STAFF_ACCOUNTS.map((d) => (
+                    <option key={d.email} value={d.email}>
+                      {d.office} — {d.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

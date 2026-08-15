@@ -117,3 +117,36 @@ h1, h2, h3, .font-heading {
     border: 2px solid #292929 !important;
   }
 }
+
+/* ── Skeleton Shimmer Effects ─────────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-alt) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--bg-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-alt) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    var(--surface-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

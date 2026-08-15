@@ -12,8 +12,9 @@ import { supabase } from '@/lib/supabase';
 import { formatAvgTurnaround } from '@/lib/turnaround';
 import { lguIdFromName } from '@/lib/lgu';
 import { listRegions, provincesOfRegion, citiesOfProvince } from '@/data/ph-locations';
-import { Add, Eye, CloseCircle, DocumentDownload, ArrowLeft, ArrowRight, TickCircle, Location, Colorfilter, UserAdd, ClipboardText, Key } from 'iconsax-react';
+import { Add, Eye, EyeSlash, CloseCircle, DocumentDownload, ArrowLeft, ArrowRight, TickCircle, Location, Colorfilter, UserAdd, ClipboardText, Key } from 'iconsax-react';
 import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
+import { SkeletonTable } from '@/components/ui/Skeleton';
 
 function generateStrongPassword(length = 16): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=';
@@ -161,6 +162,80 @@ export default function SuperLgusPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Super Admin LGU Admin Reset Password States (Pattern 1)
+  const [resettingLguAdminFor, setResettingLguAdminFor] = useState<Lgu | null>(null);
+  const [targetLguAdminUser, setTargetLguAdminUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [loadingLguAdmin, setLoadingLguAdmin] = useState(false);
+  const [newLguAdminPassword, setNewLguAdminPassword] = useState('');
+  const [showLguAdminPassword, setShowLguAdminPassword] = useState(false);
+  const [updatingLguAdminPass, setUpdatingLguAdminPass] = useState(false);
+
+  const handleOpenResetLguAdmin = async (lgu: Lgu) => {
+    setResettingLguAdminFor(lgu);
+    setTargetLguAdminUser(null);
+    setNewLguAdminPassword('');
+    setShowLguAdminPassword(false);
+    setLoadingLguAdmin(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('lgu_id', lgu.id)
+        .eq('role', 'LGU_ADMIN')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        showToast(`No LGU Administrator account found for ${lgu.name}.`, 'error');
+        setResettingLguAdminFor(null);
+        return;
+      }
+      setTargetLguAdminUser(data);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to fetch LGU Administrator account.', 'error');
+      setResettingLguAdminFor(null);
+    } finally {
+      setLoadingLguAdmin(false);
+    }
+  };
+
+  const handleUpdateLguAdminPassword = async () => {
+    if (!targetLguAdminUser || !newLguAdminPassword || newLguAdminPassword.length < 8) {
+      showToast('Password must be at least 8 characters.', 'info');
+      return;
+    }
+
+    setUpdatingLguAdminPass(true);
+    try {
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: targetLguAdminUser.id,
+          newPassword: newLguAdminPassword,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to reset password.');
+      }
+
+      showToast(`Admin password for ${targetLguAdminUser.email} updated successfully!`, 'success');
+      setResettingLguAdminFor(null);
+      setTargetLguAdminUser(null);
+      setNewLguAdminPassword('');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to update LGU Admin password.', 'error');
+    } finally {
+      setUpdatingLguAdminPass(false);
+    }
+  };
 
   // Confirmation Modal States
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -512,6 +587,9 @@ export default function SuperLgusPage() {
               <ArrowLeft className="w-4 h-4 mr-1" /> Back to Directory
             </Button>
             <div className="flex items-center gap-3">
+              <Button variant="secondary" size="sm" onClick={() => handleOpenResetLguAdmin(selectedLguForEdit)}>
+                <Key className="w-4 h-4 mr-1 text-accent" /> Reset Admin Password
+              </Button>
               <Button variant="ghost" onClick={() => setSelectedLguForEdit(null)}>Cancel</Button>
               <Button onClick={() => triggerConfirm('Confirm Settings Update', `Are you sure you want to save the configurations for ${selectedLguForEdit.name}?`, handleSaveLgu)}>Save Changes</Button>
             </div>
@@ -879,47 +957,61 @@ export default function SuperLgusPage() {
               </Button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-                <thead>
-                  <tr>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Users</th>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Avg Response</th>
-                    <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Status</th>
-                    <th className="text-right pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((lgu) => (
-                    <tr key={lgu.id} className="bg-surface-alt hover:bg-surface transition-colors">
-                      <td className="py-3 px-4 rounded-l-md font-medium text-text-primary">{lgu.name}</td>
-                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.reports}</td>
-                      <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.requests}</td>
-                      <td className="py-3 px-4 text-sm text-text-muted">{lgu.responseTime}</td>
-                      <td className="py-3 px-4">
-                        <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
-                          {lgu.status === 'active' ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 rounded-r-md">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
-                            <Eye variant="Bold" className="w-4 h-4 mr-1" /> Configure
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={() => triggerConfirm('Confirm LGU Status Update', `Are you sure you want to ${lgu.status === 'active' ? 'deactivate' : 'activate'} LGU ${lgu.name}?`, () => toggleActive(lgu.id))}>
-                            <CloseCircle className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
-                          </Button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className="py-2">
+                <SkeletonTable rows={5} cols={7} />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
+                  <thead>
+                    <tr>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">LGU</th>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Users</th>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Reports</th>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Requests</th>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Avg Response</th>
+                      <th className="text-left pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Status</th>
+                      <th className="text-right pb-2 px-4 text-xs font-semibold text-text-faint uppercase tracking-wider">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((lgu) => (
+                      <tr key={lgu.id} className="bg-surface-alt hover:bg-surface transition-colors">
+                        <td className="py-3 px-4 rounded-l-md font-medium text-text-primary">{lgu.name}</td>
+                        <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.users.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.reports}</td>
+                        <td className="py-3 px-4 text-sm font-mono text-text-muted">{lgu.requests}</td>
+                        <td className="py-3 px-4 text-sm text-text-muted">{lgu.responseTime}</td>
+                        <td className="py-3 px-4">
+                          <Badge variant={lgu.status === 'active' ? 'success' : 'default'}>
+                            {lgu.status === 'active' ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 rounded-r-md">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Reset LGU Admin Password"
+                              onClick={() => handleOpenResetLguAdmin(lgu)}
+                            >
+                              <Key className="w-4 h-4 text-accent" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedLguForEdit({ ...lgu })}>
+                              <Eye variant="Bold" className="w-4 h-4 mr-1" /> Configure
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => triggerConfirm('Confirm LGU Status Update', `Are you sure you want to ${lgu.status === 'active' ? 'deactivate' : 'activate'} LGU ${lgu.name}?`, () => toggleActive(lgu.id))}>
+                              <CloseCircle className="w-4 h-4 mr-1" /> {lgu.status === 'active' ? 'Deactivate' : 'Activate'}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </>
       )}
@@ -944,9 +1036,9 @@ export default function SuperLgusPage() {
                 <button
                   onClick={closeWizard}
                   disabled={creating}
-                  className="text-text-faint hover:text-accent text-2xl font-bold disabled:opacity-40"
+                  className="text-text-faint hover:text-accent disabled:opacity-40"
                 >
-                  ✕
+                  <CloseCircle className="w-6 h-6" />
                 </button>
               </div>
 
@@ -1376,6 +1468,107 @@ export default function SuperLgusPage() {
               <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
               <Button onClick={() => { confirmAction?.(); setConfirmOpen(false); }}>Yes, Save Changes</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Super Admin Reset LGU Admin Password Modal (Pattern 1) */}
+      {resettingLguAdminFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface rounded-2xl border border-theme p-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between mb-5 pb-3 border-b border-theme">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+                  <Key variant="Bold" className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Reset LGU Admin Password</h3>
+                  <p className="text-xs text-text-muted">Direct password update for Municipal Administrator</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResettingLguAdminFor(null)}
+                className="text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <CloseCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {loadingLguAdmin ? (
+              <div className="py-8 text-center text-sm text-text-muted animate-pulse">
+                Fetching administrator account details...
+              </div>
+            ) : targetLguAdminUser ? (
+              <>
+                {/* LGU & Admin Summary */}
+                <div className="p-3.5 rounded-xl bg-surface-alt border border-theme mb-5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-text-primary">{resettingLguAdminFor.name}</span>
+                    <Badge variant="info">LGU ADMIN</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-text-muted">Administrator:</span>
+                    <span className="font-semibold text-text-primary">{targetLguAdminUser.name || 'LGU Administrator'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-text-muted">Login Email:</span>
+                    <span className="text-accent font-semibold">{targetLguAdminUser.email}</span>
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-text-primary uppercase tracking-wider">
+                        New Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setNewLguAdminPassword(generateStrongPassword(16))}
+                        className="text-xs text-accent hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        Generate Secure Password
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showLguAdminPassword ? 'text' : 'password'}
+                        value={newLguAdminPassword}
+                        onChange={(e) => setNewLguAdminPassword(e.target.value)}
+                        placeholder="Minimum 8 characters"
+                        className="w-full h-11 pl-3.5 pr-10 bg-surface border border-theme rounded-xl text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLguAdminPassword(!showLguAdminPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
+                      >
+                        {showLguAdminPassword ? <EyeSlash className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-text-faint mt-1.5">
+                      Must be at least 8 characters. The LGU Administrator will immediately use this new password to sign in.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-theme">
+                  <Button variant="ghost" onClick={() => setResettingLguAdminFor(null)} disabled={updatingLguAdminPass}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpdateLguAdminPassword} disabled={updatingLguAdminPass || !newLguAdminPassword || newLguAdminPassword.length < 8}>
+                    {updatingLguAdminPass ? 'Updating...' : 'Update Admin Password'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="py-6 text-center text-sm text-accent">
+                No administrator profile found for this municipality.
+              </div>
+            )}
           </div>
         </div>
       )}

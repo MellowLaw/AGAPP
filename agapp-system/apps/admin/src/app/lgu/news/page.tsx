@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
-import { Book, Add, Calendar, Clock, Paperclip, Eye, Trash, Edit, Send, Image as ImageIcon, DocumentText, CloseCircle } from 'iconsax-react';
+import { Book, Add, Calendar, Clock, Paperclip, Eye, Trash, Edit, Send, Image as ImageIcon, DocumentText, CloseCircle, Danger, Notification } from 'iconsax-react';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 type AnnouncementStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 
@@ -647,7 +648,7 @@ export default function NewsPage() {
             {/* Warning / Explanation Banners to prevent confusion */}
             {formType === 'advisory' && (
               <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/50 flex items-start gap-3">
-                <span className="text-red-500 text-lg mt-0.5">⚠️</span>
+                <Danger variant="Bold" className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-bold text-red-600 dark:text-red-400">CRITICAL: Creating LGU Advisory</h3>
                   <p className="text-xs text-red-600/80 dark:text-red-300/80 mt-0.5 leading-relaxed">
@@ -658,7 +659,7 @@ export default function NewsPage() {
             )}
             {formType === 'announcement' && (
               <div className="mb-6 p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/50 flex items-start gap-3">
-                <span className="text-indigo-500 text-lg mt-0.5">📢</span>
+                <Notification variant="Bold" className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-bold text-indigo-600 dark:text-indigo-400">Creating LGU Announcement</h3>
                   <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
@@ -669,7 +670,7 @@ export default function NewsPage() {
             )}
             {formType === 'news' && (
               <div className="mb-6 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/50 flex items-start gap-3">
-                <span className="text-emerald-500 text-lg mt-0.5">📰</span>
+                <DocumentText variant="Bold" className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-bold text-emerald-600 dark:text-emerald-400">Creating Public News Article</h3>
                   <p className="text-xs text-emerald-600/80 dark:text-emerald-300/80 mt-0.5 leading-relaxed">
@@ -1034,7 +1035,23 @@ export default function NewsPage() {
                     </div>
 
                     <div className="space-y-3 flex-1 overflow-y-auto max-h-[700px] pr-1">
-                      {items.map((announcement) => (
+                      {loading && Array.from({ length: 3 }).map((_, i) => (
+                        <Card key={i} className={cardTintClass} padding="sm">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-4 w-16 rounded-full" />
+                            </div>
+                            <Skeleton className="h-3 w-full" />
+                            <Skeleton className="h-3 w-2/3" />
+                            <div className="flex items-center justify-between pt-2 border-t border-theme/40">
+                              <Skeleton className="h-3 w-20" />
+                              <Skeleton className="h-3 w-8" />
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                      {!loading && items.map((announcement) => (
                         <Card key={announcement.id} className={cardTintClass} padding="sm">
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between gap-2">
@@ -1063,7 +1080,7 @@ export default function NewsPage() {
                           </div>
                         </Card>
                       ))}
-                      {items.length === 0 && (
+                      {!loading && items.length === 0 && (
                         <div className="text-center py-8 text-xs text-text-muted">
                           No {title.toLowerCase()} posted.
                         </div>
@@ -1188,7 +1205,29 @@ export default function NewsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {announcementsList.map((announcement) => (
+              {loading && Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </div>
+                      <Skeleton className="h-4 w-3/4" />
+                      <div className="flex items-center gap-4 pt-1">
+                        <Skeleton className="h-3.5 w-32" />
+                        <Skeleton className="h-3.5 w-24" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 w-16 rounded-lg" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {!loading && announcementsList.map((announcement) => (
                 <Card
                   key={announcement.id}
                   className={
@@ -1223,7 +1262,7 @@ export default function NewsPage() {
                         </Badge>
                         {announcement.isFeatured && (
                           <Badge variant="warning">
-                            ⭐ Featured
+                            Featured
                           </Badge>
                         )}
                       </div>

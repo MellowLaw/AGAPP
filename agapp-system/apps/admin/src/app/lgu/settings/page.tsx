@@ -11,18 +11,34 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { ADMIN_MODULES, MODULE_LABELS } from '@/lib/modules';
-import { Setting2, User, Notification, Shield, Building, Location, Sms, Call, Add, Trash, Edit, CloseCircle } from 'iconsax-react';
+import { Setting2, User, Notification, Shield, Building, Location, Sms, Call, Add, Trash, Edit, CloseCircle, People, Key, Eye, EyeSlash, Copy } from 'iconsax-react';
 import { ColorPaletteSelector } from '@/components/ui/ColorPaletteSelector';
+import { Skeleton, SkeletonStaffGrid } from '@/components/ui/Skeleton';
 
 interface StaffMember {
   id: string;
   name: string;
   email: string;
   role: 'LGU_ADMIN' | 'LGU_PERSONNEL' | string;
+  assigned_office?: string | null;
   is_active: boolean;
   /** Granted admin-panel sections. Personnel only — admins hold all. */
   module_permissions?: string[];
 }
+
+const DEFAULT_OFFICES = [
+  'Civil Registrar',
+  'BPLO',
+  'Treasury',
+  "Assessor's Office",
+  'Engineering Office',
+  'MDRRMO',
+  'Health Office',
+  'MENRO / Sanitation',
+  'Agriculture',
+  "Mayor's Office",
+  'MSWDO',
+];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'customization' | 'staff' | 'notifications'>('general');
@@ -124,7 +140,25 @@ export default function SettingsPage() {
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'LGU_ADMIN' | 'LGU_PERSONNEL'>('LGU_PERSONNEL');
+  const [staffOffice, setStaffOffice] = useState<string>('');
+  const [officeFilter, setOfficeFilter] = useState<string>('all');
+  const [availableOffices, setAvailableOffices] = useState<string[]>(DEFAULT_OFFICES);
   const [staffModules, setStaffModules] = useState<string[]>([]);
+
+  // Staff Password Reset States (Pattern 1)
+  const [resetPasswordStaff, setResetPasswordStaff] = useState<StaffMember | null>(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  const generateRandomPassword = (length = 12): string => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*';
+    let pass = '';
+    for (let i = 0; i < length; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pass;
+  };
 
   // Notification Preference States
   const [notifPush, setNotifPush] = useState(true);
@@ -184,7 +218,21 @@ export default function SettingsPage() {
           setWebsiteUrl(lgu.website_url || '');
         }
 
-        // 2. Load Staff Members
+        // 2. Load dynamic offices from services catalog
+        const { data: serviceRows } = await supabase
+          .from('lgu_services')
+          .select('office_name')
+          .eq('lgu_id', lguId);
+
+        const dynamicOffices = Array.from(
+          new Set([
+            ...DEFAULT_OFFICES,
+            ...(serviceRows || []).map((s: any) => s.office_name).filter(Boolean)
+          ])
+        );
+        setAvailableOffices(dynamicOffices);
+
+        // 3. Load Staff Members with assigned_office
         const { data: users, error: usersErr } = await supabase
           .from('users')
           .select('*')
@@ -277,12 +325,18 @@ export default function SettingsPage() {
     try {
       // Admins implicitly hold every module; only personnel carry a list.
       const modulesToSave = staffRole === 'LGU_PERSONNEL' ? staffModules : [];
+      const officeToSave = staffRole === 'LGU_PERSONNEL' ? (staffOffice.trim() || null) : null;
 
       if (editingStaff) {
         // Update profile only (password changes are out of scope here)
         const { error } = await supabase
           .from('users')
-          .update({ name: staffName, email: staffEmail, role: staffRole })
+          .update({
+            name: staffName,
+            email: staffEmail,
+            role: staffRole,
+            assigned_office: officeToSave,
+          })
           .eq('id', editingStaff.id);
 
         if (error) throw error;
@@ -300,7 +354,7 @@ export default function SettingsPage() {
 
         setStaffList(prev => prev.map(s =>
           s.id === editingStaff.id
-            ? { ...s, name: staffName, email: staffEmail, role: staffRole, module_permissions: modulesToSave }
+            ? { ...s, name: staffName, email: staffEmail, role: staffRole, assigned_office: officeToSave, module_permissions: modulesToSave }
             : s
         ));
         showToast('Staff member updated successfully!', 'success');
@@ -317,6 +371,7 @@ export default function SettingsPage() {
           body: JSON.stringify({
             email: staffEmail, password: staffPassword, name: staffName,
             role: staffRole, lguId, modulePermissions: modulesToSave,
+            assignedOffice: officeToSave,
           }),
         });
 
@@ -325,6 +380,7 @@ export default function SettingsPage() {
 
         setStaffList(prev => [...prev, {
           id: json.id, name: staffName, email: staffEmail, role: staffRole,
+          assigned_office: officeToSave,
           is_active: true, module_permissions: modulesToSave,
         }]);
         showToast(`Staff account created! Share these credentials securely: ${staffEmail} / ${staffPassword}`, 'success');
@@ -337,6 +393,7 @@ export default function SettingsPage() {
       setStaffEmail('');
       setStaffPassword('');
       setStaffRole('LGU_PERSONNEL');
+      setStaffOffice('');
       setStaffModules([]);
     } catch (err: any) {
       console.error('Failed to save staff member:', err);
@@ -361,6 +418,42 @@ export default function SettingsPage() {
     } catch (err: any) {
       console.error('Failed to delete staff member:', err);
       showToast(err.message || 'Failed to remove staff member', 'error');
+    }
+  };
+
+  // Direct Staff Password Reset (Pattern 1)
+  const handleResetStaffPassword = async () => {
+    if (!resetPasswordStaff) return;
+    if (!newPasswordVal || newPasswordVal.length < 8) {
+      showToast('Password must be at least 8 characters.', 'info');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: resetPasswordStaff.id,
+          newPassword: newPasswordVal,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to reset password.');
+      }
+
+      showToast(`Password for ${resetPasswordStaff.name} updated successfully!`, 'success');
+      setResetPasswordStaff(null);
+      setNewPasswordVal('');
+      setShowNewPassword(false);
+    } catch (err: any) {
+      console.error('Failed to reset staff password:', err);
+      showToast(err.message || 'Failed to update staff password.', 'error');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -842,71 +935,182 @@ export default function SettingsPage() {
 
         {activeTab === 'staff' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-text-primary">Staff Members</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary">Staff &amp; Department Personnel</h2>
+                  <p className="text-xs text-text-muted">Create and assign personnel accounts to specific municipal offices</p>
+                </div>
                 <Button onClick={() => {
                   setEditingStaff(null);
                   setStaffName('');
                   setStaffEmail('');
                   setStaffPassword('');
                   setStaffRole('LGU_PERSONNEL');
+                  setStaffOffice('');
                   setStaffModules([]);
                   setShowStaffModal(true);
                 }}>
                   <Add className="w-4 h-4 mr-1" />
-                  Add Staff
+                  Add Staff Member
                 </Button>
               </div>
 
-              {staffList.map((member) => (
-                <Card noBorder key={member.id}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
-                        <User variant="Bold" className="w-5 h-5 text-text-muted" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-text-primary">{member.name}</p>
-                        <p className="text-sm text-text-muted">{member.email}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant={member.role === 'LGU_ADMIN' ? 'info' : 'default'}>
-                            {member.role.replace('_', ' ')}
-                          </Badge>
-                          {member.role === 'LGU_ADMIN' ? (
-                            <span className="text-xs text-text-faint">Full access</span>
-                          ) : (
-                            <span className="text-xs text-text-faint">
-                              {member.module_permissions?.length
-                                ? `${member.module_permissions.length} of ${ADMIN_MODULES.length} sections`
-                                : 'No sections granted yet'}
-                            </span>
+              {/* Department Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setOfficeFilter('all')}
+                  className={`px-3 py-1.5 rounded-full font-medium transition whitespace-nowrap ${
+                    officeFilter === 'all'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'bg-surface-alt text-text-muted hover:text-text-primary border border-theme'
+                  }`}
+                >
+                  All Staff ({staffList.length})
+                </button>
+                {staffList.some(s => !s.assigned_office && s.role === 'LGU_PERSONNEL') && (
+                  <button
+                    type="button"
+                    onClick={() => setOfficeFilter('unassigned')}
+                    className={`px-3 py-1.5 rounded-full font-medium transition whitespace-nowrap flex items-center gap-1.5 ${
+                      officeFilter === 'unassigned'
+                        ? 'bg-accent text-white shadow-xs'
+                        : 'bg-surface-alt text-text-muted hover:text-text-primary border border-theme'
+                    }`}
+                  >
+                    <span>All Offices (General)</span>
+                    <span className="text-[10px] opacity-80 font-mono">
+                      ({staffList.filter(s => !s.assigned_office && s.role === 'LGU_PERSONNEL').length})
+                    </span>
+                  </button>
+                )}
+                {Array.from(new Set(staffList.map(s => s.assigned_office).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)).map((off) => {
+                  const count = staffList.filter(s => s.assigned_office === off).length;
+                  return (
+                    <button
+                      key={off}
+                      type="button"
+                      onClick={() => setOfficeFilter(off)}
+                      className={`px-3 py-1.5 rounded-full font-medium transition whitespace-nowrap flex items-center gap-1.5 ${
+                        officeFilter === off
+                          ? 'bg-accent text-white shadow-xs'
+                          : 'bg-surface-alt text-text-muted hover:text-text-primary border border-theme'
+                      }`}
+                    >
+                      <span>{off}</span>
+                      <span className="text-[10px] opacity-80 font-mono">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {loading ? (
+                <SkeletonStaffGrid count={6} />
+              ) : (
+                <>
+                  {staffList
+                    .filter(member => {
+                      if (officeFilter === 'all') return true;
+                      if (officeFilter === 'unassigned') return !member.assigned_office && member.role === 'LGU_PERSONNEL';
+                      return member.assigned_office === officeFilter;
+                    })
+                    .sort((a, b) => {
+                      // Priority order:
+                      // 1. LGU Administrator always at the very top
+                      // 2. All Offices / General Personnel
+                      // 3. Department desks ordered alphabetically by office, then by name
+                      const getRank = (m: StaffMember) => {
+                        if (m.role === 'LGU_ADMIN') return 1;
+                        if (!m.assigned_office) return 2;
+                        return 3;
+                      };
+                      const rankA = getRank(a);
+                      const rankB = getRank(b);
+                      if (rankA !== rankB) return rankA - rankB;
+                      if (a.assigned_office && b.assigned_office && a.assigned_office !== b.assigned_office) {
+                        return a.assigned_office.localeCompare(b.assigned_office);
+                      }
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((member) => (
+                    <Card noBorder key={member.id}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-surface-alt rounded-full flex items-center justify-center">
+                            <User variant="Bold" className="w-5 h-5 text-text-muted" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-text-primary">{member.name}</p>
+                              {member.assigned_office ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-accent text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs">
+                                  <Building variant="Bold" className="w-3 h-3 text-white shrink-0" />
+                                  <span>{member.assigned_office}</span>
+                                </span>
+                              ) : member.role === 'LGU_PERSONNEL' ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-surface-alt text-text-primary text-[11px] font-medium border border-theme flex items-center gap-1">
+                                  <People variant="Bold" className="w-3 h-3 text-text-muted shrink-0" />
+                                  <span>All Offices</span>
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-text-muted">{member.email}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant={member.role === 'LGU_ADMIN' ? 'info' : 'default'}>
+                                {member.role.replace('_', ' ')}
+                              </Badge>
+                              {member.role === 'LGU_ADMIN' ? (
+                                <span className="text-xs text-text-faint">Full access across all departments</span>
+                              ) : (
+                                <span className="text-xs text-text-faint">
+                                  {member.module_permissions?.length
+                                    ? `${member.module_permissions.length} of ${ADMIN_MODULES.length} sections`
+                                    : 'No sections granted yet'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {member.role === 'LGU_PERSONNEL' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Change Password"
+                              onClick={() => {
+                                setResetPasswordStaff(member);
+                                setNewPasswordVal('');
+                                setShowNewPassword(false);
+                              }}
+                            >
+                              <Key className="w-4 h-4 text-accent" />
+                            </Button>
                           )}
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setEditingStaff(member);
+                            setStaffName(member.name);
+                            setStaffEmail(member.email);
+                            setStaffRole(member.role as any);
+                            setStaffOffice(member.assigned_office || '');
+                            setStaffModules(member.module_permissions ?? []);
+                            setShowStaffModal(true);
+                          }}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(member.id, member.name)}>
+                            <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        setEditingStaff(member);
-                        setStaffName(member.name);
-                        setStaffEmail(member.email);
-                        setStaffRole(member.role as any);
-                        setStaffModules(member.module_permissions ?? []);
-                        setShowStaffModal(true);
-                      }}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(member.id, member.name)}>
-                        <Trash variant="Bold" className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                    </Card>
+                  ))}
 
-              {staffList.length === 0 && (
-                <Card noBorder>
-                  <p className="text-center py-6 text-text-muted text-sm">No LGU staff members found.</p>
-                </Card>
+                  {staffList.length === 0 && (
+                    <Card noBorder>
+                      <p className="text-center py-6 text-text-muted text-sm">No LGU staff members found.</p>
+                    </Card>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1005,6 +1209,28 @@ export default function SettingsPage() {
                 </select>
               </div>
 
+              {/* Department / Office Selection for Personnel */}
+              {staffRole === 'LGU_PERSONNEL' && (
+                <div>
+                  <label className="block text-sm text-text-muted mb-1.5">
+                    Assigned Department / Municipal Office
+                  </label>
+                  <select
+                    value={staffOffice}
+                    onChange={(e) => setStaffOffice(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-theme rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                  >
+                    <option value="">All Offices / General Staff</option>
+                    {availableOffices.map((off) => (
+                      <option key={off} value={off}>{off}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-faint mt-1">
+                    Staff assigned to an office will only see and process service requests and issue reports belonging to that department.
+                  </p>
+                </div>
+              )}
+
               {/* Module access — personnel only. An LGU Administrator always
                   has every section, so there is nothing to choose. */}
               {staffRole === 'LGU_PERSONNEL' ? (
@@ -1074,6 +1300,98 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-2 border-t border-theme pt-4">
               <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
               <Button onClick={() => { confirmAction?.(); setConfirmOpen(false); }}>Yes, Save Changes</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Staff Password Modal (Pattern 1) */}
+      {resetPasswordStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface rounded-2xl border border-theme p-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between mb-5 pb-3 border-b border-theme">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+                  <Key variant="Bold" className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Change Staff Password</h3>
+                  <p className="text-xs text-text-muted">Set a new password directly for this account</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetPasswordStaff(null)}
+                className="text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <CloseCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Staff Details Summary */}
+            <div className="p-3.5 rounded-xl bg-surface-alt border border-theme mb-5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-sm text-text-primary">{resetPasswordStaff.name}</span>
+                {resetPasswordStaff.assigned_office ? (
+                  <span className="px-2 py-0.5 rounded-full bg-accent text-white text-[10.5px] font-semibold flex items-center gap-1">
+                    <Building variant="Bold" className="w-2.5 h-2.5" />
+                    <span>{resetPasswordStaff.assigned_office}</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-surface text-text-primary text-[10.5px] font-medium border border-theme flex items-center gap-1">
+                    <People variant="Bold" className="w-2.5 h-2.5 text-text-muted" />
+                    <span>All Offices</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-text-muted font-mono">{resetPasswordStaff.email}</p>
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-text-primary uppercase tracking-wider">
+                    New Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setNewPasswordVal(generateRandomPassword(12))}
+                    className="text-xs text-accent hover:underline font-semibold flex items-center gap-1"
+                  >
+                    Generate Secure Password
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPasswordVal}
+                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className="w-full h-11 pl-3.5 pr-10 bg-surface border border-theme rounded-xl text-sm font-mono text-text-primary focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeSlash className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-text-faint mt-1.5">
+                  Must be at least 8 characters. The staff member can use this password to sign in immediately.
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-theme">
+              <Button variant="ghost" onClick={() => setResetPasswordStaff(null)} disabled={resettingPassword}>
+                Cancel
+              </Button>
+              <Button onClick={handleResetStaffPassword} disabled={resettingPassword || !newPasswordVal || newPasswordVal.length < 8}>
+                {resettingPassword ? 'Updating...' : 'Update Password'}
+              </Button>
             </div>
           </div>
         </div>

@@ -50,6 +50,7 @@ desktop.ini
 # Temporary files
 tmp/
 temp/
+scratch/
 
 # TypeScript build cache (regenerated on every build)
 *.tsbuildinfo

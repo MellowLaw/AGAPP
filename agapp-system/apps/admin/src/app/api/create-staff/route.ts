@@ -18,11 +18,13 @@ const ALLOWED_MODULES = [
 ] as const;
 
 export async function POST(req: NextRequest) {
-  const { email, password, name, role, lguId, modulePermissions } = await req.json();
+  const { email, password, name, role, lguId, modulePermissions, assignedOffice, assigned_office } = await req.json();
 
   if (!email || !password || !name || !role || !lguId) {
     return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
   }
+
+  const office = assignedOffice || assigned_office || null;
 
   if (!CREATABLE_ROLES.includes(role)) {
     return NextResponse.json({ error: 'Invalid role for this endpoint.' }, { status: 400 });
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { name, role, lgu_id: lguId },
+    user_metadata: { name, role, lgu_id: lguId, assigned_office: office },
   });
 
   if (authError || !authData.user) {
@@ -109,6 +111,7 @@ export async function POST(req: NextRequest) {
     email,
     role,
     lgu_id: lguId,
+    assigned_office: office,
     is_active: true,
     notification_preferences: { push: true, sms: true, email: true },
     module_permissions: modules,

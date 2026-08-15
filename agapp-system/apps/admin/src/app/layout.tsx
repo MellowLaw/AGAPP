@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import { Inter, Lora } from 'next/font/google';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AdminAuthProvider } from '@/contexts/AdminAuthContext';
 
 const sansFont = Inter({
   subsets: ['latin'],
@@ -30,7 +31,9 @@ export default function RootLayout({
     <html lang="en" className={`${sansFont.variable} ${serifFont.variable}`}>
       <body className="min-h-screen">
         <Suspense fallback={<div className="flex h-screen items-center justify-center text-text-muted text-sm">Loading...</div>}>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <AdminAuthProvider>{children}</AdminAuthProvider>
+          </ThemeProvider>
         </Suspense>
       </body>
     </html>

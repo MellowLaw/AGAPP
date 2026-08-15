@@ -156,7 +156,7 @@ export function NotificationsScreen({ navigation }: any) {
 
                   await Notifications.scheduleNotificationAsync({
                     content: {
-                      title: '🔔 AGAPP Test Notification',
+                      title: 'AGAPP Test Notification',
                       body: 'Testing local notification in Expo Go! Tap to open.',
                       data: { type: 'notifications' },
                     },

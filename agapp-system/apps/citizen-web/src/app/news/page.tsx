@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { getRelativeTime } from '../../lib/timeAgo';
 import { getNewsImageUrl, isItemExpired } from '../../lib/newsHelpers';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { SkeletonFeed } from '../../components/common/Skeleton';
 import { 
   NotificationBing, 
   SearchNormal1, 
@@ -155,9 +156,7 @@ export default function NewsPage() {
       {/* Item List */}
       <div className="space-y-4 pt-1">
         {loading ? (
-          <div className="p-12 text-center text-xs text-text-muted font-['Inter-Medium']">
-            Loading municipal bulletins...
-          </div>
+          <SkeletonFeed count={3} />
         ) : displayedItems.length === 0 ? (
           <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-2">
             <DocumentText size={32} className="text-text-muted mx-auto" />

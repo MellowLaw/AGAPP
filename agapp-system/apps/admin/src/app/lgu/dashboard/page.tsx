@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { ReportsMap, type ReportPin } from '@/components/map';
 import { Danger, DocumentText, TickCircle, ArrowRight, Location, Personalcard } from 'iconsax-react';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { Skeleton, SkeletonStats, SkeletonTable } from '@/components/ui/Skeleton';
 
 type DbReportStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected';
 
@@ -62,12 +64,43 @@ const CATEGORY_COLORS: Record<string, string> = {
 // True Liliw poblacion (PhilAtlas) — only used until the LGU row loads.
 const LILIW_FALLBACK: [number, number] = [14.131, 121.4365];
 
+const isCategoryForOffice = (dbCategory: string, office: string): boolean => {
+  const norm = (office || '').toLowerCase();
+  const cat = (dbCategory || '').toLowerCase();
+  if (norm.includes('engineer') || norm.includes('building') || norm.includes('public works') || norm.includes('obo')) {
+    return cat.includes('pothole') || cat.includes('drainage') || cat.includes('pole') || cat.includes('road') || cat.includes('structure');
+  }
+  if (norm.includes('health') || norm.includes('sanitation') || norm.includes('menro')) {
+    return cat.includes('garbage') || cat.includes('waste') || cat.includes('sanitation') || cat.includes('health') || cat.includes('septic');
+  }
+  if (norm.includes('mdrrmo') || norm.includes('disaster') || norm.includes('emergency')) {
+    return cat.includes('flood') || cat.includes('disaster') || cat.includes('accident') || cat.includes('hazard') || cat.includes('tree');
+  }
+  if (norm.includes('agriculture') || norm.includes('vet')) {
+    return cat.includes('animal') || cat.includes('pet') || cat.includes('crop') || cat.includes('livestock');
+  }
+  if (norm.includes('bplo') || norm.includes('licensing') || norm.includes('business')) {
+    return cat.includes('business') || cat.includes('permit') || cat.includes('vendor') || cat.includes('commercial');
+  }
+  if (norm.includes('barangay') || norm.includes('peace') || norm.includes('order')) {
+    return cat.includes('community') || cat.includes('dispute') || cat.includes('disturbance');
+  }
+  if (norm.includes('mswdo') || norm.includes('social')) {
+    return cat.includes('assistance') || cat.includes('welfare') || cat.includes('dweller');
+  }
+  return false;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const params = useSearchParams();
   const lguParam = params?.get('lguName') || 'Liliw, Laguna';
   const reportsHref = lguParam ? `/lgu/reports?lguName=${encodeURIComponent(lguParam)}` : '/lgu/reports';
   const lguId = lguIdFromName(lguParam);
+
+  const { profile, effectiveRole, assignedOffice, loading: authLoading } = useAdminAuth();
+  const isPersonnel = effectiveRole === 'lgu-personnel';
+
   const [reportRows, setReportRows] = useState<any[]>([]);
   const [serviceRows, setServiceRows] = useState<any[]>([]);
   const [pendingVerifications, setPendingVerifications] = useState(0);
@@ -76,6 +109,8 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchData = async () => {
       setLoading(true);
       setLoadError(null);
@@ -84,27 +119,32 @@ export default function DashboardPage() {
         { data: reportsData, error: reportsError },
         { data: servicesData, error: servicesError },
         { data: verifData, error: verifError },
-        { data: lguRow },
+        { data: lguRow, error: lguError },
       ] = await Promise.all([
         supabase
           .from('reports')
-          .select('id, reference_number, category, status, barangay, created_at, latitude, longitude, photo_url')
-          .eq('lgu_id', lguId),
+          .select('id, reference_number, category, status, barangay, latitude, longitude, created_at, assigned_office')
+          .eq('lgu_id', lguId)
+          .order('created_at', { ascending: false }),
         supabase
           .from('service_requests')
-          .select('id, reference_number, status, created_at')
+          .select('id, reference_number, service_id, status, citizen_id, submitted_at, department')
           .eq('lgu_id', lguId),
         supabase
-          .from('verification_requests')
-          .select('id, status')
+          .from('users')
+          .select('id')
           .eq('lgu_id', lguId)
-          .eq('status', 'pending'),
-        supabase.from('lgus').select('latitude, longitude').eq('id', lguId).single(),
+          .eq('verification_status', 'submitted'),
+        supabase
+          .from('lgus')
+          .select('latitude, longitude')
+          .eq('id', lguId)
+          .maybeSingle(),
       ]);
 
       if (reportsError || servicesError) {
-        console.error('Error loading dashboard metrics', reportsError || servicesError);
-        setLoadError((reportsError || servicesError)?.message || 'Unknown error');
+        console.error('Error fetching dashboard data:', reportsError || servicesError);
+        setLoadError(reportsError?.message || servicesError?.message || 'Failed to load dashboard data');
         setReportRows([]);
         setServiceRows([]);
         setLoading(false);
@@ -119,7 +159,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [lguId]);
+  }, [lguId, isPersonnel, assignedOffice, authLoading]);
 
   const stats = useMemo(() => {
     const submittedCount = reportRows.filter((r) => r.status === 'Submitted').length;
@@ -216,48 +256,47 @@ export default function DashboardPage() {
     <DashboardLayout
       role="lgu-admin"
       title="Dashboard Overview"
-      heroKicker={`${lguParam.toUpperCase()} — MUNICIPAL CONTROL CENTER`}
+      heroKicker={`${lguParam.toUpperCase()}${assignedOffice && isPersonnel ? ` · ${assignedOffice.toUpperCase()} DESK` : ' — MUNICIPAL CONTROL CENTER'}`}
       heroTitleAccent="Agapp Portal"
       heroSubtitle="Real-time visual reports tracking system for municipal hazard logging, business licensing, and citizen service requests."
     >
-      {loading && (
-        <div className="mb-3 px-4 py-2 text-sm font-mono text-text-muted bg-surface-alt rounded-xl animate-pulse">
-          Loading dashboard metrics…
-        </div>
-      )}
       {loadError && !loading && (
-        <div className="mb-3 px-4 py-2 text-sm text-accent bg-accent-soft rounded-xl">
+        <div className="mb-6 px-4 py-3 text-sm text-accent bg-accent-soft rounded-2xl border border-accent/20">
           Failed to load dashboard metrics: {loadError}
         </div>
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          const content = (
-            <>
-              <div className="flex items-start justify-between">
-                <p className="text-sm font-bold text-text-primary">{stat.label}</p>
-                <div className="p-1.5 rounded-lg bg-surface-alt border border-theme">
-                  <Icon className="w-4 h-4 text-accent" variant="Bold" />
+      {loading ? (
+        <SkeletonStats count={4} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            const content = (
+              <>
+                <div className="flex items-start justify-between">
+                  <p className="text-sm font-bold text-text-primary">{stat.label}</p>
+                  <div className="p-1.5 rounded-lg bg-surface-alt border border-theme">
+                    <Icon className="w-4 h-4 text-accent" variant="Bold" />
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
-                {stat.change && (
-                  <p className="text-xs font-serif italic text-accent mt-1">{stat.change}</p>
-                )}
-              </div>
-            </>
-          );
-          return (
-            <Card key={stat.label} noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
-              {stat.href ? <Link href={stat.href} className="w-full h-full flex flex-col justify-between">{content}</Link> : content}
-            </Card>
-          );
-        })}
-      </div>
+                <div className="mt-4">
+                  <p className="text-[32px] font-mono font-bold text-text-primary tracking-tight leading-none">{stat.value}</p>
+                  {stat.change && (
+                    <p className="text-xs font-serif italic text-accent mt-1">{stat.change}</p>
+                  )}
+                </div>
+              </>
+            );
+            return (
+              <Card key={stat.label} noBorder className="rounded-[20px] min-h-[140px] flex flex-col justify-between">
+                {stat.href ? <Link href={stat.href} className="w-full h-full flex flex-col justify-between">{content}</Link> : content}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Bento: 8-col map / 4-col categorical distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
@@ -274,8 +313,10 @@ export default function DashboardPage() {
               <ArrowRight variant="Linear" className="w-4 h-4" />
             </Link>
           </div>
-          {!loading && reportPins.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-sm text-text-primary bg-surface-alt/30 rounded-2xl">
+          {loading ? (
+            <Skeleton className="h-[26rem] rounded-[20px] w-full" />
+          ) : reportPins.length === 0 ? (
+            <div className="h-[26rem] flex items-center justify-center text-sm text-text-primary bg-surface-alt/30 rounded-2xl border border-theme">
               No reports with location data yet.
             </div>
           ) : (
@@ -296,7 +337,19 @@ export default function DashboardPage() {
             Live categorical distribution of citizen reports active in the municipality system.
           </p>
 
-          {categoryDistribution.length === 0 ? (
+          {loading ? (
+            <div className="space-y-5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+          ) : categoryDistribution.length === 0 ? (
             <p className="text-sm text-text-primary italic">No reports logged yet.</p>
           ) : (
             <div className="space-y-5">
@@ -333,50 +386,54 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
-            <thead>
-              <tr>
-                <th className="pb-2 pl-10 pr-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">ID</th>
-                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Category</th>
-                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Location</th>
-                <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Status</th>
-                <th className="pb-2 pl-4 pr-10 text-xs font-medium text-text-primary/80 uppercase tracking-wider text-right">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentReports.map((report) => (
-                <tr
-                  key={report.id}
-                  className="bg-surface-alt hover:bg-accent-soft transition-colors cursor-pointer group"
-                  onClick={() => router.push(`/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(report.id)}`)}
-                >
-                  <td className="py-5 pl-10 pr-4 rounded-l-xl text-sm font-mono font-medium text-text-primary">{report.id}</td>
-                  <td className="py-5 px-4 text-sm text-text-primary">{report.category}</td>
-                  <td className="py-5 px-4 text-sm text-text-primary/80">
-                    <div className="flex items-center gap-1.5">
-                      <Location className="w-4 h-4 text-accent" />
-                      {report.location}
-                    </div>
-                  </td>
-                  <td className="py-5 px-4">
-                    <Badge
-                      variant={
-                        report.status === 'resolved' ? 'success' :
-                        report.status === 'in_progress' ? 'info' :
-                        report.status === 'acknowledged' ? 'default' :
-                        'warning'
-                      }
-                    >
-                      {report.status.replace('_', ' ')}
-                    </Badge>
-                  </td>
-                  <td className="py-5 pl-4 pr-10 rounded-r-xl text-xs font-mono text-text-primary/70 text-right">{report.time}</td>
+        {loading ? (
+          <SkeletonTable rows={4} cols={5} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
+              <thead>
+                <tr>
+                  <th className="pb-2 pl-10 pr-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">ID</th>
+                  <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Category</th>
+                  <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Location</th>
+                  <th className="pb-2 px-4 text-xs font-medium text-text-primary/80 uppercase tracking-wider">Status</th>
+                  <th className="pb-2 pl-4 pr-10 text-xs font-medium text-text-primary/80 uppercase tracking-wider text-right">Time</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentReports.map((report) => (
+                  <tr
+                    key={report.id}
+                    className="bg-surface-alt hover:bg-accent-soft transition-colors cursor-pointer group"
+                    onClick={() => router.push(`/lgu/reports?lguName=${encodeURIComponent(lguParam)}&reportId=${encodeURIComponent(report.id)}`)}
+                  >
+                    <td className="py-5 pl-10 pr-4 rounded-l-xl text-sm font-mono font-medium text-text-primary">{report.id}</td>
+                    <td className="py-5 px-4 text-sm text-text-primary">{report.category}</td>
+                    <td className="py-5 px-4 text-sm text-text-primary/80">
+                      <div className="flex items-center gap-1.5">
+                        <Location className="w-4 h-4 text-accent" />
+                        {report.location}
+                      </div>
+                    </td>
+                    <td className="py-5 px-4">
+                      <Badge
+                        variant={
+                          report.status === 'resolved' ? 'success' :
+                          report.status === 'in_progress' ? 'info' :
+                          report.status === 'acknowledged' ? 'default' :
+                          'warning'
+                        }
+                      >
+                        {report.status.replace('_', ' ')}
+                      </Badge>
+                    </td>
+                    <td className="py-5 pl-4 pr-10 rounded-r-xl text-xs font-mono text-text-primary/70 text-right">{report.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </DashboardLayout>
   );

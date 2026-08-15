@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { CloseCircle } from 'iconsax-react';
 
 const DISMISS_KEY_SESSION = 'agapp_pwa_dismissed_session';
 const DISMISS_KEY_UNTIL = 'agapp_pwa_dismissed_until';
@@ -148,10 +149,10 @@ export function PwaInstallBanner() {
           </button>
           <button
             onClick={handleDismiss}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition text-xs cursor-pointer"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
             aria-label="Dismiss"
           >
-            ✕
+            <CloseCircle size={18} />
           </button>
         </div>
       </div>

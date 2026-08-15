@@ -40,6 +40,7 @@ import {
   GalleryAdd
 } from 'iconsax-react';
 import { compressImageFile } from '../../lib/imageCompression';
+import { SkeletonServiceGrid, SkeletonList } from '../../components/common/Skeleton';
 
 const PURPOSE_PRESETS: Record<string, string[]> = {
   // Business Permits & Licensing (BPLO)
@@ -250,6 +251,7 @@ export default function ServicesPage() {
 
   const [activeTab, setActiveTab] = useState<'services' | 'my_requests'>('services');
   const [services, setServices] = useState<any[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -306,6 +308,8 @@ export default function ServicesPage() {
       }
     } catch (err) {
       console.error('Error fetching lgu_services', err);
+    } finally {
+      setLoadingServices(false);
     }
   };
 
@@ -756,7 +760,9 @@ export default function ServicesPage() {
 
           {/* Services List */}
           <div className="space-y-3.5">
-            {filtered.length === 0 ? (
+            {loadingServices ? (
+              <SkeletonServiceGrid count={4} />
+            ) : filtered.length === 0 ? (
               <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-2">
                 <DocumentText size={32} className="text-text-muted mx-auto" />
                 <p className="text-xs font-heading text-text-primary">No services found</p>
@@ -858,10 +864,7 @@ export default function ServicesPage() {
               </Link>
             </div>
           ) : loadingRequests ? (
-            <div className="p-12 text-center text-xs text-text-muted bg-surface dark:bg-card rounded-[28px] border border-theme space-y-2 shadow-xs">
-              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-              <p>Loading your applications...</p>
-            </div>
+            <SkeletonList count={3} />
           ) : myRequests.length === 0 ? (
             <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-3 shadow-xs">
               <div className="w-14 h-14 rounded-full bg-surface-alt dark:bg-chip text-text-muted flex items-center justify-center mx-auto">
@@ -1360,7 +1363,10 @@ export default function ServicesPage() {
 
             {/* In-Person Physical Pickup Guideline */}
             <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 text-left space-y-1">
-              <strong className="block font-heading text-amber-900 dark:text-amber-200">⚠️ Pickup Requirement Check:</strong>
+              <strong className="flex items-center gap-1.5 font-heading text-amber-900 dark:text-amber-200">
+                <Warning2 size={14} variant="Bold" className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Pickup Requirement Check:</span>
+              </strong>
               <p>
                 Present this QR code and bring the <strong>physical original/photocopies</strong> of your requirements at the <strong>{claimModalData.office_name || 'Municipal Desk'}</strong> counter.
               </p>

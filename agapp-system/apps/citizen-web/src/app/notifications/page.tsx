@@ -15,6 +15,7 @@ import {
   DocumentText,
   Clock
 } from 'iconsax-react';
+import { SkeletonList } from '../../components/common/Skeleton';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -112,9 +113,7 @@ export default function NotificationsPage() {
       {/* Notifications List */}
       <div className="space-y-3 pt-1">
         {loading ? (
-          <div className="p-12 text-center text-xs text-text-muted font-['Inter-Medium']">
-            Loading notifications...
-          </div>
+          <SkeletonList count={4} />
         ) : notifications.length === 0 ? (
           <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-2">
             <NotificationBing size={32} className="text-text-muted mx-auto" />

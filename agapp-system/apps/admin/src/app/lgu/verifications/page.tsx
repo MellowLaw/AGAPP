@@ -15,6 +15,7 @@ import {
   SearchNormal1, Danger, Sms, Location, DocumentText, Camera,
   InfoCircle, ShieldTick, Warning2, FilterSearch, Sort,
 } from 'iconsax-react';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -519,7 +520,50 @@ export default function VerificationsPage() {
 
       {/* Request cards */}
       {loading ? (
-        <Card noBorder><div className="text-center py-8 text-text-muted text-sm">Loading requests…</div></Card>
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card noBorder key={i} className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-24 rounded-lg" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 pt-3 border-t border-theme/50">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-theme/50">
+                <Skeleton className="h-3 w-32" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-9 w-28 rounded-xl" />
+                  <Skeleton className="h-9 w-24 rounded-xl" />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : loadError ? (
         <Card noBorder><div className="text-center py-8 text-red-500 text-sm">{loadError}</div></Card>
       ) : (
@@ -644,7 +688,9 @@ export default function VerificationsPage() {
                   <ShieldTick variant="Bold" className="w-5 h-5 text-accent" />
                   Review Verification
                 </h2>
-                <button onClick={handleCloseModal} className="text-text-muted hover:text-text-primary transition-colors text-xl leading-none">✕</button>
+                <button onClick={handleCloseModal} className="text-text-muted hover:text-text-primary transition-colors">
+                  <CloseCircle className="w-5 h-5" />
+                </button>
               </div>
 
               {/* RA 10173 banner */}
@@ -806,8 +852,9 @@ export default function VerificationsPage() {
                   </div>
                 )}
 
-                <p className="text-xs text-text-faint mt-3 pt-3 border-t border-theme leading-relaxed">
-                  ⚠️ AI scores are decision-support tools only. <strong>Your judgment as the LGU administrator governs the final decision.</strong>
+                <p className="text-xs text-text-faint mt-3 pt-3 border-t border-theme leading-relaxed flex items-center gap-1.5">
+                  <Warning2 variant="Bold" className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>AI scores are decision-support tools only. <strong>Your judgment as the LGU administrator governs the final decision.</strong></span>
                 </p>
               </div>
 

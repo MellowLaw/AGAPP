@@ -20,6 +20,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { downloadQrCodeAsPng } from '../../lib/qrExport';
 import { OfficialTransactionReceipt } from '../../components/receipt/OfficialTransactionReceipt';
 import { DocumentDownload, Printer } from 'iconsax-react';
+import { SkeletonList } from '../../components/common/Skeleton';
 
 export default function TrackingPage() {
   const { activeLgu } = useLgu();
@@ -126,9 +127,7 @@ export default function TrackingPage() {
       {/* Content List */}
       <div className="space-y-4">
         {loading ? (
-          <div className="p-12 text-center text-xs text-text-muted font-['Inter-Medium']">
-            Loading submissions...
-          </div>
+          <SkeletonList count={3} />
         ) : tab === 'requests' ? (
           requests.length === 0 ? (
             <div className="bg-surface dark:bg-card border border-theme rounded-[28px] p-10 text-center text-xs text-text-muted space-y-2">

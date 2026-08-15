@@ -106,7 +106,7 @@ export function EmailOtpScreen({ navigation, route }: any) {
         await AsyncStorage.setItem('pendingGreeting', newUserId);
       }
 
-      showToast('Email confirmed! Welcome to AGAPP 🎉', 'success');
+      showToast('Email confirmed! Welcome to AGAPP', 'success');
       // AuthContext will detect the new session and redirect automatically
     } catch (err: any) {
       showToast(err.message ?? 'Invalid or expired code. Please try again.', 'error');
