@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm pointer-events-auto animate-fade-in">
           <div
-            className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md transition-all ${
+            className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md transition-all relative pr-9 ${
               toast.variant === 'success'
                 ? 'bg-emerald-950/90 text-white border-emerald-500/40'
                 : toast.variant === 'error'
@@ -74,9 +74,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
             <button
               onClick={dismiss}
-              className="text-white/60 hover:text-white shrink-0 p-1"
+              className="absolute top-2.5 right-2.5 text-white/60 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
+              aria-label="Close notification"
             >
-              <CloseCircle size={16} />
+              <CloseCircle size={18} />
             </button>
           </div>
         </div>

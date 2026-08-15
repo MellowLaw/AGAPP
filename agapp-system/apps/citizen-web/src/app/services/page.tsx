@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLgu } from '../../contexts/LguContext';
@@ -31,47 +31,183 @@ import {
   Location,
   Trash,
   Call,
-  DocumentDownload
+  DocumentDownload,
+  DocumentUpload,
+  Warning2,
+  FolderOpen,
+  Eye,
+  Add,
+  GalleryAdd
 } from 'iconsax-react';
+import { compressImageFile } from '../../lib/imageCompression';
 
 const PURPOSE_PRESETS: Record<string, string[]> = {
-  'New Business Permit': [
-    'Start a new retail business',
-    'Open a food service shop',
+  // Business Permits & Licensing (BPLO)
+  'New Business Permit (Mayor\'s Permit)': [
+    'Start retail / commercial establishment',
+    'Open food service / restaurant',
     'Register local service agency',
     'Commercial branch expansion',
   ],
   'Business Permit Renewal': [
     'Annual license renewal',
-    'Update business operations',
+    'Update business operations & capital',
+    'Commercial permit continuation',
   ],
-  'Community Tax Certificate (Cedula)': [
+  'Occupational / Work Permit': [
+    'Local employment requirement',
+    'Food service worker accreditation',
+    'Commercial driver / operator permit',
+    'Professional trade practice',
+  ],
+
+  // Civil Registrar
+  'Certificate of Live Birth (Timely Registration)': [
+    'Newborn official registration',
+    'PSA endorsement copy',
+  ],
+  'Late Birth Registration (>30 Days)': [
+    'Delayed school enrollment requirement',
+    'Passport / DFA application requirement',
+    'Late registration for adult records',
+    'Legal identity registration',
+  ],
+  'Certified True Copy of Civil Registry Document': [
+    'Passport / Visa application',
+    'School enrollment / Transcripts',
     'Employment requirement',
-    'Business permit application',
-    'Real estate transaction',
+    'Marriage license application',
     'Government ID application',
-    'Notarization requirement',
+    'Social security / SSS claim',
   ],
-  'Birth Certificate (Certified Copy)': [
-    'Passport/Travel application',
-    'School enrollment',
-    'Employment requirement',
-    'Marriage license requirement',
-    'Government ID application',
+  'Marriage License Application': [
+    'Upcoming civil / church wedding',
+    'Legal solemnization requirement',
   ],
-  'Certificate of Indigency': [
-    'Medical assistance / Medicine aid',
-    'Financial assistance',
-    'Educational scholarship',
-    'Legal aid / PAO support',
+  'Certificate of Death (Timely Registration)': [
+    'Burial / Funeral permit issuance',
+    'Estate settlement & insurance claim',
+  ],
+  'Legitimation of Child (R.A. 9858)': [
+    'Update child birth certificate after parents marriage',
+    'Legal change of child surname',
+  ],
+  'Correction of Clerical Error (R.A. 9048 / R.A. 10172)': [
+    'Correct misspelled name / parents name',
+    'Correct day / month of birth',
+    'Correct erroneous sex entry',
+  ],
+
+  // Barangay Affairs
+  'Barangay Clearance (Employment / General)': [
+    'Local employment requirement',
+    'Bank account opening',
+    'Police / NBI clearance requirement',
+    'Postal ID requirement',
+    'Driver license application',
+  ],
+  'Barangay Certificate of Residency': [
+    'Proof of address / Utility setup',
+    'Passport application requirement',
+    'Bank loan / Financing requirement',
+    'Government subsidy / 4Ps verification',
+  ],
+  'Barangay Certificate of Indigency': [
+    'Hospitalization / Medical assistance (AICS)',
+    'Medicine assistance / Prescription aid',
+    'Educational scholarship / Tuition support',
+    'Free Legal Aid / PAO representation',
     'Burial assistance',
   ],
-  'Barangay Clearance Endorsement': [
-    'Local employment',
-    'Bank account opening',
-    'Police clearance requirement',
-    'Postal ID requirement',
+  'Barangay Business Clearance': [
+    'New Mayor\'s Permit application',
+    'Annual business permit renewal',
+    'DTI / SEC local endorsement',
   ],
+
+  // Municipal Treasurer
+  'Community Tax Certificate (Cedula)': [
+    'Employment requirement',
+    'Business permit application / renewal',
+    'Real estate sale / Deed notarization',
+    'Government ID application',
+    'Legal affidavit notarization',
+  ],
+  'Real Property Tax (RPT / Land Tax) Payment': [
+    'Annual land tax settlement',
+    'Real property tax discount payment',
+    'Bank loan collateral verification',
+  ],
+  'Real Property Tax Clearance': [
+    'Property sale / title transfer requirement',
+    'Building permit application requirement',
+    'Bank loan / mortgage requirement',
+  ],
+  'Transfer Tax Payment & Certification': [
+    'Deed of Absolute Sale registration',
+    'Inheritance / Extrajudicial settlement',
+    'Donation title conveyance',
+  ],
+
+  // Assessor's Office
+  'Transfer / Issuance of Tax Declaration': [
+    'Update tax declaration after property purchase',
+    'Subdivision of lot assessment',
+    'Consolidation of land titles',
+  ],
+  'Certified True Copy of Tax Declaration': [
+    'Bank mortgage / loan collateral',
+    'Court / legal proceeding evidence',
+    'Boundary verification & survey',
+  ],
+
+  // MPDO / Zoning
+  'Locational / Zoning Clearance': [
+    'Commercial establishment building permit',
+    'Residential house construction',
+    'Subdivision / warehouse development',
+  ],
+
+  // OBO / Engineering
+  'Building Permit (New Construction / Renovation)': [
+    'New residential house construction',
+    'Commercial building erection',
+    'Building renovation & extension',
+    'Perimeter fence / structural repair',
+  ],
+  'Certificate of Occupancy': [
+    'Finished residential building occupancy',
+    'Commercial store / facility opening',
+    'Permanent electric / water utility hookup',
+  ],
+
+  // Health Office
+  'Sanitary Permit to Operate (Establishments)': [
+    'Food service & dining establishment permit',
+    'Water refilling station sanitation compliance',
+    'Commercial salon / personal care permit',
+  ],
+  'Food Handler\'s Health Certificate (Health Card)': [
+    'Food service / kitchen staff employment',
+    'Waiter / waitress restaurant accreditation',
+    'Hotel & resort staff clearance',
+  ],
+
+  // MSWDO & OSCA
+  'Crisis Assistance (AICS / Financial & Medical Aid)': [
+    'Urgent hospital bill settlement',
+    'Chemotherapy / Dialysis medicine aid',
+    'Emergency burial assistance',
+    'Transportation aid for stranded resident',
+  ],
+  'Senior Citizen ID Registration & Booklet': [
+    'New Senior Citizen ID (60+ years old)',
+    'Medicine & grocery discount booklet',
+  ],
+  'Person with Disability (PWD) ID Application': [
+    'New PWD Identification Card',
+    'Medicine & transport discount privileges',
+  ]
 };
 
 const DEFAULT_PRESETS = [
@@ -83,11 +219,34 @@ const DEFAULT_PRESETS = [
   'Medical assistance',
 ];
 
+interface UploadedDoc {
+  requirement_name?: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
+
+interface RequirementSlot {
+  requirementName: string;
+  file: File | null;
+  previewUrl?: string;
+  isCompressing?: boolean;
+}
+
+interface AdditionalDoc {
+  id: string;
+  name: string;
+  file: File;
+  previewUrl?: string;
+}
+
 export default function ServicesPage() {
   const router = useRouter();
   const { activeLgu } = useLgu();
   const { user, profile } = useAuth();
   const { showToast } = useToast();
+  const additionalFileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<'services' | 'my_requests'>('services');
   const [services, setServices] = useState<any[]>([]);
@@ -107,6 +266,9 @@ export default function ServicesPage() {
   const [copies, setCopies] = useState('1');
   const [applicantName, setApplicantName] = useState('');
   const [barangay, setBarangay] = useState('Poblacion');
+  const [reqSlots, setReqSlots] = useState<RequirementSlot[]>([]);
+  const [additionalFiles, setAdditionalFiles] = useState<AdditionalDoc[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(false);
 
   const barangayList = getBarangays(activeLgu?.id);
   const isVerified = profile?.verification_status === 'verified';
@@ -117,78 +279,62 @@ export default function ServicesPage() {
     else if (barangayList.length > 0) setBarangay(barangayList[0]);
   }, [profile, activeLgu?.id]);
 
-  // Load LGU Services
+  // Lock background body scroll whenever a modal is open to prevent background scrolling
   useEffect(() => {
-    async function loadServices() {
-      if (!activeLgu?.id) return;
-      try {
-        const { data, error } = await supabase
-          .from('lgu_services')
-          .select('*')
-          .eq('lgu_id', activeLgu.id)
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true });
-
-        if (data && data.length > 0) {
-          setServices(data);
-        } else {
-          // Fallback default catalog
-          setServices([
-            {
-              id: 'srv-1',
-              name: 'Barangay Clearance Endorsement',
-              office_name: 'Barangay Affairs',
-              fee_note: '₱50.00 at Cashier',
-              processing_time: '24 Hours',
-              description: 'Official clearance issued for employment, travel, or residency verification.',
-              requirements: ['Valid Government ID', 'Proof of Residency (Utility Bill / 2x2 Photo)'],
-            },
-            {
-              id: 'srv-2',
-              name: 'Certificate of Indigency',
-              office_name: 'Social Welfare & Development (MSWDO)',
-              fee_note: 'FREE',
-              processing_time: '24 Hours',
-              description: 'Issued to eligible low-income residents for medical, burial, or educational assistance.',
-              requirements: ['Barangay Endorsement', 'Valid Government ID'],
-            },
-            {
-              id: 'srv-3',
-              name: 'Birth Certificate (Certified Copy)',
-              office_name: 'Civil Registrar',
-              fee_note: '₱100.00 per copy',
-              processing_time: '48 Hours',
-              description: 'Certified true copy of Birth, Marriage, or Death Certificate.',
-              requirements: ['PSA or Local Registry Document copy', 'Authorization letter if representative'],
-            },
-            {
-              id: 'srv-4',
-              name: 'Community Tax Certificate (Cedula)',
-              office_name: "Treasurer's Office",
-              fee_note: '₱55.00 Basic + Income Assessment',
-              processing_time: 'Same Day',
-              description: 'Tax certificate issued to individuals or corporations residing or operating in the municipality.',
-              requirements: ['Valid ID', 'Proof of Gross Income (for assessment)'],
-            },
-            {
-              id: 'srv-5',
-              name: 'New Business Permit Assessment',
-              office_name: 'BPLO',
-              fee_note: 'Calculated upon assessment',
-              processing_time: '3 Working Days',
-              description: 'Initial document assessment and fee calculation for business licensing.',
-              requirements: ['DTI / SEC Registration', 'Barangay Business Clearance', 'Fire Safety Certificate'],
-            },
-          ]);
-        }
-      } catch (err) {
-        console.error('Error fetching lgu_services', err);
-      }
+    if (applyModalOpen || guestModalOpen || Boolean(claimModalData)) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow || 'unset';
+      };
     }
+  }, [applyModalOpen, guestModalOpen, claimModalData]);
+
+  // Load LGU Services dynamically from database with live realtime sync
+  const loadServices = async () => {
+    if (!activeLgu?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('lgu_services')
+        .select('*')
+        .eq('lgu_id', activeLgu.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        setServices(data);
+      }
+    } catch (err) {
+      console.error('Error fetching lgu_services', err);
+    }
+  };
+
+  useEffect(() => {
     loadServices();
+
+    if (!activeLgu?.id) return;
+    const channel = supabase
+      .channel(`citizen_lgu_services_realtime_${activeLgu.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lgu_services',
+          filter: `lgu_id=eq.${activeLgu.id}`,
+        },
+        () => {
+          loadServices();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeLgu?.id]);
 
-  // Load User's Own Submitted Service Requests
+  // Load User's Own Submitted Service Requests with live realtime sync
   const fetchMyRequests = async () => {
     if (!user?.id) return;
     setLoadingRequests(true);
@@ -210,36 +356,140 @@ export default function ServicesPage() {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      fetchMyRequests();
-    }
+    if (!user?.id) return;
+    fetchMyRequests();
+
+    const channel = supabase
+      .channel(`citizen_service_requests_realtime_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'service_requests',
+          filter: `citizen_id=eq.${user.id}`,
+        },
+        () => {
+          fetchMyRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id, activeLgu?.id]);
 
-  const offices = [
-    { id: 'all', label: 'All Offices' },
-    { id: 'Civil Registrar', label: 'Civil Registrar' },
-    { id: 'Barangay Affairs', label: 'Barangay Clearances' },
-    { id: 'MSWDO', label: 'Social Welfare (MSWDO)' },
-    { id: 'Treasurer', label: "Treasurer's Office" },
-    { id: 'BPLO', label: 'Business Permits (BPLO)' },
-  ];
+  // Dynamically compute unique office categories from the database services
+  const offices = useMemo(() => {
+    const distinctOffices = Array.from(
+      new Set(services.map((s) => s.office_name?.trim()).filter(Boolean))
+    );
+    return [
+      { id: 'all', label: 'All Offices' },
+      ...distinctOffices.map((off) => ({ id: off, label: off })),
+    ];
+  }, [services]);
 
-  const filtered = services.filter((s) => {
-    const matchOffice = selectedOffice === 'all' || s.office_name?.toLowerCase().includes(selectedOffice.toLowerCase());
-    const matchSearch = s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchOffice && matchSearch;
-  });
+  // Dynamically filter services by selected office and search query
+  const filtered = useMemo(() => {
+    return services.filter((s) => {
+      const matchOffice = selectedOffice === 'all' || s.office_name === selectedOffice;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q ||
+        s.name?.toLowerCase().includes(q) ||
+        (s.description && s.description.toLowerCase().includes(q)) ||
+        (s.office_name && s.office_name.toLowerCase().includes(q));
+
+      return matchOffice && matchSearch;
+    });
+  }, [services, selectedOffice, searchQuery]);
 
   const handleOpenApply = (service: any) => {
     setSelectedService(service);
     setPurpose('');
     setCopies('1');
+    const reqs: string[] = Array.isArray(service.requirements) ? service.requirements : [];
+    setReqSlots(reqs.map(r => ({
+      requirementName: r,
+      file: null,
+      previewUrl: undefined,
+      isCompressing: false,
+    })));
+    setAdditionalFiles([]);
     if (!user) {
       setGuestModalOpen(true);
       return;
     }
     setApplyModalOpen(true);
+  };
+
+  const handleSlotFileSelected = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast(`"${file.name}" exceeds 15MB limit.`, 'info');
+      return;
+    }
+
+    setReqSlots(prev => prev.map((s, i) => i === index ? { ...s, isCompressing: true } : s));
+
+    try {
+      const optimized = await compressImageFile(file);
+      const previewUrl = optimized.type.startsWith('image/') ? URL.createObjectURL(optimized) : undefined;
+      setReqSlots(prev => prev.map((s, i) => i === index ? {
+        ...s,
+        file: optimized,
+        previewUrl,
+        isCompressing: false,
+      } : s));
+      showToast(`Attached: ${file.name}`, 'info');
+    } catch {
+      setReqSlots(prev => prev.map((s, i) => i === index ? { ...s, file, isCompressing: false } : s));
+    }
+  };
+
+  const handleRemoveSlotFile = (index: number) => {
+    setReqSlots(prev => prev.map((s, i) => i === index ? { ...s, file: null, previewUrl: undefined } : s));
+  };
+
+  const handleAddAdditionalFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast(`"${file.name}" exceeds 15MB limit.`, 'info');
+      return;
+    }
+
+    try {
+      const optimized = await compressImageFile(file);
+      const previewUrl = optimized.type.startsWith('image/') ? URL.createObjectURL(optimized) : undefined;
+      setAdditionalFiles(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          name: file.name,
+          file: optimized,
+          previewUrl
+        }
+      ]);
+      showToast(`Attached supporting document: ${file.name}`, 'info');
+    } catch {
+      setAdditionalFiles(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          name: file.name,
+          file,
+        }
+      ]);
+    }
+  };
+
+  const handleRemoveAdditionalFile = (id: string) => {
+    setAdditionalFiles(prev => prev.filter(a => a.id !== id));
   };
 
   const handleWithdrawRequest = async (requestId: string) => {
@@ -286,9 +536,66 @@ export default function ServicesPage() {
     }
 
     setSubmitting(true);
+    setUploadProgress(true);
+
     try {
       const refCode = `REQ-${Date.now().toString().slice(-6)}`;
       const claimCode = `CLM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      // Collect all requirement files 1-by-1
+      const queue: Array<{ requirementName: string; file: File }> = [];
+
+      reqSlots.forEach((slot, i) => {
+        if (slot.file) {
+          queue.push({
+            requirementName: slot.requirementName || `Requirement #${i + 1}`,
+            file: slot.file,
+          });
+        }
+      });
+
+      additionalFiles.forEach((add) => {
+        queue.push({
+          requirementName: add.name || 'Additional Supporting Document',
+          file: add.file,
+        });
+      });
+
+      const uploadedDocs: UploadedDoc[] = [];
+      let primaryAttachmentUrl = '';
+
+      if (queue.length > 0) {
+        for (let i = 0; i < queue.length; i++) {
+          const item = queue[i];
+          const cleanName = item.file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const storagePath = `${user.id}/${refCode}-${Date.now()}-${i}-${cleanName}`;
+
+          const { data: uploadData, error: uploadErr } = await supabase.storage
+            .from('service-attachments')
+            .upload(storagePath, item.file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (!uploadErr && uploadData) {
+            const { data: publicUrlData } = supabase.storage
+              .from('service-attachments')
+              .getPublicUrl(storagePath);
+
+            const url = publicUrlData.publicUrl;
+            if (!primaryAttachmentUrl) primaryAttachmentUrl = url;
+            uploadedDocs.push({
+              requirement_name: item.requirementName,
+              name: item.file.name,
+              url,
+              size: item.file.size,
+              type: item.file.type,
+            });
+          } else if (uploadErr) {
+            console.warn(`File upload issue for ${item.file.name}:`, uploadErr);
+          }
+        }
+      }
 
       const payload = {
         lgu_id: activeLgu?.id || 'liliw-laguna',
@@ -299,6 +606,7 @@ export default function ServicesPage() {
         lgu_service_id: selectedService?.id?.length === 36 ? selectedService.id : null,
         reference_number: refCode,
         claim_code: claimCode,
+        attachment_url: primaryAttachmentUrl || null,
         status: 'Submitted',
         form_details: {
           applicant_name: applicantName,
@@ -307,6 +615,8 @@ export default function ServicesPage() {
           copies: parseInt(copies, 10) || 1,
           requirements: selectedService?.requirements || [],
           fee_note: selectedService?.fee_note,
+          processing_time: selectedService?.processing_time,
+          attachments: uploadedDocs,
         },
       };
 
@@ -321,12 +631,15 @@ export default function ServicesPage() {
       showToast(`Application submitted! Reference: ${refCode}`, 'success');
       setClaimModalData(data || payload);
       setApplyModalOpen(false);
+      setReqSlots([]);
+      setAdditionalFiles([]);
       fetchMyRequests();
     } catch (err: any) {
       console.error('Error applying for service', err);
       showToast(`Application failed: ${err.message || 'Please try again.'}`, 'error');
     } finally {
       setSubmitting(false);
+      setUploadProgress(false);
     }
   };
 
@@ -342,11 +655,11 @@ export default function ServicesPage() {
           E-Services.
         </h1>
         <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed">
-          Request official barangay clearances, civil registry certificates, and municipal permits online.
+          Request official barangay clearances, civil registry certificates, business permits, and social assistance online.
         </p>
       </div>
 
-      {/* 2-Tab Bar (Matching Mobile Architecture) */}
+      {/* 2-Tab Bar */}
       <div className="flex items-center border-b border-theme gap-6 text-sm">
         <button
           onClick={() => setActiveTab('services')}
@@ -417,7 +730,7 @@ export default function ServicesPage() {
               <SearchNormal1 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
-                placeholder="Search clearances, permits, indigency..."
+                placeholder="Search civil registry, business permits, taxes, barangay clearances..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-11 pr-4 py-3 rounded-full bg-surface dark:bg-card border border-theme text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-['Inter-Medium'] shadow-xs transition-colors"
@@ -475,7 +788,7 @@ export default function ServicesPage() {
 
                   {srv.requirements && srv.requirements.length > 0 && (
                     <div className="p-3.5 rounded-2xl bg-surface-alt dark:bg-chip border border-theme space-y-1.5">
-                      <span className="text-[10px] font-heading uppercase text-text-muted block">Document Checklist:</span>
+                      <span className="text-[10px] font-heading uppercase text-text-muted block">Required Documents & Pre-Requisites:</span>
                       <ul className="text-[11px] text-text-muted font-['Inter-Medium'] list-disc pl-4 space-y-1">
                         {srv.requirements.map((req: string, idx: number) => (
                           <li key={idx}>{req}</li>
@@ -484,7 +797,13 @@ export default function ServicesPage() {
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-theme flex items-center justify-between">
+                  {/* Prominent Physical Requirement Reminder */}
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 font-['Inter-Medium'] flex items-center gap-2">
+                    <Warning2 size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>Bring original copies upon claiming at the Municipal Hall.</span>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between">
                     <span className="text-xs font-heading text-accent">
                       Fee: {srv.fee_note || 'Standard Fee'}
                     </span>
@@ -492,7 +811,7 @@ export default function ServicesPage() {
                       onClick={() => handleOpenApply(srv)}
                       className="px-4 py-2 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition flex items-center gap-1.5 shadow-xs"
                     >
-                      <span>Apply Online</span>
+                      <span>Apply & Upload Docs</span>
                       <ArrowRight size={14} />
                     </button>
                   </div>
@@ -521,7 +840,6 @@ export default function ServicesPage() {
           </div>
 
           {!user ? (
-            /* Guest Empty State matching mobile */
             <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-3 shadow-xs">
               <div className="w-14 h-14 rounded-full bg-surface-alt dark:bg-chip border border-theme text-text-muted flex items-center justify-center mx-auto">
                 <ClipboardText size={28} />
@@ -602,7 +920,14 @@ export default function ServicesPage() {
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between pt-1 border-t border-theme">
+                  {req.form_details?.attachments && req.form_details.attachments.length > 0 && (
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted font-['Inter-Medium']">
+                      <FolderOpen size={14} className="text-accent" />
+                      <span>{req.form_details.attachments.length} document attachment(s) uploaded</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
                     <button
                       onClick={() => setClaimModalData(req)}
                       className="inline-flex items-center gap-1.5 text-xs font-heading text-text-primary hover:underline"
@@ -629,7 +954,14 @@ export default function ServicesPage() {
       {/* Guest Sign-In Prompt Modal */}
       {guestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+          <div className="relative bg-surface dark:bg-card rounded-[32px] border border-theme p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <button
+              onClick={() => setGuestModalOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-alt dark:hover:bg-chip transition"
+              aria-label="Close modal"
+            >
+              <CloseCircle size={22} />
+            </button>
             <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 mx-auto flex items-center justify-center">
               <LoginCurve size={28} />
             </div>
@@ -657,16 +989,22 @@ export default function ServicesPage() {
         </div>
       )}
 
-      {/* Application Form Modal with Purpose Presets */}
+      {/* Application Form Modal with Requirement Upload & Physical Notice */}
       {applyModalOpen && selectedService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-theme pb-3">
-              <div>
-                <span className="text-[9px] font-heading uppercase text-accent block tracking-wider">E-Service Application</span>
+            <div className="flex items-start justify-between border-b border-theme pb-3 relative">
+              <div className="pr-8">
+                <span className="text-[9px] font-heading uppercase text-accent block tracking-wider">
+                  {selectedService.office_name || 'E-Service Application'}
+                </span>
                 <h3 className="text-base font-heading text-text-primary">{selectedService.name}</h3>
               </div>
-              <button onClick={() => setApplyModalOpen(false)} className="text-text-muted hover:text-text-primary p-1">
+              <button
+                onClick={() => setApplyModalOpen(false)}
+                className="absolute top-0 right-0 p-1 text-text-muted hover:text-text-primary hover:bg-surface-alt dark:hover:bg-chip rounded-full transition"
+                aria-label="Close modal"
+              >
                 <CloseCircle size={22} />
               </button>
             </div>
@@ -689,6 +1027,17 @@ export default function ServicesPage() {
               </div>
             ) : (
               <form onSubmit={handleApplySubmit} className="space-y-4 text-xs font-['Inter-Medium']">
+                {/* MANDATORY PHYSICAL PICKUP BANNER */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1 font-['Inter-Medium']">
+                  <div className="flex items-center gap-1.5 font-heading text-amber-800 dark:text-amber-300 text-[11px]">
+                    <Warning2 size={16} className="shrink-0" />
+                    <span>Paunawa: Dalhin ang Orihinal na Dokumento</span>
+                  </div>
+                  <p className="text-[10.5px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                    Ang pag-upload online ay para sa paunang pagsusuri (pre-assessment). <strong>MANDATORY</strong> po na dalhin ang orihinal o opisyal na kopya ng inyong mga requirements sa oras ng pagkuha (claiming) sa Municipal Hall.
+                  </p>
+                </div>
+
                 {/* Applicant Name */}
                 <div className="space-y-1.5">
                   <label className="block font-heading text-text-primary uppercase tracking-wider text-[10px]">
@@ -773,6 +1122,189 @@ export default function ServicesPage() {
                   />
                 </div>
 
+                {/* 1-BY-1 REQUIREMENT ATTACHMENT UPLOADER */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block font-heading text-text-primary uppercase tracking-wider text-[10px]">
+                        Upload Document Requirements (1-by-1)
+                      </label>
+                      <span className="text-[10px] text-text-muted">
+                        Attach digital scans or photos for online pre-assessment
+                      </span>
+                    </div>
+                    {reqSlots.length > 0 && (
+                      <span className="text-[10px] font-mono text-accent font-heading px-2 py-0.5 rounded-full bg-accent/10 border border-accent/20">
+                        {reqSlots.filter(s => s.file).length} of {reqSlots.length} Attached
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Requirement Slots List */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {reqSlots.map((slot, idx) => {
+                      const isAttached = !!slot.file;
+                      const isImg = slot.file?.type.startsWith('image/');
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-2xl border transition ${
+                            isAttached
+                              ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/30'
+                              : 'bg-surface-alt dark:bg-chip border-theme'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-accent text-accent-contrast text-[9px] font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs font-heading text-text-primary leading-tight">
+                                {slot.requirementName}
+                              </span>
+                            </div>
+                            {isAttached && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-heading text-emerald-600 dark:text-emerald-400 shrink-0">
+                                <TickCircle size={13} variant="Bold" />
+                                <span>Attached</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {isAttached ? (
+                            <div className="flex items-center justify-between p-2.5 rounded-2xl bg-surface dark:bg-card border border-theme text-xs gap-3">
+                              <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                {isImg && slot.previewUrl ? (
+                                  <img
+                                    src={slot.previewUrl}
+                                    alt="preview"
+                                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border border-theme shadow-xs shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-accent/10 flex flex-col items-center justify-center text-accent shrink-0 border border-accent/20">
+                                    <DocumentText size={24} />
+                                    <span className="text-[9px] font-heading font-mono mt-0.5">DOC</span>
+                                  </div>
+                                )}
+                                <div className="overflow-hidden space-y-0.5">
+                                  <p className="font-heading text-xs text-text-primary truncate">{slot.file?.name}</p>
+                                  <p className="text-[10px] text-text-muted font-mono">
+                                    {((slot.file?.size || 0) / 1024).toFixed(0)} KB · Auto-Optimized
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <label className="px-3 py-1.5 rounded-xl bg-surface-alt dark:bg-chip border border-theme text-xs font-heading text-text-muted hover:text-text-primary cursor-pointer transition">
+                                  <span>Replace</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    onChange={(e) => handleSlotFileSelected(idx, e)}
+                                    className="hidden"
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSlotFile(idx)}
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-xl transition"
+                                  title="Remove file"
+                                >
+                                  <Trash size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="flex items-center justify-center gap-1.5 w-full p-2.5 rounded-xl border border-dashed border-theme hover:border-accent bg-surface dark:bg-card cursor-pointer transition text-center">
+                                {slot.isCompressing ? (
+                                  <span className="text-[11px] text-accent font-heading animate-pulse">Optimizing image...</span>
+                                ) : (
+                                  <>
+                                    <DocumentUpload size={15} className="text-accent shrink-0" />
+                                    <span className="text-[11px] font-heading text-text-primary">
+                                      Attach Document or Take Photo
+                                    </span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*,application/pdf"
+                                  onChange={(e) => handleSlotFileSelected(idx, e)}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {reqSlots.length === 0 && (
+                      <div className="p-3 bg-surface-alt dark:bg-chip rounded-xl text-center text-xs text-text-muted">
+                        No specific document requirements recorded for this service.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Extra Supporting Documents */}
+                  <div className="pt-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-heading text-text-muted uppercase tracking-wider">
+                        Additional Supporting Documents (Optional)
+                      </span>
+                      <label className="inline-flex items-center gap-1 text-[10px] font-heading text-accent hover:underline cursor-pointer">
+                        <Add size={12} />
+                        <span>Add Extra File</span>
+                        <input
+                          type="file"
+                          ref={additionalFileInputRef}
+                          accept="image/*,application/pdf"
+                          onChange={handleAddAdditionalFile}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {additionalFiles.length > 0 && (
+                      <div className="space-y-1.5">
+                        {additionalFiles.map((add) => (
+                          <div
+                            key={add.id}
+                            className="flex items-center justify-between p-2.5 rounded-2xl bg-surface dark:bg-card border border-theme text-xs gap-3"
+                          >
+                            <div className="flex items-center gap-3 overflow-hidden flex-1">
+                              {add.previewUrl ? (
+                                <img
+                                  src={add.previewUrl}
+                                  alt="preview"
+                                  className="w-12 h-12 rounded-xl object-cover border border-theme shadow-xs shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent shrink-0 border border-accent/20">
+                                  <DocumentText size={20} />
+                                </div>
+                              )}
+                              <div className="overflow-hidden space-y-0.5">
+                                <span className="font-heading text-xs text-text-primary truncate block">{add.name}</span>
+                                <span className="text-[10px] text-text-muted font-mono block">
+                                  {((add.file.size || 0) / 1024).toFixed(0)} KB
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAdditionalFile(add.id)}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-xl transition shrink-0"
+                            >
+                              <Trash size={15} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="pt-2 flex items-center justify-end gap-2">
                   <button
                     type="button"
@@ -798,7 +1330,14 @@ export default function ServicesPage() {
       {/* Claim Pass & QR Code Modal */}
       {claimModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+          <div className="relative bg-surface dark:bg-card rounded-[32px] border border-theme p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <button
+              onClick={() => setClaimModalData(null)}
+              className="absolute top-4 right-4 p-1 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-alt dark:hover:bg-chip transition"
+              aria-label="Close modal"
+            >
+              <CloseCircle size={22} />
+            </button>
             <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
               <TickCircle size={28} variant="Bold" />
             </div>
@@ -819,9 +1358,13 @@ export default function ServicesPage() {
               />
             </div>
 
-            <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed">
-              Present this digital Claim Pass and reference code at the {claimModalData.office_name || 'Municipal Desk'} counter for pickup and official release.
-            </p>
+            {/* In-Person Physical Pickup Guideline */}
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 text-left space-y-1">
+              <strong className="block font-heading text-amber-900 dark:text-amber-200">⚠️ Pickup Requirement Check:</strong>
+              <p>
+                Present this QR code and bring the <strong>physical original/photocopies</strong> of your requirements at the <strong>{claimModalData.office_name || 'Municipal Desk'}</strong> counter.
+              </p>
+            </div>
 
             <div className="flex items-center justify-center gap-2 pt-1">
               <button

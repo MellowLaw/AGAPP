@@ -22,7 +22,9 @@ import {
   Printer,
   DocumentDownload,
   CloseCircle,
-  Share
+  Share,
+  Warning2,
+  Eye
 } from 'iconsax-react';
 
 const SERVICE_STEPS = ['Submitted', 'Under Review', 'In Progress', 'Ready for Pickup', 'Released'];
@@ -51,8 +53,15 @@ export default function TrackingDetailPage() {
     async function fetchDetail() {
       setLoading(true);
       try {
-        const { data: item } = await supabase.from(table).select('*').eq('id', id).single();
-        if (item) {
+        const isUuid = id.length === 36 && id.includes('-');
+        let query = supabase.from(table).select('*');
+        if (isUuid) {
+          query = query.eq('id', id);
+        } else {
+          query = query.eq('reference_number', id);
+        }
+        const { data: item, error: queryErr } = await query.maybeSingle();
+        if (item && !queryErr) {
           setData(item);
         } else {
           // Fallback mock
@@ -111,6 +120,17 @@ export default function TrackingDetailPage() {
     };
   }, [id, isReport, rawType]);
 
+  // Lock body scroll when receipt preview modal is open
+  useEffect(() => {
+    if (showReceiptPreview) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original || 'unset';
+      };
+    }
+  }, [showReceiptPreview]);
+
   const steps = isReport ? REPORT_STEPS : SERVICE_STEPS;
   const currentStepIdx = data ? steps.indexOf(data.status) : 0;
 
@@ -149,9 +169,9 @@ export default function TrackingDetailPage() {
         dateFiled: data.created_at || new Date().toISOString(),
         status: data.status || 'Submitted',
         officeName: data.office_name,
-        targetRelease: isReport ? 'Target Response: 24–48 Hours' : '2–3 Working Days (R.A. 11032 SLA)',
-        amount: data.form_details?.fee || data.fee,
-        description: data.description,
+        targetRelease: data.form_details?.processing_time || (isReport ? 'Target Response: 24–48 Hours' : '2–3 Working Days (R.A. 11032 SLA)'),
+        amount: data.form_details?.fee_note || data.form_details?.fee || data.fee || 'Pay at Municipal Hall',
+        description: data.description || (data.form_details?.purpose ? `Purpose: ${data.form_details.purpose}` : undefined),
         claimCode: data.claim_code,
       }
     : null;
@@ -271,6 +291,17 @@ export default function TrackingDetailPage() {
                   </span>
                 </div>
 
+                {/* In-Person Physical Pickup Check Reminder */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 text-left space-y-1">
+                  <div className="flex items-center gap-1.5 font-heading text-amber-900 dark:text-amber-200">
+                    <Warning2 size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>In-Person Physical Document Requirement</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    Please bring the <strong>physical original and photocopies</strong> of all required documents when claiming your official clearance/permit at the <strong>{data.office_name || 'Municipal Desk'}</strong> counter.
+                  </p>
+                </div>
+
                 <div className="flex items-center justify-center gap-2 pt-1">
                   <button
                     onClick={handleDownloadQrPng}
@@ -286,6 +317,49 @@ export default function TrackingDetailPage() {
                     <Printer size={15} />
                     <span>Print Receipt Stub</span>
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Service Request: Attached Requirement Scans */}
+            {!isReport && data.form_details?.attachments && data.form_details.attachments.length > 0 && (
+              <div className="space-y-3">
+                <span className="text-xs font-heading uppercase tracking-wider text-text-primary block flex items-center justify-between">
+                  <span>Uploaded Requirement Documents</span>
+                  <span className="text-accent font-mono text-[10px]">({data.form_details.attachments.length} files)</span>
+                </span>
+                <div className="space-y-2">
+                  {data.form_details.attachments.map((att: any, idx: number) => {
+                    const isImg = att.url?.match(/\.(jpg|jpeg|png|webp|gif)$/i) || att.type?.startsWith('image/');
+                    return (
+                      <div key={idx} className="p-3 bg-surface-alt dark:bg-chip rounded-2xl border border-theme flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          {isImg ? (
+                            <img src={att.url} alt={att.name} className="w-8 h-8 object-cover rounded-lg border border-theme shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-surface dark:bg-card flex items-center justify-center text-accent shrink-0 border border-theme">
+                              <DocumentText size={16} />
+                            </div>
+                          )}
+                          <div className="overflow-hidden">
+                            {att.requirement_name && (
+                              <p className="text-[10px] font-heading text-accent truncate">{att.requirement_name}</p>
+                            )}
+                            <span className="font-heading text-text-primary text-xs truncate block">{att.name}</span>
+                          </div>
+                        </div>
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-full bg-surface dark:bg-card border border-theme text-text-primary font-heading text-[11px] hover:border-accent transition shrink-0 flex items-center gap-1"
+                        >
+                          <Eye size={14} className="text-accent" />
+                          <span>View</span>
+                        </a>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

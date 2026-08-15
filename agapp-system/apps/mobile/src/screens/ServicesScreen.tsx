@@ -27,21 +27,29 @@ const OFFICE_ICONS: Record<string, any> = {
   "Treasurer's Office": Card,
   'Civil Registrar': DocumentText,
   'MSWDO': Heart,
+  'Barangay Affairs': Scroll,
   "Mayor's Office": Scroll,
   'Health Office': ClipboardText,
+  "Assessor's Office": Document,
+  'Office of the Building Official (OBO)': Location,
   'Municipal Planning and Development Office': Location,
 };
 
 const PURPOSE_PRESETS: Record<string, string[]> = {
-  'New Business Permit': [
+  'New Business Permit (Mayor\'s Permit)': [
     'Start a new retail business',
-    'Open a food service shop',
+    'Open a food service establishment',
     'Register local service agency',
     'Commercial branch expansion',
   ],
   'Business Permit Renewal': [
     'Annual license renewal',
     'Update business operations',
+  ],
+  'Occupational / Work Permit': [
+    'Local employment permit',
+    'Food handler health certification',
+    'Commercial trade practice',
   ],
   'Community Tax Certificate (Cedula)': [
     'Employment requirement',
@@ -50,59 +58,94 @@ const PURPOSE_PRESETS: Record<string, string[]> = {
     'Government ID application',
     'Notarization requirement',
   ],
-  'Birth Certificate (Certified Copy)': [
+  'Certificate of Live Birth (Timely Registration)': [
+    'Newborn official registration',
+    'PSA endorsement copy',
+  ],
+  'Late Birth Registration (>30 Days)': [
+    'Delayed school enrollment',
+    'Passport application requirement',
+    'Late registration for adult records',
+  ],
+  'Certified True Copy of Civil Registry Document': [
     'Passport/Travel application',
     'School enrollment',
     'Employment requirement',
     'Marriage license requirement',
     'Government ID application',
   ],
-  'Marriage Certificate (Certified Copy)': [
-    'Spousal benefit claim',
-    'Change of surname',
-    'Visa/Travel application',
-    'Legal documentation',
-  ],
   'Marriage License Application': [
     'Upcoming church wedding',
     'Upcoming civil wedding',
   ],
-  'Death Certificate (Certified Copy)': [
+  'Certificate of Death (Timely Registration)': [
     'Claiming insurance/benefits',
     'Estate/Legal settlement',
     'Burial arrangements',
   ],
-  'Certificate of Indigency': [
-    'Medical assistance/Medicine aid',
-    'Financial/Social assistance',
+  'Barangay Clearance (Employment / General)': [
+    'Local employment requirement',
+    'Bank account opening',
+    'Police clearance requirement',
+    'Postal ID requirement',
+  ],
+  'Barangay Certificate of Residency': [
+    'Proof of address / Utility setup',
+    'Passport application requirement',
+    'Government subsidy / 4Ps verification',
+  ],
+  'Barangay Certificate of Indigency': [
+    'Medical assistance / Hospital bill',
+    'Medicine assistance / Prescription aid',
     'Educational scholarship',
-    'Legal aid/PAO support',
+    'Free Legal aid / PAO support',
     'Burial assistance',
   ],
-  'Mayor\'s Clearance': [
-    'Local employment',
-    'Overseas employment (seaman/OFW)',
-    'Firearm license application',
-    'Transfer of residency',
+  'Barangay Business Clearance': [
+    'New Mayor\'s Permit application',
+    'Annual business renewal',
   ],
-  'Sanitary Permit': [
-    'Food business health compliance',
-    'Beauty/Health salon compliance',
-    'Commercial space compliance',
+  'Real Property Tax (RPT / Land Tax) Payment': [
+    'Annual land tax settlement',
+    'Real property tax discount payment',
   ],
-  'Health Certificate': [
-    'Food handler employment',
-    'Non-food handler work clearance',
-    'School health clearance',
+  'Real Property Tax Clearance': [
+    'Property sale / title transfer',
+    'Building permit requirement',
   ],
-  'Zoning/Locational Clearance': [
+  'Transfer / Issuance of Tax Declaration': [
+    'Update tax declaration after land sale',
+    'Lot subdivision assessment',
+  ],
+  'Locational / Zoning Clearance': [
     'Building construction permit',
     'Business zoning compliance',
-    'Renovation clearance',
   ],
-  'Occupational/Work Permit': [
-    'Local employment permit',
-    'Special work clearance',
+  'Building Permit (New Construction / Renovation)': [
+    'New residential house construction',
+    'Commercial building erection',
+    'Building renovation & extension',
+  ],
+  'Sanitary Permit to Operate (Establishments)': [
+    'Food business health compliance',
+    'Commercial salon / personal care',
+  ],
+  'Food Handler\'s Health Certificate (Health Card)': [
+    'Food handler employment',
+    'Kitchen & restaurant staff clearance',
+  ],
+  'Crisis Assistance (AICS / Financial & Medical Aid)': [
+    'Urgent hospital bill settlement',
+    'Chemotherapy / Dialysis medicine aid',
+    'Emergency burial assistance',
+  ],
+  'Senior Citizen ID Registration & Booklet': [
+    'New Senior Citizen ID (60+ years old)',
+    'Discount booklet application',
+  ],
+  'Person with Disability (PWD) ID Application': [
+    'New PWD Identification Card',
+    'Medicine & transport discount booklet',
   ],
 };
 
@@ -110,8 +153,9 @@ const DEFAULT_PRESETS = [
   'Employment requirement',
   'Government ID application',
   'School requirement',
-  'Travel/Visa application',
+  'Travel / Visa application',
   'Business requirement',
+  'Medical assistance',
 ];
 
 export function ServicesScreen({ route, navigation }: any) {
@@ -555,6 +599,24 @@ export function ServicesScreen({ route, navigation }: any) {
                     <Text style={{ color: T.text, fontFamily: 'Inter-Medium', fontSize: 14, flex: 1, lineHeight: 18 }}>{req}</Text>
                   </View>
                 ))}
+
+                <View style={{
+                  marginTop: 6,
+                  padding: 12,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(245, 158, 11, 0.3)',
+                }}>
+                  <Text style={{
+                    fontFamily: 'Inter-Medium',
+                    fontSize: 12,
+                    color: isDarkMode ? '#FBBF24' : '#D97706',
+                    lineHeight: 16,
+                  }}>
+                    ⚠️ <Text style={{ fontFamily: 'Octarine-Bold' }}>In-Person Pickup Check:</Text> You must bring the physical original copies/photocopies of all required documents when claiming at the Municipal Hall counter.
+                  </Text>
+                </View>
               </>
             )}
           </View>

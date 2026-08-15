@@ -12,9 +12,17 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
-import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload } from 'iconsax-react';
+import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload, Eye, DocumentText, FolderOpen, Warning2, InfoCircle } from 'iconsax-react';
 
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
+
+interface AttachmentItem {
+  requirement_name?: string;
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
 
 interface ServiceRequestItem {
   id: string;       // display id (reference_number)
@@ -25,17 +33,27 @@ interface ServiceRequestItem {
   submittedBy: string;
   submittedAt: string;
   purpose: string;
+  barangay: string | null;
+  copies: number;
   assignedTo: string | null;
   claimCode: string | null;
   releasedAt: string | null;
   rejectReason: string | null;
   requirements: string[];
+  attachments: AttachmentItem[];
   feeNote: string | null;
   processingTime: string | null;
 }
 
 const mapServiceRowToItem = (row: any): ServiceRequestItem => {
   const catalog = row.lgu_services;
+  const rawAttachments = row.form_details?.attachments;
+  const attachments: AttachmentItem[] = Array.isArray(rawAttachments)
+    ? rawAttachments
+    : row.attachment_url
+    ? [{ name: 'Submitted Document Attachment', url: row.attachment_url, size: 0, type: 'file' }]
+    : [];
+
   return {
     id: row.reference_number || row.id,
     dbId: row.id,
@@ -47,13 +65,16 @@ const mapServiceRowToItem = (row: any): ServiceRequestItem => {
       ? new Date(row.created_at).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' }) + ' · ' + new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '',
     purpose: row.form_details?.purpose || '',
+    barangay: row.form_details?.barangay || null,
+    copies: row.form_details?.copies || 1,
     assignedTo: row.assigned_personnel || null,
     claimCode: row.claim_code || null,
     releasedAt: row.released_at || null,
     rejectReason: row.reject_reason || null,
-    requirements: Array.isArray(catalog?.requirements) ? catalog.requirements : [],
-    feeNote: catalog?.fee_note || null,
-    processingTime: catalog?.processing_time || null,
+    requirements: Array.isArray(catalog?.requirements) ? catalog.requirements : (Array.isArray(row.form_details?.requirements) ? row.form_details.requirements : []),
+    attachments,
+    feeNote: catalog?.fee_note || row.form_details?.fee_note || null,
+    processingTime: catalog?.processing_time || row.form_details?.processing_time || null,
   };
 };
 
@@ -186,13 +207,18 @@ export default function ServicesPage() {
         <div class="section">
           <h2>Applicant Information</h2>
           <div class="row"><span class="label">Submitted By</span><span class="value">${req.submittedBy}</span></div>
+          ${req.barangay ? `<div class="row"><span class="label">Barangay</span><span class="value">${req.barangay}</span></div>` : ''}
+          <div class="row"><span class="label">Requested Copies</span><span class="value">${req.copies}</span></div>
           <div class="row"><span class="label">Date Submitted</span><span class="value">${req.submittedAt}</span></div>
           <div class="row"><span class="label">Assigned To</span><span class="value">${req.assignedTo || 'Unassigned'}</span></div>
+          ${req.purpose ? `<div class="row"><span class="label">Purpose</span><span class="value">${req.purpose}</span></div>` : ''}
+          <div class="row"><span class="label">Uploaded Proofs</span><span class="value">${req.attachments.length > 0 ? `${req.attachments.length} attachment(s) verified` : 'Physical documents required upon claiming'}</span></div>
         </div>
 
         <div class="section">
-          <h2>Fee</h2>
-          <div class="row"><span class="label">Payment</span><span class="value">${req.feeNote || 'Pay at the Municipal Hall'}</span></div>
+          <h2>Fee & Processing</h2>
+          <div class="row"><span class="label">Fee Schedule</span><span class="value">${req.feeNote || 'Pay at the Municipal Hall'}</span></div>
+          ${req.processingTime ? `<div class="row"><span class="label">Statutory SLA</span><span class="value">${req.processingTime}</span></div>` : ''}
         </div>
 
         <div class="footer">
@@ -508,29 +534,100 @@ export default function ServicesPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedRequest.barangay && (
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Barangay</p>
+                        <p className="text-sm font-semibold text-text-primary">{selectedRequest.barangay}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Requested Copies</p>
+                      <p className="text-sm font-semibold text-text-primary">{selectedRequest.copies} {selectedRequest.copies === 1 ? 'Copy' : 'Copies'}</p>
+                    </div>
+                  </div>
+
                   {selectedRequest.purpose && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Purpose</p>
-                      <p className="text-text-primary">{selectedRequest.purpose}</p>
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-1">Purpose of Request</p>
+                      <p className="text-text-primary text-sm bg-surface-alt p-3 rounded-xl border border-theme">{selectedRequest.purpose}</p>
                     </div>
                   )}
 
+                  {/* Citizen Uploaded Document Scans */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium">Uploaded Requirements</p>
+                      <span className="text-[11px] font-mono text-accent font-semibold">{selectedRequest.attachments.length} attached</span>
+                    </div>
+
+                    {selectedRequest.attachments.length === 0 ? (
+                      <div className="p-3 bg-surface-alt rounded-xl border border-theme text-xs text-text-primary/70 flex items-center gap-2">
+                        <InfoCircle className="w-4 h-4 text-accent shrink-0" />
+                        <span>No digital scans uploaded. Inspect physical documents upon claiming.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedRequest.attachments.map((att, idx) => {
+                          const isImg = att.url?.match(/\.(jpg|jpeg|png|webp|gif)$/i) || att.type?.startsWith('image/');
+                          return (
+                            <div key={idx} className="p-2.5 bg-surface-alt border border-theme rounded-xl flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                {isImg ? (
+                                  <img src={att.url} alt={att.name} className="w-9 h-9 object-cover rounded-lg border border-theme shrink-0" />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-lg bg-accent-soft flex items-center justify-center text-accent shrink-0">
+                                    <DocumentText className="w-5 h-5" />
+                                  </div>
+                                )}
+                                <div className="overflow-hidden">
+                                  {att.requirement_name && (
+                                    <p className="text-[10px] font-bold text-accent truncate">{att.requirement_name}</p>
+                                  )}
+                                  <p className="text-xs font-semibold text-text-primary truncate">{att.name}</p>
+                                  {att.size ? (
+                                    <p className="text-[10px] text-text-primary/50">{(att.size / 1024).toFixed(0)} KB</p>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <a
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90 transition shrink-0 flex items-center gap-1"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Inspect</span>
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {selectedRequest.requirements.length > 0 && (
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-2">Requirements Checklist</p>
-                      <ul className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-text-primary/60 font-medium mb-2">Statutory Requirements Checklist</p>
+                      <ul className="space-y-1.5 bg-surface-alt p-3.5 rounded-xl border border-theme">
                         {selectedRequest.requirements.map((req, i) => (
-                          <li key={i} className="flex items-center gap-2 text-sm text-text-primary">
-                            <TickSquare className="w-3.5 h-3.5 text-accent" />
-                            {req}
+                          <li key={i} className="flex items-start gap-2 text-xs text-text-primary">
+                            <TickSquare className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                            <span>{req}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
+                  {/* Physical In-Person Reminder for Staff */}
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <Warning2 className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Confirm physical original documents are inspected and validated before releasing.</span>
+                  </div>
+
                   {/* Fee Info */}
-                  <div className="p-4 bg-surface-alt rounded-md space-y-2">
+                  <div className="p-4 bg-surface-alt rounded-xl border border-theme space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-text-primary/70">Fee</span>
                       <span className="font-semibold text-text-primary">{selectedRequest.feeNote || 'Pay at the Municipal Hall'}</span>

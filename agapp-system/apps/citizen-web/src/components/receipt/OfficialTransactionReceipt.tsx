@@ -155,7 +155,8 @@ export function OfficialTransactionReceipt({ lgu, transaction }: OfficialTransac
         </span>
         <p>1. <strong>Presentation of Stub:</strong> Present this printed receipt or digital copy on your smartphone to the Municipal Releasing Officer / Cashier.</p>
         <p>2. <strong>Identity Verification:</strong> Bring at least one (1) valid government-issued ID matching the registered applicant name.</p>
-        <p>3. <strong>Anti-Fraud Protection:</strong> Keep the QR barcode intact and unblemished. Alteration or forgery of this stub is punishable under the Revised Penal Code.</p>
+        <p>3. <strong>Physical Requirements Check:</strong> You MUST present the original copies and photocopies of all required application documents upon claiming.</p>
+        <p>4. <strong>Anti-Fraud Protection:</strong> Keep the QR barcode intact and unblemished. Alteration or forgery of this stub is punishable under the Revised Penal Code.</p>
       </div>
 
       {/* Legal & System Certification Footer */}

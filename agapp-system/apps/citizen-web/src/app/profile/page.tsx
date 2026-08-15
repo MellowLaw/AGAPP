@@ -89,6 +89,18 @@ export default function ProfilePage() {
   // Push notifications toggle
   const [pushEnabled, setPushEnabled] = useState(true);
 
+  // Lock background body scroll when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = historyOpen || helpCenterOpen || faqOpen || developerInfoOpen || Boolean(infoModal);
+    if (isAnyModalOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original || 'unset';
+      };
+    }
+  }, [historyOpen, helpCenterOpen, faqOpen, developerInfoOpen, infoModal]);
+
   // If user is a guest, render the standard mobile AuthGate
   if (!user) {
     return (

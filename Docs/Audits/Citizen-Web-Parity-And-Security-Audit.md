@@ -88,3 +88,18 @@ Both platforms coexist harmoniously within the monorepo architecture:
 - **2026-08-13**: Implemented **Bilingual Semantic FAQ Search** (`BILINGUAL_SYNONYM_MAP` in Tagalog, Taglish, and English with regex word boundaries) and tuned Mistral AI system prompt for respectful Filipino responses (`po/opo`).
 - **2026-08-13**: Aligned **Home Dashboard & Community Tab** (`src/app/page.tsx`) with live `news_announcements` query, unexpired filtering, type prioritization, Announcements section, Trending Forum Discussion with replier avatar stack, and direct article routing to `/news/[id]`.
 - **2026-08-13**: Upgraded **News & Advisories Hub** (`src/app/news/page.tsx`) with 3 segment tabs (*News & Updates*, *Public Advisories*, *Archived*) matching mobile `NewsScreen.tsx`.
+- **2026-08-14**: Implemented **Full Dark Mode Engine & Dynamic LGU Theming** across all 23 routes with dual-mode semantic tokens in `globals.css` and `ThemeContext.tsx`.
+- **2026-08-14**: Engineered **Apple iOS Liquid Glass Bottom Navigation** with authentic blur/specular sheen, high-contrast tab items, and contextual Home-only AI companion floater.
+- **2026-08-14**: Fixed **Bento Grid dynamic icon contrast**, dynamically tinting icons to match LGU primary/secondary colors in both light and dark modes.
+- **2026-08-14**: Overhauled **Town Map Explorer (`/map`)** with custom `L.divIcon` category markers, elevated `z-[1000]` UI layers, and dynamic LGU center/fly-to controller.
+- **2026-08-14**: Built **High-Resolution QR PNG Exporter** (`src/lib/qrExport.ts`) and authentic **Philippine Municipal Electronic Claim Stub & Receipt Document** (`OfficialTransactionReceipt.tsx`) with `@media print` isolation.
+- **2026-08-14**: Polished **Submission Tracking (`/tracking`)** with 5-stage milestone progress stepper, divider-free card surfaces, and responsive photo evidence framing.
+- **2026-08-14**: Upgraded **Incident Reporting (`/report`)** with solid vibrant category badge squircles (Pothole, Drainage, Stray Pets, Damaged Pole) with bold white icons.
+- **2026-08-15**: **Comprehensive Philippine LGU E-Services Overhaul**:
+  - Derived and standardized all **28 authentic Philippine LGU citizen services** across Civil Registrar, BPLO, Barangay Affairs, Treasurer's Office, Assessor's Office, MPDO (Planning & Zoning), OBO (Building & Engineering), Health Office, and MSWDO based on deep research reports into R.A. 11032, R.A. 7160, and R.A. 8792.
+  - Published master specification document [`Docs/Planning/LGU-Citizen-Services-Master-Specification.md`](file:///c:/Users/Lawrence/Documents/PROJECTS/AGAP/Docs/Planning/LGU-Citizen-Services-Master-Specification.md).
+  - Seeded and live-synced 56 standard services (28 Liliw, 28 Nagcarlan) in `lgu_services` via SQL patch `16_comprehensive_eservices_catalog.sql` and `seed.sql`.
+  - Added **Interactive Requirement Document Uploader** to Citizen Web (`/services`) storing scans/PDFs in Supabase Storage `service-attachments` under `${user.id}/${refCode}/${filename}`.
+  - Enforced prominent **In-Person Physical Pickup Check Notice** across web portal, mobile app detail sheets, and official printable stubs (`OfficialTransactionReceipt.tsx`).
+  - Added **Document Inspection & Preview Drawer** in Admin Portal (`/lgu/services`) allowing officers to inspect citizen-uploaded scans, verify document requirements, and manage pickup workflow.
+

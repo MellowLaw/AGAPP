@@ -5,6 +5,14 @@
 
 ## 🔴 Now (active)
 
+- [x] **Comprehensive LGU E-Services Overhaul (2026-08-15)** — Standardize and expand
+      all 28 authentic Philippine LGU citizen services across `supabase`, `citizen-web`,
+      `admin`, and `mobile` per `Docs/Planning/LGU-Citizen-Services-Master-Specification.md`:
+      (1) Complete catalog with accurate offices (LCR, BPLO, Treasurer, Assessor, OBO, MPDO,
+      Health, MSWDO, Barangay), (2) Complete requirement checklists, statutory SLAs (R.A. 11032),
+      and fee schedules, (3) Document upload capability to `service-attachments` with prominent
+      physical pickup in-person reminder notice, (4) Admin queue document review & attachment
+      inspection drawer.
 - [x] **Built mobile push notification gaps (2026-07-17)** — per
       `Plan-Mobile-Push-Notifications.md`: (1) `verify_citizen()` now inserts a
       `notifications` row on approve/reject (highest-priority gap — the one
