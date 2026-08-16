@@ -43,18 +43,17 @@ export function PwaInstallBanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Fast-exit if already dismissed or installed
-    if (isDismissedOrInstalled()) return;
-
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-    // On localhost, unregister old service workers and purge caches to prevent stale bundles
-    if (isLocalhost && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const reg of registrations) {
-          reg.unregister();
-        }
-      });
+    // On localhost, aggressively unregister old service workers and purge caches to prevent stale dev bundles
+    if (isLocalhost) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const reg of registrations) {
+            reg.unregister();
+          }
+        });
+      }
       if ('caches' in window) {
         caches.keys().then((keys) => {
           for (const key of keys) {
@@ -67,6 +66,9 @@ export function PwaInstallBanner() {
         console.log('SW registration note:', err);
       });
     }
+
+    // Fast-exit for the visual install toast if already dismissed or installed
+    if (isDismissedOrInstalled()) return;
 
     const handler = (e: Event) => {
       e.preventDefault();

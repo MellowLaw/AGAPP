@@ -1,4 +1,19 @@
-const CACHE_NAME = 'agapp-citizen-v2';
+const CACHE_NAME = 'agapp-citizen-v3';
+
+// If running in development (localhost/127.0.0.1), self-unregister and purge caches immediately
+if (typeof self !== 'undefined' && self.location && (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1')) {
+  self.addEventListener('install', () => {
+    self.skipWaiting();
+  });
+  self.addEventListener('activate', (event) => {
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+  });
+}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

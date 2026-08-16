@@ -47,7 +47,7 @@ interface SidebarProps {
 // (users.module_permissions). This is UX only — the actual boundary is
 // staff_can('<module>') inside the RLS policies.
 const LGU_NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/lgu/dashboard', icon: Home, module: 'dashboard' },
+  { label: 'Dashboard', href: '/lgu/dashboard', icon: Home, adminOnly: true },
   { label: 'Service Requests', href: '/lgu/services', icon: DocumentText, section: 'services', module: 'services' },
   { label: 'eServices Catalog', href: '/lgu/eservices-catalog', icon: Scroll, module: 'eservices-catalog' },
   { label: 'Issue Reports', href: '/lgu/reports', icon: Danger, section: 'reports', module: 'reports' },
@@ -203,12 +203,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, lguName }) => {
             {lguLogo ? (
               <img src={lguLogo} alt="LGU Seal" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-accent">{initials(profile?.name || '?')}</span>
+              <span className="text-xs font-bold text-accent" suppressHydrationWarning>{initials(profile?.name || '?')}</span>
             )}
           </div>
           <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <p className="text-sm font-semibold text-text-primary truncate">{profile?.name || 'Admin User'}</p>
-            <p className="text-xs font-mono text-text-muted truncate" title={profile?.email || ''}>{profile?.email || ''}</p>
+            <p className="text-sm font-semibold text-text-primary truncate" suppressHydrationWarning>{profile?.name || 'Admin User'}</p>
+            <p className="text-xs font-mono text-text-muted truncate" title={profile?.email || ''} suppressHydrationWarning>{profile?.email || ''}</p>
           </div>
         </div>
         <motion.button

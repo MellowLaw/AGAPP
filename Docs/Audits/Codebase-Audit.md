@@ -1,8 +1,33 @@
 # AGAPP System — Full Codebase Audit
 
-> **Scope:** `agapp-system/` monorepo (mobile, admin, field-officer, api, shared, supabase)
-> **Date:** 2026-06-17 · Last updated: 2026-07-06
+> **Scope:** `agapp-system/` monorepo (`apps/mobile`, `apps/citizen-web`, `apps/admin`, `apps/api`, `packages/shared`, `supabase/`)
+> **Date:** 2026-06-17 · Last updated: 2026-08-16
 > **Purpose:** Ground-truth status of every folder/file — what's done, what's stubbed, what's broken, what's not connected. Use this instead of the AI-generated requirements doc, which is partly inaccurate.
+
+---
+
+## 🔄 Update — 2026-08-16 (Citizen Web Portal 1:1 Mobile Parity & Access Control Hardening)
+
+`apps/citizen-web` is now a first-class, fully operational Next.js 14 (App Router) Progressive Web App with 100% visual, functional, and security parity with `apps/mobile`:
+
+1. **5-State Access Control Hierarchy (Mobile 1:1 Parity)**:
+   - **Guest (`!user`)**: Read-only exploration. Action gating across Services, Reports, Forum, Profile, and My Requests renders the animated `<AuthGate />` companion.
+   - **Unverified Citizen (`user && !isVerified`)**: Can browse and comment; clearance applications show disabled `"Verify to Submit"` button routing to `/verify`. Reports form shows solid amber `"Verification Required"` alert. Forum thread creation shows `"Verify to Post"`. Profile displays `"Unverified Citizen"` card with direct `/verify` action.
+   - **Verified Resident (`user && isVerified`)**: Unrestricted access to clearance application submission with instant Claim QR passes, geotagged incident reporting with GPS & photo evidence, and community forum publishing.
+   - **Restricted (`moderation_status === 'restricted'`)**: Real-time moderation listener blocks forum thread creation, commenting, and liking with a clear notice. Public safety reporting and basic services remain operational.
+   - **Banned (`moderation_status === 'banned'`)**: Real-time listener immediately locks out the session and forces navigation to `/banned` countdown & appeal form.
+2. **Lottie Animated Mascot Player**:
+   - Built client-side SSR-safe `LottiePlayer.tsx` powered by `lottie-react`.
+   - Placed moving `ai-floating.json` mascot cleanly at `-top-[62px] -left-3` (`w-20 h-20`) above bottom nav on Home `/` (hidden on `/chatbot`).
+   - Chatbot screen (`/chatbot`) renders moving `chatbot-message.json` avatar above bot messages and in thinking state with typewriter text animation and zero emojis.
+3. **28 Standardized LGU E-Services**:
+   - Standardized 28 authentic Philippine LGU citizen services across Civil Registry, BPLO, Treasury, Barangay Affairs, Assessor, MPDO, OBO, Health, and MSWDO.
+   - Interactive requirement document uploader storing files in `service-attachments` Supabase storage bucket under `${user.id}/${refCode}/${filename}`.
+   - Prominent in-person physical pickup notice on web, mobile detail sheets, and printable receipts (`OfficialTransactionReceipt.tsx`).
+4. **Identity Verification Hardening**:
+   - 4-step wizard: ID selection + photo &rarr; Residency declaration &rarr; Live selfie &rarr; Review & RA 10173 consent.
+   - Files are uploaded directly to the private `citizen-ids` Supabase storage bucket (`<lgu_id>/<user_id>/id_front_<timestamp>.jpg`).
+   - Submits via `submit_verification_request` RPC, updating `users.verification_status = 'pending'`.
 
 ---
 

@@ -15,22 +15,24 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => {
   const variants = {
     default: 'bg-surface-alt text-text-primary border border-theme',
-    success: 'bg-green-600 text-white',
-    warning: 'bg-amber-500 text-black',
-    error: 'bg-red-600 text-white',
-    info: 'bg-blue-600 text-white',
+    success: 'bg-[#10B981] text-white',
+    warning: 'bg-[#F59E0B] text-white',
+    error: 'bg-[#EF4444] text-white',
+    info: 'bg-[#0284C7] text-white',
   };
   
   return (
     <span
       className={`
-        inline-flex items-center px-2.5 py-0.5
-        text-xs font-medium rounded-full whitespace-nowrap shrink-0
+        inline-flex items-center justify-center px-2.5 h-[22px]
+        text-[10.5px] font-bold uppercase tracking-wider rounded-full whitespace-nowrap shrink-0 text-center select-none shadow-2xs
         ${variants[variant]}
         ${className}
       `}
     >
-      {children}
+      <span className="inline-flex items-center justify-center translate-y-[0.5px] leading-none">
+        {children}
+      </span>
     </span>
   );
 };

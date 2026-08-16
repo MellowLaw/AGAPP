@@ -12,19 +12,19 @@
 ```
 agapp-system/
 ├── apps/
-│   ├── mobile/      # Citizen mobile app — Expo SDK 54, React Native 0.81, React 19
-│   ├── admin/       # LGU / Super-Admin dashboard — Next.js 14 (App Router), React 18
-│   └── api/         # NestJS API — chatbot + a guarded photo-verification ML endpoint ONLY
+│   ├── mobile/       # Citizen mobile app — Expo SDK 54, React Native 0.81, React 19 (:8081)
+│   ├── citizen-web/  # Citizen Web Portal & PWA — Next.js 14 (App Router), React 18 (:3001)
+│   ├── admin/        # LGU / Super-Admin dashboard — Next.js 14 (App Router), React 18 (:3002)
+│   └── api/          # NestJS API — chatbot + a guarded photo-verification ML endpoint ONLY (:3000)
 ├── packages/
-│   └── shared/      # Shared TS types (consumed by the other workspaces)
-├── stubs/           # Placeholder packages that force npm to nest React 18 for admin
+│   └── shared/       # Shared TS types (consumed by the other workspaces)
+├── stubs/            # Placeholder packages that force npm to nest React 18 for web apps
 │                     # (see "React 18/19 split" gotcha below — do not remove)
-└── supabase/        # schema.sql, seed.sql, storage_setup.sql, verification_setup.sql
+└── supabase/         # schema.sql, seed.sql, storage_setup.sql, verification_setup.sql
 ```
 
-> ⚠️ There used to be a fourth app, `apps/field-officer` — it was cut from the project
-> and deleted. If you see it referenced anywhere (old docs, old branches), it's gone;
-> don't try to resurrect it.
+> ⚠️ There used to be an `apps/field-officer` app — it was cut from the project
+> and deleted. If you see it referenced in old notes, don't resurrect it.
 
 ---
 
@@ -32,17 +32,12 @@ agapp-system/
 
 | Tool | Version | Why |
 |---|---|---|
-| **Node.js** | 20 LTS (or 18+) | Runtime for all three apps |
+| **Node.js** | 20 LTS (or 18+) | Runtime for all workspaces |
 | **npm** | 10+ | Comes with Node |
-| **Git** | any | Clone the repo |
+| **Git** | any | Version control |
 | **Expo Go app** | latest | Run the mobile app on your physical phone (Play Store / App Store) |
 | **A Supabase project** | free tier is fine | The shared Postgres backend — **required**, there is no mock/offline mode |
 | Android Studio / Xcode | optional | Only if you want an emulator/simulator instead of a physical phone |
-
-> ⚠️ **Phone and PC must be on the same Wi-Fi network** for Expo Go to reach your
-> machine — the mobile app talks to Supabase directly over the internet, but if you
-> also run the API locally (for the chatbot/ML endpoints), your phone needs to reach
-> your PC's LAN IP, not `localhost`.
 
 ---
 
@@ -62,21 +57,14 @@ npm run build:shared
 #    apps/api/.env
 #    apps/mobile/.env
 #    apps/admin/.env.local
+#    apps/citizen-web/.env.local
 ```
-
-**Why `--legacy-peer-deps`?** Mobile needs React 19 (Expo 54); admin needs React 18
-(Next.js 14). That mismatch means some peer-dep warnings are expected — this flag
-(and `npx expo install` for mobile packages) is the correct way to handle it in this
-repo. See the React 18/19 gotcha further down before touching root `package.json` or
-`stubs/`.
 
 ---
 
 ## 🔐 Environment variables
 
-Every app fails silently (or shows no data) without its `.env` file. **None of these
-are committed** — copy the `.example` file in each app and ask the project lead for
-the real values (they're one shared Supabase project + a couple of third-party API keys).
+Every app fails silently (or shows no data) without its `.env` file. **None of these are committed** — copy the `.example` file in each app and fill in the values:
 
 ### `apps/api/.env` (copy from `.env.example`)
 ```env
@@ -86,34 +74,34 @@ MISTRAL_API_KEY=<key>                        # chatbot LLM fallback (mistral-sma
 ROBOFLOW_API_KEY=<key>                       # pothole + stray-pet photo-verification ML
 ROBOFLOW_POTHOLE_MODEL_URL=https://serverless.roboflow.com/<pothole-slug>/<version>
 ROBOFLOW_STRAYPETS_MODEL_URL=https://serverless.roboflow.com/<straypets-slug>/<version>
-PORT=5000
-# ALLOWED_ORIGINS=https://your-deployed-admin-url   # CORS allowlist; unset = open + a warning, fine for local dev
+PORT=3000
 ```
-Missing `ROBOFLOW_*` just means the AI photo-verification badge returns "not analyzed"
-instead of a result — it never fabricates a confidence score, so it's safe to skip if
-you're not working on that feature. `MISTRAL_API_KEY` missing means the chatbot falls
-back to "couldn't find an answer" once its keyword FAQ match fails.
+
+### `apps/citizen-web/.env.local` (copy from `.env.local.example`)
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
+NEXT_PUBLIC_API_URL=http://localhost:3000
+PORT=3001
+```
 
 ### `apps/mobile/.env` (copy from `.env.example`)
 ```env
-EXPO_PUBLIC_API_URL=http://192.168.1.x:5000/api   # your PC's LAN IP, NOT localhost
+EXPO_PUBLIC_API_URL=http://192.168.1.x:3000/api   # your PC's LAN IP, NOT localhost
 EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
 REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.x        # your PC's LAN IP
 ```
-> 📡 Find your LAN IP: Windows → `ipconfig` (look for `IPv4 Address`); macOS/Linux →
-> `ifconfig | grep inet`.
 
 ### `apps/admin/.env.local` (copy from `.env.local.example`)
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
-NEXT_PUBLIC_API_URL=http://localhost:5000
-SUPABASE_SERVICE_ROLE_KEY=<service-role-secret-key>   # server-only; needed for staff creation ("Add Staff") and LGU onboarding
+NEXT_PUBLIC_API_URL=http://localhost:3000
+SUPABASE_SERVICE_ROLE_KEY=<service-role-secret-key>   # server-only; needed for staff creation & LGU onboarding
+PORT=3002
 
-# Demo Quick Login (seeded accounts) — base64-encoded, ask the project lead for the
-# actual passwords, then encode locally:
-#   node -e "console.log(Buffer.from('yourPassword','utf8').toString('base64'))"
+# Demo Quick Login (base64-encoded passwords)
 DEMO_SUPERADMIN_PASSWORD_B64=
 DEMO_LGUADMIN_PASSWORD_B64=
 DEMO_PERSONNEL_PASSWORD_B64=
@@ -126,10 +114,11 @@ DEMO_PERSONNEL_PASSWORD_B64=
 From `agapp-system/`:
 
 ```bash
-npm run dev          # API (:5000) + Admin (:3000) together
-npm run dev:api       # API only (NestJS, hot reload)
-npm run dev:admin     # Admin only (Next.js, hot reload)
-npm run dev:mobile    # Mobile only (Expo)
+npm run dev                 # API (:3000) + Citizen Web (:3001) + Admin (:3002)
+npm run dev:api             # NestJS API only (:3000)
+npm run dev:citizen-web     # Citizen Web portal only (:3001)
+npm run dev:admin           # Admin dashboard only (:3002)
+npm run dev:mobile          # Mobile only (Expo Metro bundler)
 ```
 
 The mobile app is a separate native dev server and isn't part of `npm run dev` —

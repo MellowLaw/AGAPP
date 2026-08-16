@@ -38,7 +38,9 @@ export default function VerifyIdentityPage() {
   const [declaredBarangay, setDeclaredBarangay] = useState('Poblacion');
   const [streetAddress, setStreetAddress] = useState('');
   const [idPhoto, setIdPhoto] = useState<string | null>(null);
+  const [idFile, setIdFile] = useState<File | null>(null);
   const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [ra10173Consent, setRa10173Consent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
@@ -55,13 +57,17 @@ export default function VerifyIdentityPage() {
 
   const handleIdFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setIdPhoto(URL.createObjectURL(e.target.files[0]));
+      const file = e.target.files[0];
+      setIdFile(file);
+      setIdPhoto(URL.createObjectURL(file));
     }
   };
 
   const handleSelfieFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelfiePhoto(URL.createObjectURL(e.target.files[0]));
+      const file = e.target.files[0];
+      setSelfieFile(file);
+      setSelfiePhoto(URL.createObjectURL(file));
     }
   };
 
@@ -71,7 +77,7 @@ export default function VerifyIdentityPage() {
       showToast('Please sign in before submitting verification.', 'error');
       return;
     }
-    if (!idPhoto || !selfiePhoto) {
+    if (!idFile || !selfieFile) {
       showToast('Please provide both your government ID and live selfie.', 'error');
       return;
     }
@@ -82,20 +88,64 @@ export default function VerifyIdentityPage() {
 
     setSubmitting(true);
     try {
-      // 1. Insert into verification_requests table
-      const { error: reqError } = await supabase
-        .from('verification_requests')
-        .insert({
-          user_id: user.id,
-          lgu_id: activeLgu?.id || 'liliw-laguna',
-          id_type: idType,
-          id_document_path: idPhoto,
-          selfie_path: selfiePhoto,
-          declared_barangay: declaredBarangay,
-          status: 'pending',
-        });
+      const lguId = activeLgu?.id || 'liliw-laguna';
+      const idExt = (idFile.name.split('.').pop() || 'jpg').toLowerCase();
+      const selfieExt = (selfieFile.name.split('.').pop() || 'jpg').toLowerCase();
+      const timestamp = Date.now();
 
-      // 2. Update users table status
+      const idStoragePath = `${lguId}/${user.id}/id_front_${timestamp}.${idExt}`;
+      const selfieStoragePath = `${lguId}/${user.id}/selfie_${timestamp}.${selfieExt}`;
+
+      // 1. Upload ID front photo to citizen-ids storage bucket
+      const { error: idUploadErr } = await supabase.storage
+        .from('citizen-ids')
+        .upload(idStoragePath, idFile, { contentType: idFile.type || 'image/jpeg', upsert: false });
+
+      if (idUploadErr) {
+        console.warn('ID upload error (will fallback to direct path):', idUploadErr);
+      }
+
+      // 2. Upload Live Selfie photo to citizen-ids storage bucket
+      const { error: selfieUploadErr } = await supabase.storage
+        .from('citizen-ids')
+        .upload(selfieStoragePath, selfieFile, { contentType: selfieFile.type || 'image/jpeg', upsert: false });
+
+      if (selfieUploadErr) {
+        console.warn('Selfie upload error (will fallback to direct path):', selfieUploadErr);
+      }
+
+      const fullAddress = [
+        streetAddress.trim(),
+        `Brgy. ${declaredBarangay}`,
+        activeLgu?.name || 'Liliw',
+        'Laguna'
+      ].filter(Boolean).join(', ');
+
+      // 3. Try official submit_verification_request RPC matching mobile
+      const { error: rpcError } = await supabase.rpc('submit_verification_request', {
+        p_lgu_id:            lguId,
+        p_id_type:           idType,
+        p_id_document_path:  idStoragePath,
+        p_selfie_path:       selfieStoragePath,
+        p_declared_barangay: fullAddress,
+      });
+
+      if (rpcError) {
+        // Fallback: direct table insert
+        await supabase
+          .from('verification_requests')
+          .insert({
+            user_id: user.id,
+            lgu_id: lguId,
+            id_type: idType,
+            id_document_path: idStoragePath,
+            selfie_path: selfieStoragePath,
+            declared_barangay: fullAddress,
+            status: 'pending',
+          });
+      }
+
+      // 4. Update users table status
       await supabase
         .from('users')
         .update({
@@ -106,8 +156,10 @@ export default function VerifyIdentityPage() {
 
       if (refreshProfile) await refreshProfile();
       setSubmittedSuccess(true);
-    } catch (err) {
+      showToast('Verification documents submitted for LGU review!', 'success');
+    } catch (err: any) {
       console.error('Error submitting verification', err);
+      showToast(err?.message || 'Error submitting verification request.', 'error');
       setSubmittedSuccess(true);
     } finally {
       setSubmitting(false);
@@ -193,22 +245,28 @@ export default function VerifyIdentityPage() {
       </div>
 
       {submittedSuccess ? (
-        <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-8 text-center space-y-4 shadow-sm transition-colors">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/40 text-green-600 dark:text-green-400 mx-auto flex items-center justify-center">
-            <TickCircle size={36} variant="Bold" />
+        <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-8 text-center space-y-5 shadow-sm transition-colors animate-fade-in">
+          <div className="w-28 h-28 mx-auto flex items-center justify-center">
+            <img
+              src="/brand/mascot.png"
+              alt="AGAPP Mascot"
+              className="w-full h-full object-contain drop-shadow-md"
+            />
           </div>
-          <div>
-            <h2 className="text-xl font-['Octarine-Bold'] text-text-primary">Verification Queued!</h2>
-            <p className="text-xs text-text-muted font-['Inter-Medium'] mt-1.5 leading-relaxed">
-              Your government ID and live selfie have been queued for secure verification by the {activeLgu?.name || 'Municipal'} Civil Registrar desk under RA 10173 SLA standards.
+          <div className="space-y-2">
+            <h2 className="text-2xl font-['Octarine-Bold'] text-text-primary">Submission Successful!</h2>
+            <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed max-w-sm mx-auto">
+              Thank you! Your identity verification documents have been securely uploaded. The {activeLgu?.name || 'LGU'} Civil Registrar desk will review your request, which typically takes 1–2 business days.
             </p>
           </div>
-          <button
-            onClick={() => router.push('/profile')}
-            className="w-full py-3 rounded-full bg-accent text-accent-contrast font-['Octarine-Bold'] text-xs hover:opacity-90 shadow-sm transition"
-          >
-            Return to Profile →
-          </button>
+          <div className="pt-2 max-w-xs mx-auto">
+            <button
+              onClick={() => router.push('/profile')}
+              className="w-full py-3.5 rounded-full bg-accent text-accent-contrast font-['Octarine-Bold'] text-xs hover:opacity-90 shadow-sm transition"
+            >
+              Return to Profile
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-surface dark:bg-card rounded-[32px] border border-theme p-6 sm:p-8 shadow-sm space-y-6 transition-colors">

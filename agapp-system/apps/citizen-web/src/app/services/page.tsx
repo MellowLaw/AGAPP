@@ -39,6 +39,7 @@ import {
   Add,
   GalleryAdd
 } from 'iconsax-react';
+import { AuthGate } from '../../components/auth/AuthGate';
 import { compressImageFile } from '../../lib/imageCompression';
 import { SkeletonServiceGrid, SkeletonList } from '../../components/common/Skeleton';
 
@@ -410,6 +411,16 @@ export default function ServicesPage() {
   }, [services, selectedOffice, searchQuery]);
 
   const handleOpenApply = (service: any) => {
+    if (!user) {
+      showToast('Sign in required to apply for municipal services.', 'info');
+      setGuestModalOpen(true);
+      return;
+    }
+    if (!isVerified) {
+      showToast('Identity verification required to apply for official documents.', 'info');
+      router.push('/verify');
+      return;
+    }
     setSelectedService(service);
     setPurpose('');
     setCopies('1');
@@ -421,10 +432,6 @@ export default function ServicesPage() {
       isCompressing: false,
     })));
     setAdditionalFiles([]);
-    if (!user) {
-      setGuestModalOpen(true);
-      return;
-    }
     setApplyModalOpen(true);
   };
 
@@ -652,84 +659,92 @@ export default function ServicesPage() {
     : DEFAULT_PRESETS;
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-4 space-y-5 animate-fade-in pb-28">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6 space-y-6 animate-fade-in pb-28">
       {/* Title Header */}
-      <div className="space-y-1 pt-1">
-        <h1 className="text-3xl font-heading text-text-primary tracking-tight">
-          E-Services.
-        </h1>
-        <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed">
-          Request official barangay clearances, civil registry certificates, business permits, and social assistance online.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-theme/60 pb-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-heading text-text-primary tracking-tight">
+            E-Services Catalog
+          </h1>
+          <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed max-w-2xl">
+            Request official barangay clearances, civil registry certificates, business permits, and social assistance with instant Claim QR passes.
+          </p>
+        </div>
 
-      {/* 2-Tab Bar */}
-      <div className="flex items-center border-b border-theme gap-6 text-sm">
-        <button
-          onClick={() => setActiveTab('services')}
-          className={`pb-3 font-heading transition relative ${
-            activeTab === 'services'
-              ? 'text-text-primary'
-              : 'text-text-muted hover:text-text-primary'
-          }`}
-        >
-          <span>Available Services</span>
-          {activeTab === 'services' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
-          )}
-        </button>
+        {/* 2-Tab Bar */}
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setActiveTab('services')}
+            className={`px-4 py-2 rounded-full text-xs font-heading transition shadow-xs ${
+              activeTab === 'services'
+                ? 'bg-accent text-accent-contrast'
+                : 'bg-surface dark:bg-card text-text-muted border border-theme hover:text-text-primary'
+            }`}
+          >
+            <span>Available Services</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('my_requests')}
-          className={`pb-3 font-heading transition relative flex items-center gap-1.5 ${
-            activeTab === 'my_requests'
-              ? 'text-text-primary'
-              : 'text-text-muted hover:text-text-primary'
-          }`}
-        >
-          <span>My Requests</span>
-          <span className={`px-2 py-0.2 rounded-full text-[10px] ${
-            activeTab === 'my_requests' ? 'bg-accent text-accent-contrast' : 'bg-surface-alt dark:bg-chip text-text-muted'
-          }`}>
-            {myRequests.length}
-          </span>
-          {activeTab === 'my_requests' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
-          )}
-        </button>
+          <button
+            onClick={() => setActiveTab('my_requests')}
+            className={`px-4 py-2 rounded-full text-xs font-heading transition flex items-center gap-1.5 shadow-xs ${
+              activeTab === 'my_requests'
+                ? 'bg-accent text-accent-contrast'
+                : 'bg-surface dark:bg-card text-text-muted border border-theme hover:text-text-primary'
+            }`}
+          >
+            <span>My Requests</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === 'my_requests' ? 'bg-black/20 text-white' : 'bg-surface-alt dark:bg-chip text-text-muted'
+            }`}>
+              {myRequests.length}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ── TAB 1: AVAILABLE SERVICES CATALOG ── */}
       {activeTab === 'services' && (
-        <div className="space-y-5">
-          {/* Guest / Unverified Notice */}
-          {!user ? (
-            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-['Inter-Medium']">
-                <InfoCircle size={20} className="shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>You are browsing as a <strong>Guest</strong>. Sign in to submit service applications.</span>
-              </div>
-              <Link href="/auth/login" className="px-3.5 py-1.5 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition shrink-0 shadow-xs">
-                Sign In
-              </Link>
-            </div>
-          ) : !isVerified ? (
-            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-['Inter-Medium']">
-                <ShieldSecurity size={20} className="shrink-0 text-amber-600 dark:text-amber-400" />
-                <div>
-                  <span className="font-heading block text-amber-900 dark:text-amber-200">Identity Verification Required</span>
-                  <span className="text-[10px] text-amber-800 dark:text-amber-300">Verify your residency to unlock fast-track document processing.</span>
-                </div>
-              </div>
-              <Link href="/verify" className="px-3.5 py-1.5 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition shrink-0 shadow-xs">
-                Verify
-              </Link>
-            </div>
-          ) : null}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
+          {/* Left Department Filter Rail (Desktop) */}
+          <div className="lg:col-span-3 space-y-3 lg:sticky lg:top-6">
+            <h3 className="text-xs font-['Octarine-Bold'] uppercase tracking-wider text-text-muted hidden lg:block pl-1">
+              Departments & Offices
+            </h3>
 
-          {/* Search Bar & Department Filter Chips */}
-          <div className="space-y-3">
+            {/* Desktop Vertical List / Mobile Horizontal Scroll */}
+            <div className="flex lg:flex-col items-stretch gap-1.5 overflow-x-auto pb-1 lg:pb-0 no-scrollbar">
+              {offices.map((off) => {
+                const count = off.id === 'ALL'
+                  ? services.length
+                  : services.filter(s => s.office_name === off.id || (off.id === 'Civil Registrar' && s.office_name?.includes('Civil'))).length;
+
+                return (
+                  <button
+                    key={off.id}
+                    onClick={() => setSelectedOffice(off.id)}
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-heading transition flex items-center justify-between shadow-xs ${
+                      selectedOffice === off.id
+                        ? 'bg-accent text-accent-contrast'
+                        : 'bg-surface dark:bg-card text-text-muted hover:bg-surface-alt dark:hover:bg-chip border border-theme text-left'
+                    }`}
+                  >
+                    <span className="truncate">{off.label}</span>
+                    {count > 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ml-1.5 shrink-0 hidden lg:inline-block ${
+                        selectedOffice === off.id ? 'bg-black/20 text-white' : 'bg-surface-alt dark:bg-chip text-text-muted'
+                      }`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Main Catalog Area */}
+          <div className="lg:col-span-9 space-y-5">
+            {/* Search Bar */}
             <div className="relative">
               <SearchNormal1 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
@@ -741,27 +756,9 @@ export default function ServicesPage() {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {offices.map((off) => (
-                <button
-                  key={off.id}
-                  onClick={() => setSelectedOffice(off.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-heading whitespace-nowrap transition shadow-xs ${
-                    selectedOffice === off.id
-                      ? 'bg-accent text-accent-contrast'
-                      : 'bg-surface dark:bg-card text-text-muted hover:bg-surface-alt dark:hover:bg-chip border border-theme'
-                  }`}
-                >
-                  {off.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Services List */}
-          <div className="space-y-3.5">
+            {/* Services Grid (2 Columns on Desktop) */}
             {loadingServices ? (
-              <SkeletonServiceGrid count={4} />
+              <SkeletonServiceGrid count={6} />
             ) : filtered.length === 0 ? (
               <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-2">
                 <DocumentText size={32} className="text-text-muted mx-auto" />
@@ -769,60 +766,52 @@ export default function ServicesPage() {
                 <p className="text-[11px] text-text-muted font-['Inter-Medium']">Try adjusting your search or department filter.</p>
               </div>
             ) : (
-              filtered.map((srv) => (
-                <div
-                  key={srv.id}
-                  className="p-5 rounded-[24px] bg-surface dark:bg-card border border-theme shadow-xs hover:border-accent transition duration-200 space-y-3.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-heading uppercase text-accent block tracking-wider">
-                        {srv.office_name || 'Municipal Office'}
-                      </span>
-                      <h3 className="text-base font-heading text-text-primary mt-0.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filtered.map((srv) => (
+                  <div
+                    key={srv.id}
+                    onClick={() => handleOpenApply(srv)}
+                    className="p-5 rounded-[24px] bg-surface dark:bg-card border border-theme shadow-xs hover:border-accent hover:shadow-md transition duration-200 space-y-3.5 cursor-pointer group flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[10px] font-heading uppercase text-accent block tracking-wider">
+                          {srv.office_name || 'Municipal Office'}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-surface-alt dark:bg-chip border border-theme text-[10px] font-heading text-text-muted shrink-0">
+                          {srv.processing_time || '24-48 Hrs'}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-heading text-text-primary group-hover:text-accent transition-colors">
                         {srv.name}
                       </h3>
+                      <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed line-clamp-3">
+                        {srv.description}
+                      </p>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-surface-alt dark:bg-chip border border-theme text-[10px] font-heading text-text-muted shrink-0">
-                      {srv.processing_time || '24-48 Hrs'}
-                    </span>
-                  </div>
 
-                  <p className="text-xs text-text-muted font-['Inter-Medium'] leading-relaxed">
-                    {srv.description}
-                  </p>
+                    <div className="space-y-3 pt-2">
+                      {srv.requirements && srv.requirements.length > 0 && (
+                        <div className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme space-y-1">
+                          <span className="text-[9px] font-heading uppercase text-text-muted block">Requirements:</span>
+                          <span className="text-[11px] text-text-muted font-['Inter-Medium'] line-clamp-2">
+                            {srv.requirements.join(' · ')}
+                          </span>
+                        </div>
+                      )}
 
-                  {srv.requirements && srv.requirements.length > 0 && (
-                    <div className="p-3.5 rounded-2xl bg-surface-alt dark:bg-chip border border-theme space-y-1.5">
-                      <span className="text-[10px] font-heading uppercase text-text-muted block">Required Documents & Pre-Requisites:</span>
-                      <ul className="text-[11px] text-text-muted font-['Inter-Medium'] list-disc pl-4 space-y-1">
-                        {srv.requirements.map((req: string, idx: number) => (
-                          <li key={idx}>{req}</li>
-                        ))}
-                      </ul>
+                      <div className="flex items-center justify-between pt-1 border-t border-theme/50">
+                        <span className="text-xs font-['Octarine-Bold'] text-text-primary">
+                          {srv.fee_note || 'Standard LGU Rate'}
+                        </span>
+                        <span className="px-4 py-1.5 rounded-full bg-accent text-accent-contrast text-xs font-['Octarine-Bold'] group-hover:opacity-90 transition shadow-2xs">
+                          Apply &rarr;
+                        </span>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Prominent Physical Requirement Reminder */}
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 font-['Inter-Medium'] flex items-center gap-2">
-                    <Warning2 size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
-                    <span>Bring original copies upon claiming at the Municipal Hall.</span>
                   </div>
-
-                  <div className="pt-2 flex items-center justify-between">
-                    <span className="text-xs font-heading text-accent">
-                      Fee: {srv.fee_note || 'Standard Fee'}
-                    </span>
-                    <button
-                      onClick={() => handleOpenApply(srv)}
-                      className="px-4 py-2 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition flex items-center gap-1.5 shadow-xs"
-                    >
-                      <span>Apply & Upload Docs</span>
-                      <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -846,22 +835,11 @@ export default function ServicesPage() {
           </div>
 
           {!user ? (
-            <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-3 shadow-xs">
-              <div className="w-14 h-14 rounded-full bg-surface-alt dark:bg-chip border border-theme text-text-muted flex items-center justify-center mx-auto">
-                <ClipboardText size={28} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-heading text-text-primary">Track Your Applications</h3>
-                <p className="text-xs text-text-muted font-['Inter-Medium'] max-w-sm mx-auto leading-relaxed">
-                  Sign in to view status updates, claim passes, and releases for your submitted municipal applications.
-                </p>
-              </div>
-              <Link
-                href="/auth/login"
-                className="inline-block px-6 py-2.5 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition shadow-xs"
-              >
-                Sign In to View Requests
-              </Link>
+            <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-4 shadow-xs">
+              <AuthGate
+                title="Track Your Applications"
+                subtitle="Sign in to view status updates, claim passes, and releases for your submitted municipal applications."
+              />
             </div>
           ) : loadingRequests ? (
             <SkeletonList count={3} />
@@ -1013,9 +991,9 @@ export default function ServicesPage() {
             </div>
 
             {!isVerified ? (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-200 space-y-3 font-['Inter-Medium']">
+              <div className="p-4 rounded-2xl bg-[#FEF3C7] dark:bg-[#2A2218] border border-[#FDE68A] dark:border-[#4B3B22] text-xs text-[#92400E] dark:text-[#FDE68A] space-y-3 font-['Inter-Medium']">
                 <div className="flex items-center gap-2">
-                  <ShieldSecurity size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
+                  <ShieldSecurity size={20} className="text-[#D97706] dark:text-[#FBBF24] shrink-0" />
                   <span className="font-heading">Identity Verification Required</span>
                 </div>
                 <p>
@@ -1030,13 +1008,13 @@ export default function ServicesPage() {
               </div>
             ) : (
               <form onSubmit={handleApplySubmit} className="space-y-4 text-xs font-['Inter-Medium']">
-                {/* MANDATORY PHYSICAL PICKUP BANNER */}
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1 font-['Inter-Medium']">
-                  <div className="flex items-center gap-1.5 font-heading text-amber-800 dark:text-amber-300 text-[11px]">
-                    <Warning2 size={16} className="shrink-0" />
+                {/* MANDATORY PHYSICAL PICKUP BANNER - SOLID */}
+                <div className="p-3.5 rounded-2xl bg-[#FEF3C7] dark:bg-[#2A2218] border border-[#FDE68A] dark:border-[#4B3B22] text-[#92400E] dark:text-[#FDE68A] space-y-1 font-['Inter-Medium']">
+                  <div className="flex items-center gap-1.5 font-heading text-[#92400E] dark:text-[#FDE68A] text-[11px]">
+                    <Warning2 size={16} className="shrink-0 text-[#D97706] dark:text-[#FBBF24]" />
                     <span>Paunawa: Dalhin ang Orihinal na Dokumento</span>
                   </div>
-                  <p className="text-[10.5px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                  <p className="text-[10.5px] leading-relaxed text-[#78350F] dark:text-[#FDE68A]/90">
                     Ang pag-upload online ay para sa paunang pagsusuri (pre-assessment). <strong>MANDATORY</strong> po na dalhin ang orihinal o opisyal na kopya ng inyong mga requirements sa oras ng pagkuha (claiming) sa Municipal Hall.
                   </p>
                 </div>
@@ -1361,13 +1339,13 @@ export default function ServicesPage() {
               />
             </div>
 
-            {/* In-Person Physical Pickup Guideline */}
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 text-left space-y-1">
-              <strong className="flex items-center gap-1.5 font-heading text-amber-900 dark:text-amber-200">
-                <Warning2 size={14} variant="Bold" className="text-amber-600 dark:text-amber-400 shrink-0" />
+            {/* In-Person Physical Pickup Guideline - SOLID */}
+            <div className="p-3 rounded-2xl bg-[#FEF3C7] dark:bg-[#2A2218] border border-[#FDE68A] dark:border-[#4B3B22] text-[10.5px] text-[#92400E] dark:text-[#FDE68A] text-left space-y-1">
+              <strong className="flex items-center gap-1.5 font-heading text-[#92400E] dark:text-[#FDE68A]">
+                <Warning2 size={14} variant="Bold" className="text-[#D97706] dark:text-[#FBBF24] shrink-0" />
                 <span>Pickup Requirement Check:</span>
               </strong>
-              <p>
+              <p className="text-[#78350F] dark:text-[#FDE68A]/90">
                 Present this QR code and bring the <strong>physical original/photocopies</strong> of your requirements at the <strong>{claimModalData.office_name || 'Municipal Desk'}</strong> counter.
               </p>
             </div>

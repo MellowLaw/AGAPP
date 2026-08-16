@@ -102,4 +102,10 @@ Both platforms coexist harmoniously within the monorepo architecture:
   - Added **Interactive Requirement Document Uploader** to Citizen Web (`/services`) storing scans/PDFs in Supabase Storage `service-attachments` under `${user.id}/${refCode}/${filename}`.
   - Enforced prominent **In-Person Physical Pickup Check Notice** across web portal, mobile app detail sheets, and official printable stubs (`OfficialTransactionReceipt.tsx`).
   - Added **Document Inspection & Preview Drawer** in Admin Portal (`/lgu/services`) allowing officers to inspect citizen-uploaded scans, verify document requirements, and manage pickup workflow.
+- **2026-08-16**:
+  - **Lottie Animated Mascot System**: Integrated SSR-safe `LottiePlayer.tsx` with `lottie-react` using mobile animated assets (`/brand/ai-floating.json`, `/brand/chatbot-message.json`, `/brand/sign-up-animation.json`).
+  - **Floating Companion Alignment**: Positioned animated `ai-floating.json` companion at `-top-[62px] -left-3` (`w-20 h-20`) on Home `/` (hidden on `/chatbot`), perfectly matching mobile [AppNavigator.tsx](file:///c:/Users/Lawrence/Documents/PROJECTS/AGAP/agapp-system/apps/mobile/src/navigation/AppNavigator.tsx#L280-L304).
+  - **Chatbot Screen Parity**: Stripped green online dot/text; aligned header (Back, Reset), welcome question *"What is on your mind today?"* without emojis, moving `chatbot-message.json` animation, typewriter text stream, and direct action redirect cards.
+  - **5-State Access Control Matrix Parity**: Standardized Guest, Unverified, Verified, Restricted, and Banned gating across all citizen-web modules matching mobile.
+  - **Identity Verification Storage Hardening**: Updated `/verify` flow to store files in private `citizen-ids` Supabase bucket (`<lgu_id>/<user_id>/id_front_<timestamp>.jpg`), invoke `submit_verification_request` RPC, and display celebration sticker success view.
 

@@ -7,6 +7,7 @@ import { Manrope } from 'next/font/google';
 import { ArrowRight, Eye, EyeSlash, TickCircle, Sms } from 'iconsax-react';
 import { supabase } from '@/lib/supabase';
 import { lguNameFromId, lguIdFromName } from '@/lib/lgu';
+import { homePathForModules } from '@/lib/modules';
 import { AgappLogo } from '@/components/ui/AgappLogo';
 
 // Scoped to this page only — the rest of the admin app uses Plus Jakarta Sans
@@ -109,7 +110,14 @@ export default function UnifiedLoginPage() {
       }
       router.push(`/lgu/dashboard?lguName=${encodeURIComponent(lguName)}`);
     } else if (profile.role === 'LGU_PERSONNEL') {
-      router.push('/personnel/dashboard');
+      let lguName = lguNameFromId(profile.lgu_id);
+      const { data: lgu } = await supabase.from('lgus').select('name').eq('id', profile.lgu_id).single();
+      if (lgu?.name && lguIdFromName(lgu.name) === profile.lgu_id) {
+        lguName = lgu.name;
+      }
+      const landing = homePathForModules(profile.module_permissions) ?? '/personnel/settings';
+      const sep = landing.includes('?') ? '&' : '?';
+      router.push(`${landing}${sep}lguName=${encodeURIComponent(lguName)}`);
     } else {
       await supabase.auth.signOut();
       return 'Access denied: Citizens must use the mobile application.';

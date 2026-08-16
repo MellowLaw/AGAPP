@@ -128,13 +128,13 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false }),
         supabase
           .from('service_requests')
-          .select('id, reference_number, service_id, status, citizen_id, submitted_at, department')
+          .select('id, reference_number, lgu_service_id, service_type, status, citizen_id, created_at, office_name')
           .eq('lgu_id', lguId),
         supabase
-          .from('users')
+          .from('verification_requests')
           .select('id')
           .eq('lgu_id', lguId)
-          .eq('verification_status', 'submitted'),
+          .eq('status', 'pending'),
         supabase
           .from('lgus')
           .select('latitude, longitude')

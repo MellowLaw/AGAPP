@@ -14,10 +14,13 @@ Separate from the academic paper (those stay in `Manuscript/` and `CAPSTONE/`).
 ## Index
 
 **Audits**
-- [Codebase-Audit](Audits/Codebase-Audit.md) — ground-truth state of every app/folder
+- [Codebase-Audit](Audits/Codebase-Audit.md) — ground-truth state of every app/folder across monorepo
+- [Citizen-Web-Parity-And-Security-Audit](Audits/Citizen-Web-Parity-And-Security-Audit.md) — 100% functional, security & visual parity report for `apps/citizen-web`
 - [Sweep-2026-07-06-Findings](Audits/Sweep-2026-07-06-Findings.md) — 3-agent security/bug sweep: prioritized action plan (§1 insert-forgery is the big one; create-staff regression already fixed)
 
-**Planning**
+**Planning & Specifications**
+- [Plan-Citizen-Web-Desktop-UI-UX](Planning/Plan-Citizen-Web-Desktop-UI-UX.md) — Desktop UI/UX overhaul: admin-style expanding frosted sidebar + responsive layouts
+- [LGU-Citizen-Services-Master-Specification](Planning/LGU-Citizen-Services-Master-Specification.md) — 28 standardized Philippine LGU citizen services master spec
 - [Roadmap](Planning/Roadmap.md) — overall phased build plan + intended tech stack
 - [Feasibility-Analysis](Planning/Feasibility-Analysis.md) — feature feasibility + stack rationale
 - [Plan-Verification-Feature](Planning/Plan-Verification-Feature.md) — citizen ID verification (in progress)

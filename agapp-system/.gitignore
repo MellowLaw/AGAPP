@@ -11,6 +11,9 @@ out/
 .next/
 .serverless/
 .output/
+.turbo/
+.cache/
+.vercel/
 
 # Debug and Logs
 npm-debug.log*
@@ -20,13 +23,15 @@ yarn-error.log*
 logs/
 *.log
 
-# Environment Variables and Secrets
+# Environment Variables and Secrets (Keep .example files tracked)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.sample
+.env*.local
+!.env.example
+!.env.local.example
 syncpack.config.js
 
 # IDE / Editors Configuration

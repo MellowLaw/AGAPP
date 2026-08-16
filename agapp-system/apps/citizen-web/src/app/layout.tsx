@@ -4,8 +4,8 @@ import { LguProvider } from '../contexts/LguContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
-import { ThemeSync } from '../components/ThemeSync';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { DesktopSidebar } from '../components/layout/DesktopSidebar';
 import { BottomNav } from '../components/layout/BottomNav';
 import { PwaInstallBanner } from '../components/pwa/PwaInstallBanner';
 
@@ -40,18 +40,33 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    regs.forEach(function(r) { r.unregister(); });
+                  });
+                }
+              }
+            `,
+          }}
+        />
       </head>
       <body className="min-h-screen flex flex-col bg-bg text-text-primary antialiased selection:bg-amber-200 transition-colors duration-200">
         <LguProvider>
           <ThemeProvider>
             <AuthProvider>
               <ToastProvider>
-                <ThemeSync />
                 <PwaInstallBanner />
                 <ScreenBackground>
-                  <main className="flex-1 min-h-screen max-w-xl mx-auto w-full relative">
-                    {children}
-                  </main>
+                  <div className="flex min-h-screen">
+                    <DesktopSidebar className="hidden lg:flex" />
+                    <main className="flex-1 min-h-screen w-full relative lg:pl-[72px] pb-24 lg:pb-12">
+                      {children}
+                    </main>
+                  </div>
                   <BottomNav />
                 </ScreenBackground>
               </ToastProvider>

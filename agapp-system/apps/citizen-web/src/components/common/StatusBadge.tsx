@@ -2,8 +2,9 @@
 
 import React from 'react';
 
-export function getBadgeColorClass(status?: string): string {
-  const norm = (status || '').toLowerCase().trim();
+export function getBadgeColorClass(status?: string | string[] | any): string {
+  const raw = Array.isArray(status) ? (status[0] ?? '') : (status ?? '');
+  const norm = String(raw).toLowerCase().trim();
 
   // 1. Submitted / Pending / Open / Queued (Sky Blue)
   if (
@@ -73,22 +74,26 @@ export function StatusBadge({
   status,
   className = '',
 }: {
-  status: string;
+  status?: string | string[] | any;
   className?: string;
 }) {
-  const colorClass = getBadgeColorClass(status);
+  const displayStatus = Array.isArray(status)
+    ? (status.length > 0 ? String(status[0]) : 'General')
+    : (status !== undefined && status !== null ? String(status) : 'General');
+  const colorClass = getBadgeColorClass(displayStatus);
+
   return (
     <span
-      className={`h-[20px] px-2.5 rounded-full font-['Octarine-Bold'] text-[9px] uppercase tracking-wide inline-flex items-center justify-center text-center leading-none select-none shrink-0 shadow-2xs ${colorClass} ${className}`}
+      className={`h-[22px] px-2.5 rounded-full font-['Octarine-Bold'] text-[9.5px] uppercase tracking-wider inline-flex items-center justify-center text-center leading-none select-none shrink-0 shadow-2xs ${colorClass} ${className}`}
       style={{ boxSizing: 'border-box' }}
     >
-      <span className="inline-block translate-y-[-0.5px] leading-none text-center">
-        {status}
+      <span className="inline-flex items-center justify-center translate-y-[1px] leading-none text-center">
+        {displayStatus}
       </span>
     </span>
   );
 }
 
-export function getStatusBadge(status: string, className?: string) {
+export function getStatusBadge(status?: string | string[] | any, className?: string) {
   return <StatusBadge status={status} className={className} />;
 }

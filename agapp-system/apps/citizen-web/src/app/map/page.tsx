@@ -172,82 +172,184 @@ export default function TownMapPage() {
   }, [facilities, selectedCategory, searchQuery]);
 
   return (
-    <div className="relative h-[calc(100vh-68px)] w-full flex flex-col bg-bg overflow-hidden">
-      {/* Top Floating Explorer Header (z-[1000] so it is never blocked by Leaflet layers) */}
-      <div className="absolute top-3 left-3 right-3 z-[1000] pointer-events-auto max-w-lg mx-auto space-y-2">
-        <div className="p-3 sm:p-3.5 rounded-[28px] bg-white/85 dark:bg-[#24211F]/90 backdrop-blur-2xl border border-white/70 dark:border-white/15 shadow-[0_16px_36px_-8px_rgba(0,0,0,0.18)] flex items-center justify-between gap-3 transition-colors">
-          <Link
-            href="/"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-text-primary hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0"
-            title="Back to Home"
-          >
-            <ArrowLeft2 size={18} />
-          </Link>
-
-          <div className="flex-1 min-w-0">
-            <span className="text-[9px] font-['Octarine-Bold'] uppercase tracking-wider text-accent block leading-none">
-              AGAPP MAP
+    <div className="relative h-[calc(100vh-68px)] w-full flex flex-col lg:flex-row bg-bg overflow-hidden">
+      {/* Desktop Left Facilities Sidebar (Hidden on Mobile, Visible on Desktop) */}
+      <div className="hidden lg:flex w-[380px] xl:w-[420px] h-full flex-col bg-surface dark:bg-card border-r border-theme z-20 shrink-0 shadow-sm transition-colors">
+        {/* Header with LGU Name & Search */}
+        <div className="p-4 border-b border-theme space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[9px] font-['Octarine-Bold'] uppercase tracking-wider text-accent block leading-none">
+                AGAPP MAP EXPLORER
+              </span>
+              <h2 className="text-sm font-['Octarine-Bold'] text-text-primary mt-1">
+                {activeLgu?.name || 'Liliw, Laguna'}
+              </h2>
+            </div>
+            <span className="text-[11px] font-['Inter-Medium'] text-text-muted">
+              {filteredFacilities.length} locations
             </span>
-            <h2 className="text-xs sm:text-sm font-['Octarine-Bold'] text-text-primary truncate mt-0.5">
-              {activeLgu?.name || 'Liliw, Laguna'}
-            </h2>
           </div>
 
-          <div className="relative flex-1 max-w-[170px] sm:max-w-[200px]">
-            <SearchNormal1 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <div className="relative">
+            <SearchNormal1 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
-              placeholder="Search facilities..."
+              placeholder="Search facilities, clinics, stations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-7 py-1.5 rounded-full bg-surface-alt dark:bg-chip border border-theme text-[11px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-['Inter-Medium']"
+              className="w-full pl-9 pr-8 py-2 rounded-full bg-surface-alt dark:bg-chip border border-theme text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-['Inter-Medium'] transition-colors"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
               >
-                <CloseCircle size={13} />
+                <CloseCircle size={14} />
               </button>
             )}
           </div>
+
+          {/* Category Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {CATEGORIES.map((c) => {
+              const isSelected = selectedCategory === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCategory(c.id)}
+                  className={`px-3 py-1 rounded-full text-[10.5px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-2xs flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-accent text-accent-contrast'
+                      : 'bg-surface-alt dark:bg-chip text-text-muted hover:text-text-primary border border-theme'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                  <span>{c.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Category Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-          {CATEGORIES.map((c) => {
-            const isSelected = selectedCategory === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCategory(c.id)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-sm flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-accent text-accent-contrast scale-105 shadow-md'
-                    : 'bg-white/80 dark:bg-[#282422]/85 text-stone-700 dark:text-stone-200 hover:text-black dark:hover:text-white border border-white/60 dark:border-white/15 backdrop-blur-xl'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                <span>{c.label}</span>
-              </button>
-            );
-          })}
+        {/* Scrollable Facility Cards List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+          {filteredFacilities.length === 0 ? (
+            <div className="p-8 text-center text-xs text-text-muted">
+              No facilities found matching your search.
+            </div>
+          ) : (
+            filteredFacilities.map((fac) => {
+              const isSelected = selectedFacility?.id === fac.id;
+              return (
+                <div
+                  key={fac.id}
+                  onClick={() => setSelectedFacility(fac)}
+                  className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'bg-accent/10 border-accent shadow-xs'
+                      : 'bg-surface-alt/60 dark:bg-chip/50 border-theme hover:border-accent/60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <StatusBadge status={fac.category || fac.type || 'Government Office'} />
+                    {fac.phone && (
+                      <span className="text-[10px] text-text-muted font-mono">{fac.phone}</span>
+                    )}
+                  </div>
+                  <h4 className="text-xs font-['Octarine-Bold'] text-text-primary mt-1.5 leading-snug">
+                    {fac.name}
+                  </h4>
+                  {fac.address && (
+                    <p className="text-[10.5px] text-text-muted font-['Inter-Medium'] flex items-center gap-1 mt-1 truncate">
+                      <Location size={11} className="text-accent shrink-0" />
+                      <span>{fac.address}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Interactive Map Viewport */}
-      <div className="w-full h-full relative z-0">
-        <TownMapClient
-          center={lguCenter}
-          facilities={filteredFacilities}
-          selectedFacility={selectedFacility}
-          onSelectFacility={(fac) => setSelectedFacility(fac)}
-        />
-      </div>
+      {/* Main Interactive Map Viewport */}
+      <div className="flex-1 h-full relative z-0">
+        {/* Mobile Floating Explorer Header (Hidden on Desktop) */}
+        <div className="lg:hidden absolute top-3 left-3 right-3 z-[1000] pointer-events-auto max-w-lg mx-auto space-y-2">
+          <div className="p-3 sm:p-3.5 rounded-[28px] bg-white/85 dark:bg-[#24211F]/90 backdrop-blur-2xl border border-white/70 dark:border-white/15 shadow-[0_16px_36px_-8px_rgba(0,0,0,0.18)] flex items-center justify-between gap-3 transition-colors">
+            <Link
+              href="/"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-text-primary hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0"
+              title="Back to Home"
+            >
+              <ArrowLeft2 size={18} />
+            </Link>
 
-      {/* Selected Facility Details Drawer Card (z-[1000] pointer-events-auto) */}
-      {selectedFacility && (
-        <div className="absolute bottom-20 left-4 right-4 z-[1000] pointer-events-auto max-w-md mx-auto animate-fade-in">
+            <div className="flex-1 min-w-0">
+              <span className="text-[9px] font-['Octarine-Bold'] uppercase tracking-wider text-accent block leading-none">
+                AGAPP MAP
+              </span>
+              <h2 className="text-xs sm:text-sm font-['Octarine-Bold'] text-text-primary truncate mt-0.5">
+                {activeLgu?.name || 'Liliw, Laguna'}
+              </h2>
+            </div>
+
+            <div className="relative flex-1 max-w-[170px] sm:max-w-[200px]">
+              <SearchNormal1 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 rounded-full bg-surface-alt dark:bg-chip border border-theme text-[11px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-['Inter-Medium']"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                >
+                  <CloseCircle size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Category Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+            {CATEGORIES.map((c) => {
+              const isSelected = selectedCategory === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCategory(c.id)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-sm flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-accent text-accent-contrast scale-105 shadow-md'
+                      : 'bg-white/80 dark:bg-[#282422]/85 text-stone-700 dark:text-stone-200 hover:text-black dark:hover:text-white border border-white/60 dark:border-white/15 backdrop-blur-xl'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                  <span>{c.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Interactive Map Canvas */}
+        <div className="w-full h-full relative z-0">
+          <TownMapClient
+            center={lguCenter}
+            facilities={filteredFacilities}
+            selectedFacility={selectedFacility}
+            onSelectFacility={(fac) => setSelectedFacility(fac)}
+          />
+        </div>
+
+        {/* Selected Facility Details Drawer Card */}
+        {selectedFacility && (
+          <div className="absolute bottom-20 lg:bottom-6 left-4 right-4 lg:left-6 lg:right-auto lg:max-w-md z-[1000] pointer-events-auto max-w-md mx-auto lg:mx-0 animate-fade-in">
           <div className="p-4 sm:p-5 rounded-[32px] bg-white/95 dark:bg-[#252220]/95 backdrop-blur-2xl border border-white/70 dark:border-white/15 shadow-[0_20px_45px_-8px_rgba(0,0,0,0.5)] space-y-3 transition-colors">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -301,6 +403,7 @@ export default function TownMapPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

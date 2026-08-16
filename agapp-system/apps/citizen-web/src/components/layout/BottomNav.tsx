@@ -12,14 +12,17 @@ import {
   Messages1
 } from 'iconsax-react';
 
+import { LottiePlayer } from '../common/LottiePlayer';
+
 export function BottomNav() {
   const pathname = usePathname();
 
-  // Hide BottomNav on auth and onboarding pages
+  // Hide BottomNav on auth, onboarding, and full-screen chatbot pages
   if (
     pathname?.startsWith('/auth') ||
     pathname === '/lgu-select' ||
-    pathname === '/banned'
+    pathname === '/banned' ||
+    pathname === '/chatbot'
   ) {
     return null;
   }
@@ -33,23 +36,25 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md">
-      {/* Floating AI Assistant Companion Button (Only on Home screen) */}
+    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md lg:hidden">
+      {/* Floating Animated Mascot (Only on Home screen, matching mobile AppNavigator 1:1) */}
       {pathname === '/' && (
         <Link
           href="/chatbot"
-          className="absolute -top-11 left-3 z-50 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/85 dark:bg-[#282422]/90 text-text-primary border border-white/60 dark:border-white/15 shadow-[0_8px_20px_rgba(0,0,0,0.12)] hover:scale-105 transition font-['Octarine-Bold'] text-[11px] backdrop-blur-xl"
-          style={{
-            backdropFilter: 'blur(20px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          }}
+          className="absolute -top-[62px] -left-3 z-50 w-20 h-20 flex items-center justify-center group cursor-pointer transition-transform duration-300 hover:scale-110 active:scale-95 select-none"
+          title="Ask AGAPP Assistant"
+          aria-label="Ask AGAPP Assistant"
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          <div className="w-full h-full relative flex items-center justify-center drop-shadow-md pointer-events-none">
+            <LottiePlayer
+              animationPath="/brand/ai-floating.json"
+              className="w-full h-full"
+            />
+          </div>
+          {/* Clean hover tooltip on desktop */}
+          <span className="absolute -top-6 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-black/85 dark:bg-white/90 text-white dark:text-black text-[10px] font-['Octarine-Bold'] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-md">
+            Ask Assistant
           </span>
-          <Messages1 size={15} variant="Bold" className="text-accent" />
-          <span>Ask Assistant</span>
         </Link>
       )}
 

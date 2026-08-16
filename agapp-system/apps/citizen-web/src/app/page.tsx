@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase';
 import { getRelativeTime } from '../lib/timeAgo';
 import { getNewsImageUrl, isItemExpired } from '../lib/newsHelpers';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { Skeleton } from '../components/common/Skeleton';
+import { CommandSearchModal } from '../components/search/CommandSearchModal';
 import { 
   Briefcase, 
   Danger, 
@@ -26,7 +28,8 @@ import {
   CloseCircle,
   Messages,
   Calendar,
-  ShieldSecurity
+  ShieldSecurity,
+  Book
 } from 'iconsax-react';
 
 export default function CitizenHomePage() {
@@ -40,30 +43,33 @@ export default function CitizenHomePage() {
   const [trendingThread, setTrendingThread] = useState<any | null>(null);
   const [myActivity, setMyActivity] = useState<any[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [loadingHome, setLoadingHome] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
-  // Live Search Overlay State
+  // Live Command Palette Modal State
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<{
-    news: any[];
-    services: any[];
-    offices: any[];
-    forum: any[];
-    guides: any[];
-  }>({
-    news: [],
-    services: [],
-    offices: [],
-    forum: [],
-    guides: [],
-  });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 15000);
     return () => clearInterval(timer);
   }, []);
+
+  // Global Keyboard Shortcut (Ctrl+K or /) for Quick Search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowSearchModal((prev) => !prev);
+      } else if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setShowSearchModal(true);
+      } else if (e.key === 'Escape' && showSearchModal) {
+        setShowSearchModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSearchModal]);
 
   const getGreeting = () => {
     const hour = currentDateTime.getHours();
@@ -90,6 +96,7 @@ export default function CitizenHomePage() {
   // 1. Fetch official News & Announcements from Supabase
   const loadHomeData = useCallback(async () => {
     if (!activeLgu?.id) return;
+    setLoadingHome(true);
     try {
       // 1. News & Announcements (published and unexpired)
       const { data: newsData } = await supabase
@@ -116,6 +123,8 @@ export default function CitizenHomePage() {
         });
 
         setAllNews(sorted);
+      } else {
+        setAllNews([]);
       }
 
       // 2. Fetch Trending Forum Discussion
@@ -144,6 +153,8 @@ export default function CitizenHomePage() {
           created_at: top.created_at,
           commentsCount: top.forum_comments?.length || 0,
         });
+      } else {
+        setTrendingThread(null);
       }
 
       // 3. User submissions activity if logged in
@@ -169,54 +180,19 @@ export default function CitizenHomePage() {
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         setMyActivity(combined.slice(0, 3));
+      } else {
+        setMyActivity([]);
       }
     } catch (err) {
       console.error('Error loading home data:', err);
+    } finally {
+      setLoadingHome(false);
     }
   }, [activeLgu?.id, user?.id]);
 
   useEffect(() => {
     loadHomeData();
   }, [loadHomeData]);
-
-  // Live Concurrent Search Query
-  useEffect(() => {
-    if (!searchText.trim()) {
-      setSearchResults({ news: [], services: [], offices: [], forum: [], guides: [] });
-      setSearching(false);
-      return;
-    }
-
-    setSearching(true);
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const q = searchText.trim();
-        const lguId = activeLgu?.id || 'liliw-laguna';
-
-        const [newsRes, servicesRes, officesRes, forumRes, guidesRes] = await Promise.all([
-          supabase.from('news_announcements').select('*').eq('lgu_id', lguId).ilike('title', `%${q}%`).limit(4),
-          supabase.from('lgu_services').select('*').eq('lgu_id', lguId).ilike('name', `%${q}%`).limit(4),
-          supabase.from('lgu_facilities').select('*').eq('lgu_id', lguId).ilike('name', `%${q}%`).limit(4),
-          supabase.from('forum_posts').select('*').eq('lgu_id', lguId).ilike('title', `%${q}%`).limit(4),
-          supabase.from('citizen_guides').select('*').eq('lgu_id', lguId).ilike('title', `%${q}%`).limit(4),
-        ]);
-
-        setSearchResults({
-          news: newsRes.data || [],
-          services: servicesRes.data || [],
-          offices: officesRes.data || [],
-          forum: forumRes.data || [],
-          guides: guidesRes.data || [],
-        });
-      } catch (err) {
-        console.error('Search failed', err);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchText, activeLgu?.id]);
 
   const quickActions = [
     { label: 'E-Services', icon: Briefcase, href: '/services' },
@@ -239,18 +215,18 @@ export default function CitizenHomePage() {
   const currentFeatured = allNews[carouselIndex] || allNews[0];
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-28 animate-fade-in">
-      {/* 1. Header Tabs: For You vs Community (Centered with No Border) */}
-      <div className="flex items-center justify-center gap-9 pt-1 pb-1">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6 space-y-5 pb-28 animate-fade-in transition-colors">
+      {/* 1. Header Segment Tabs (For You vs Community) */}
+      <div className="flex items-center gap-6 border-b border-theme/60 pb-3">
         <button
           onClick={() => setActiveTab('for_you')}
-          className={`relative pb-1 text-lg font-['Octarine-Bold'] transition ${
+          className={`relative pb-1 text-lg sm:text-xl font-['Octarine-Bold'] transition ${
             activeTab === 'for_you'
               ? 'text-text-primary'
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          <span>For you</span>
+          <span>For You</span>
           {activeTab === 'for_you' && (
             <span className="absolute -top-0.5 -right-2 w-1.5 h-1.5 rounded-full bg-accent" />
           )}
@@ -258,7 +234,7 @@ export default function CitizenHomePage() {
 
         <button
           onClick={() => setActiveTab('community')}
-          className={`relative pb-1 text-lg font-['Octarine-Bold'] transition ${
+          className={`relative pb-1 text-lg sm:text-xl font-['Octarine-Bold'] transition ${
             activeTab === 'community'
               ? 'text-text-primary'
               : 'text-text-muted hover:text-text-primary'
@@ -272,57 +248,50 @@ export default function CitizenHomePage() {
       </div>
 
       {/* 2. Pill Search Bar & Notification Bell */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-3">
         <button
           onClick={() => setShowSearchModal(true)}
-          className="relative flex-1 flex items-center gap-2.5 pl-4 pr-4 py-3 rounded-full bg-surface dark:bg-card border border-theme text-xs sm:text-sm text-text-muted shadow-xs text-left hover:border-accent transition-colors"
+          className="relative flex-1 flex items-center justify-between gap-2.5 pl-4 pr-3 py-3 rounded-full bg-surface dark:bg-card border border-theme text-xs sm:text-sm text-text-muted shadow-xs text-left hover:border-accent transition-colors group cursor-pointer"
         >
-          <SearchNormal1 size={18} className="text-text-muted shrink-0" />
-          <span>Search services, news...</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <SearchNormal1 size={18} className="text-text-muted shrink-0 group-hover:text-accent transition-colors" />
+            <span className="truncate">Search services, news, municipal guides...</span>
+          </div>
+          <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-lg bg-surface-alt dark:bg-chip border border-theme text-text-muted shrink-0">
+            Ctrl K
+          </kbd>
         </button>
 
         <Link
           href="/notifications"
-          className="relative p-2 text-text-primary hover:text-accent transition shrink-0 flex items-center justify-center"
+          className="relative p-2.5 rounded-full bg-surface dark:bg-card border border-theme text-text-primary hover:text-accent hover:border-accent transition shrink-0 flex items-center justify-center shadow-xs"
           title="Notifications"
         >
-          <NotificationBing size={24} variant="Bold" />
+          <NotificationBing size={20} variant="Bold" />
           <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-accent border-2 border-surface dark:border-card shadow-xs" />
         </Link>
       </div>
 
-      {/* 3. Advisory / Announcement Alert Banner */}
-      {alertItem && (
-        <Link
-          href={`/news/${alertItem.id}`}
-          className={`w-full p-3 rounded-full border flex items-center justify-between gap-2 shadow-xs group text-left transition ${
-            alertItem.type === 'advisory'
-              ? 'bg-[#FFF1F2] dark:bg-red-950/40 border-[#FECDD3] dark:border-red-900/60 hover:bg-[#FFE4E6]'
-              : 'bg-surface-alt dark:bg-chip border-theme hover:border-accent'
-          }`}
-        >
-          <div className="flex items-center gap-2 min-w-0 pl-1">
-            <span className={`px-2.5 py-0.5 rounded-full text-white font-['Octarine-Bold'] text-[9px] uppercase tracking-wider shrink-0 shadow-2xs ${
-              alertItem.type === 'advisory' ? 'bg-[#EF4444]' : 'bg-[#D97706]'
-            }`}>
-              {alertItem.type === 'advisory' ? 'ADVISORY!' : 'ANNOUNCEMENT!'}
-            </span>
-            <span className={`text-xs font-['Inter-Medium'] truncate ${
-              alertItem.type === 'advisory' ? 'text-[#991B1B] dark:text-red-300' : 'text-text-primary'
-            }`}>
-              {alertItem.title}
-            </span>
-          </div>
-          <ArrowRight2 size={16} className={`shrink-0 pr-1 transition group-hover:translate-x-0.5 ${
-            alertItem.type === 'advisory' ? 'text-[#EF4444]' : 'text-text-muted'
-          }`} />
-        </Link>
-      )}
-
       {/* TAB 1: FOR YOU */}
       {activeTab === 'for_you' ? (
-        <div className="space-y-4">
-          {/* 4. Greeting & Location Meta Block */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-5 lg:space-y-0">
+          {/* Main Left Column (Col 1-8) */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-5">
+            {/* Restricted Status Banner */}
+            {profile?.moderation_status === 'restricted' && (
+              <Link
+                href="/restricted"
+                className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between text-xs text-rose-800 dark:text-rose-200 font-['Octarine-Bold']"
+              >
+                <div className="flex items-center gap-2">
+                  <Danger size={18} className="text-rose-600 shrink-0" variant="Bold" />
+                  <span>Your account has temporary interaction restrictions.</span>
+                </div>
+                <span>View Notice &rarr;</span>
+              </Link>
+            )}
+
+            {/* 4. Greeting & Location Meta Block */}
           <div className="pt-1">
             <p className="text-xs text-text-muted font-['Inter-Medium'] mb-1">
               {profile?.barangay ? `${profile.barangay} · ` : 'Poblacion · '}
@@ -402,7 +371,19 @@ export default function CitizenHomePage() {
               </Link>
             </div>
 
-            {currentFeatured ? (
+            {loadingHome ? (
+              <div className="rounded-[28px] overflow-hidden bg-surface dark:bg-card border border-theme p-4 space-y-3 shadow-xs">
+                <Skeleton className="w-full h-44 sm:h-52 rounded-2xl" />
+                <div className="space-y-2 pt-1">
+                  <Skeleton className="h-4 w-20 rounded-md" />
+                  <Skeleton className="h-5 w-3/4 rounded-lg" />
+                  <div className="flex items-center justify-between pt-1">
+                    <Skeleton className="h-4 w-24 rounded-md" />
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ) : currentFeatured ? (
               <div className="relative rounded-[28px] overflow-hidden bg-surface dark:bg-card border border-theme shadow-xs group transition-colors">
                 <div className="relative h-48 sm:h-56 w-full bg-surface-alt dark:bg-chip">
                   <img
@@ -431,9 +412,9 @@ export default function CitizenHomePage() {
                 </div>
 
                 <div className="p-4 pt-0 space-y-2 relative -mt-6">
-                  <span className="inline-block px-2 py-0.5 rounded-md bg-accent text-accent-contrast text-[9px] font-['Octarine-Bold'] uppercase tracking-wider shadow-2xs">
-                    {currentFeatured.category || currentFeatured.type || 'NEWS'}
-                  </span>
+                  <div>
+                    <StatusBadge status={currentFeatured.category || currentFeatured.type || 'NEWS'} />
+                  </div>
 
                   <h4 className="text-sm font-['Octarine-Bold'] text-text-primary leading-snug line-clamp-2">
                     {currentFeatured.title}
@@ -491,67 +472,55 @@ export default function CitizenHomePage() {
               </div>
             </div>
           )}
-        </div>
-      ) : (
-        /* TAB 2: COMMUNITY (Matching Mobile HomeScreen Community Tab) */
-        <div className="space-y-5">
-          {/* Section 1: Official Announcements */}
-          {announcementsOnly.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-base font-['Octarine-Bold'] text-text-primary">Official Announcements</h3>
-              {announcementsOnly.map((item) => (
-                <article
-                  key={item.id}
-                  className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 hover:border-accent transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <StatusBadge status={item.type || 'Announcement'} />
-                    <span className="text-xs text-text-muted font-['Inter-Medium']">
-                      {new Date(item.published_at || item.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  </div>
+          </div>
 
-                  <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
-                    {item.title}
-                  </h4>
+          {/* Right Rail Column (Col 9-12) - Visible as full column on desktop */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-5 lg:sticky lg:top-6">
+            {/* 1. Advisory Alert Banner */}
+            {alertItem && (
+              <Link
+                href={`/news/${alertItem.id}`}
+                className={`w-full p-3.5 rounded-2xl border flex items-center justify-between gap-2 shadow-xs group text-left transition ${
+                  alertItem.type === 'advisory'
+                    ? 'bg-[#FFF1F2] dark:bg-red-950/40 border-[#FECDD3] dark:border-red-900/60 hover:bg-[#FFE4E6]'
+                    : 'bg-surface-alt dark:bg-chip border-theme hover:border-accent'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 pl-1">
+                  <span className={`px-2.5 py-0.5 rounded-full text-white font-['Octarine-Bold'] text-[9px] uppercase tracking-wider shrink-0 shadow-2xs ${
+                    alertItem.type === 'advisory' ? 'bg-[#EF4444]' : 'bg-[#D97706]'
+                  }`}>
+                    {alertItem.type === 'advisory' ? 'ADVISORY!' : 'ANNOUNCEMENT!'}
+                  </span>
+                  <span className={`text-xs font-['Inter-Medium'] truncate ${
+                    alertItem.type === 'advisory' ? 'text-[#991B1B] dark:text-red-300' : 'text-text-primary'
+                  }`}>
+                    {alertItem.title}
+                  </span>
+                </div>
+                <ArrowRight2 size={16} className={`shrink-0 pr-1 transition group-hover:translate-x-0.5 ${
+                  alertItem.type === 'advisory' ? 'text-[#EF4444]' : 'text-text-muted'
+                }`} />
+              </Link>
+            )}
 
-                  <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
-                    {item.content}
-                  </p>
-
-                  <div className="pt-1">
-                    <Link
-                      href={`/news/${item.id}`}
-                      className="w-full py-2.5 rounded-full bg-accent text-accent-contrast text-xs font-['Octarine-Bold'] hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow-xs"
-                    >
-                      <span>Read Full Notice</span>
-                      <ArrowRight2 size={14} />
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-
-          {/* Section 2: Trending Discussion */}
-          {trendingThread && (
-            <div className="space-y-3">
-              <h3 className="text-base font-['Octarine-Bold'] text-text-primary">Trending Discussion</h3>
-              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 hover:border-accent transition-colors">
+            {/* 2. Trending Forum Discussion */}
+            {trendingThread && (
+              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 transition-colors">
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 text-[10px] font-['Octarine-Bold'] uppercase">
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 text-[10px] font-['Octarine-Bold'] uppercase">
                     #{trendingThread.category || 'General'}
                   </span>
-                  <span className="text-xs text-text-muted font-['Inter-Medium']">
+                  <span className="text-[11px] text-text-muted font-['Inter-Medium']">
                     {getRelativeTime(trendingThread.created_at)}
                   </span>
                 </div>
 
-                <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
+                <h4 className="text-sm font-['Octarine-Bold'] text-text-primary leading-snug">
                   {trendingThread.title}
                 </h4>
 
-                <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
+                <p className="text-xs text-text-muted leading-relaxed line-clamp-2 font-['Inter-Medium']">
                   {trendingThread.content}
                 </p>
 
@@ -565,157 +534,221 @@ export default function CitizenHomePage() {
                     href="/forum"
                     className="text-xs font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
                   >
-                    <span>Join Discussion</span>
+                    <span>View Discussion</span>
                     <ArrowRight2 size={14} />
                   </Link>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Section 3: News Feed */}
-          <div className="space-y-3">
-            <h3 className="text-base font-['Octarine-Bold'] text-text-primary">News Feed</h3>
-
-            {newsOnly.length === 0 ? (
-              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-8 text-center text-xs text-text-muted">
-                No feed articles published yet.
+            {/* 3. Municipal Quick Links & Emergency Hotlines */}
+            <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 transition-colors">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-['Octarine-Bold'] text-text-primary">Emergency Hotlines</h3>
+                <Link href="/emergency" className="text-xs font-heading text-accent hover:underline">
+                  Full list &rarr;
+                </Link>
               </div>
-            ) : (
-              newsOnly.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-surface dark:bg-card rounded-[28px] border border-theme overflow-hidden shadow-xs space-y-4 hover:border-accent transition-colors"
-                >
-                  <div className="h-48 w-full overflow-hidden bg-surface-alt dark:bg-chip">
-                    <img
-                      src={getNewsImageUrl(item)}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
 
-                  <div className="p-5 pt-0 space-y-2">
-                    <div className="flex items-center justify-between pt-4">
-                      <span className="px-2 py-0.5 rounded-md bg-accent text-accent-contrast text-[9px] font-['Octarine-Bold'] uppercase shadow-2xs">
-                        {item.category || 'News'}
+              <div className="space-y-2">
+                <a
+                  href="tel:911"
+                  className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between hover:border-accent transition group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center shrink-0">
+                      <Call size={16} variant="Bold" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-['Octarine-Bold'] text-text-primary">MDRRMO / Rescue</p>
+                      <p className="text-[10px] text-text-muted font-['Inter-Medium']">24/7 Disaster Response</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-['Octarine-Bold'] text-accent group-hover:underline">Call 911</span>
+                </a>
+
+                <Link
+                  href="/guides"
+                  className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between hover:border-accent transition group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+                      <Book size={16} variant="Bold" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-['Octarine-Bold'] text-text-primary">Citizen's Charter</p>
+                      <p className="text-[10px] text-text-muted font-['Inter-Medium']">Processing times & fees</p>
+                    </div>
+                  </div>
+                  <ArrowRight2 size={14} className="text-text-muted group-hover:text-accent transition" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* TAB 2: COMMUNITY (Matching Mobile HomeScreen Community Tab) */
+        <div className="space-y-5">
+          {loadingHome ? (
+            <div className="space-y-4">
+              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-4 w-20 rounded-md" />
+                </div>
+                <Skeleton className="h-6 w-3/4 rounded-lg" />
+                <Skeleton className="h-4 w-full rounded-md" />
+                <Skeleton className="h-4 w-5/6 rounded-md" />
+                <Skeleton className="h-9 w-full rounded-full mt-2" />
+              </div>
+              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-4 w-16 rounded-md" />
+                </div>
+                <Skeleton className="h-5 w-2/3 rounded-lg" />
+                <Skeleton className="h-4 w-full rounded-md" />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Section 1: Official Announcements */}
+              {announcementsOnly.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-['Octarine-Bold'] text-text-primary">Official Announcements</h3>
+                  {announcementsOnly.map((item) => (
+                    <article
+                      key={item.id}
+                      className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 hover:border-accent transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <StatusBadge status={item.type || 'Announcement'} />
+                        <span className="text-xs text-text-muted font-['Inter-Medium']">
+                          {new Date(item.published_at || item.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+
+                      <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
+                        {item.title}
+                      </h4>
+
+                      <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
+                        {item.content}
+                      </p>
+
+                      <div className="pt-1">
+                        <Link
+                          href={`/news/${item.id}`}
+                          className="w-full py-2.5 rounded-full bg-accent text-accent-contrast text-xs font-['Octarine-Bold'] hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <span>Read Full Notice</span>
+                          <ArrowRight2 size={14} />
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {/* Section 2: Trending Discussion */}
+              {trendingThread && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-['Octarine-Bold'] text-text-primary">Trending Discussion</h3>
+                  <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 hover:border-accent transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 text-[10px] font-['Octarine-Bold'] uppercase">
+                        #{trendingThread.category || 'General'}
                       </span>
                       <span className="text-xs text-text-muted font-['Inter-Medium']">
-                        {new Date(item.published_at || item.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        {getRelativeTime(trendingThread.created_at)}
                       </span>
                     </div>
 
                     <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
-                      {item.title}
+                      {trendingThread.title}
                     </h4>
 
                     <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
-                      {item.content}
+                      {trendingThread.content}
                     </p>
 
-                    <div className="pt-2">
+                    <div className="pt-2 border-t border-theme flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs text-text-muted font-['Inter-Medium']">
+                        <Messages size={16} className="text-accent" variant="Bold" />
+                        <span>+{trendingThread.commentsCount} replies</span>
+                      </div>
+
                       <Link
-                        href={`/news/${item.id}`}
-                        className="w-full py-2.5 rounded-full bg-accent text-accent-contrast text-xs font-['Octarine-Bold'] hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow-xs"
+                        href="/forum"
+                        className="text-xs font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
                       >
-                        <span>Read Full Article</span>
+                        <span>Join Discussion</span>
                         <ArrowRight2 size={14} />
                       </Link>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              )}
+
+              {/* Section 3: News Feed */}
+              <div className="space-y-3">
+                <h3 className="text-base font-['Octarine-Bold'] text-text-primary">News Feed</h3>
+
+                {newsOnly.length === 0 ? (
+                  <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-8 text-center text-xs text-text-muted">
+                    No feed articles published yet.
+                  </div>
+                ) : (
+                  newsOnly.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-surface dark:bg-card rounded-[28px] border border-theme overflow-hidden shadow-xs space-y-4 hover:border-accent transition-colors"
+                    >
+                      <div className="h-48 w-full overflow-hidden bg-surface-alt dark:bg-chip">
+                        <img
+                          src={getNewsImageUrl(item)}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <div className="p-5 pt-0 space-y-2">
+                        <div className="flex items-center justify-between pt-4">
+                          <StatusBadge status={item.category || item.type || 'News'} />
+                          <span className="text-xs text-text-muted font-['Inter-Medium']">
+                            {new Date(item.published_at || item.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+
+                        <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
+                          {item.title}
+                        </h4>
+
+                        <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
+                          {item.content}
+                        </p>
+
+                        <div className="pt-2">
+                          <Link
+                            href={`/news/${item.id}`}
+                            className="w-full py-2.5 rounded-full bg-accent text-accent-contrast text-xs font-['Octarine-Bold'] hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow-xs"
+                          >
+                            <span>Read Full Article</span>
+                            <ArrowRight2 size={14} />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Live Search Modal Overlay */}
-      {showSearchModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-surface/95 dark:bg-card/95 backdrop-blur-md p-4 max-w-lg mx-auto animate-fade-in transition-colors">
-          <div className="flex items-center gap-2 border-b border-theme pb-3">
-            <SearchNormal1 size={18} className="text-text-muted" />
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search services, news, facilities, guides..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="flex-1 text-sm bg-transparent outline-none font-['Inter-Medium'] text-text-primary placeholder:text-text-muted"
-            />
-            <button
-              onClick={() => {
-                setShowSearchModal(false);
-                setSearchText('');
-              }}
-              className="text-text-muted hover:text-text-primary p-1 cursor-pointer"
-            >
-              <CloseCircle size={20} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto pt-3 space-y-4">
-            {searching ? (
-              <p className="text-xs text-text-muted text-center py-6">Searching municipal databases...</p>
-            ) : !searchText.trim() ? (
-              <p className="text-xs text-text-muted text-center py-6">Type to search anything in {activeLgu?.name || 'Liliw'}</p>
-            ) : (
-              <>
-                {searchResults.services.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-['Octarine-Bold'] uppercase text-accent">Services</span>
-                    {searchResults.services.map((s) => (
-                      <Link
-                        key={s.id}
-                        href="/services"
-                        onClick={() => setShowSearchModal(false)}
-                        className="p-2.5 rounded-xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between text-xs hover:border-accent block transition-colors"
-                      >
-                        <span className="font-bold text-text-primary">{s.name}</span>
-                        <span className="text-[10px] text-text-muted">{s.office_name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {searchResults.news.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-['Octarine-Bold'] uppercase text-accent">News & Advisories</span>
-                    {searchResults.news.map((n) => (
-                      <Link
-                        key={n.id}
-                        href={`/news/${n.id}`}
-                        onClick={() => setShowSearchModal(false)}
-                        className="p-2.5 rounded-xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between text-xs hover:border-accent block transition-colors"
-                      >
-                        <span className="font-bold text-text-primary truncate max-w-[240px]">{n.title}</span>
-                        <span className="text-[10px] text-text-muted">{n.type || n.category}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {searchResults.guides.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-['Octarine-Bold'] uppercase text-accent">Citizen Guides</span>
-                    {searchResults.guides.map((g) => (
-                      <Link
-                        key={g.id}
-                        href="/guides"
-                        onClick={() => setShowSearchModal(false)}
-                        className="p-2.5 rounded-xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between text-xs hover:border-accent block transition-colors"
-                      >
-                        <span className="font-bold text-text-primary">{g.title}</span>
-                        <span className="text-[10px] text-text-muted">{g.section}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Universal Command Palette / Omni Search Modal */}
+      <CommandSearchModal isOpen={showSearchModal} onClose={() => setShowSearchModal(false)} />
     </div>
   );
 }

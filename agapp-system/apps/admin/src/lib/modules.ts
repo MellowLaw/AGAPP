@@ -10,10 +10,9 @@
  * stay with LGU_ADMIN. Personnel get /personnel/settings for their own profile.
  */
 export const ADMIN_MODULES = [
-  'dashboard',
-  'reports',
   'services',
   'eservices-catalog',
+  'reports',
   'news',
   'forum',
   'facilities',
@@ -26,10 +25,9 @@ export type AdminModule = (typeof ADMIN_MODULES)[number];
 
 /** Human labels for the staff-permission checkboxes. */
 export const MODULE_LABELS: Record<AdminModule, string> = {
-  'dashboard': 'Dashboard',
-  'reports': 'Issue Reports',
   'services': 'Service Requests',
   'eservices-catalog': 'eServices Catalog',
+  'reports': 'Issue Reports',
   'news': 'Community & News',
   'forum': 'Forum Moderation',
   'facilities': 'Facilities',
@@ -43,10 +41,9 @@ export const MODULE_LABELS: Record<AdminModule, string> = {
  * Longest-prefix wins, so /lgu/eservices-catalog isn't swallowed by /lgu/e...
  */
 const PATH_MODULE: [string, AdminModule][] = [
-  ['/lgu/dashboard', 'dashboard'],
-  ['/lgu/reports', 'reports'],
   ['/lgu/services', 'services'],
   ['/lgu/eservices-catalog', 'eservices-catalog'],
+  ['/lgu/reports', 'reports'],
   ['/lgu/news', 'news'],
   ['/lgu/forum', 'forum'],
   ['/lgu/facilities', 'facilities'],

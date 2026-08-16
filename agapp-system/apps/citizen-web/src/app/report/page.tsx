@@ -279,214 +279,203 @@ function IssueReportingContent() {
     const activeCategoryObj = REPORT_CATEGORIES.find((c) => c.id === category) || REPORT_CATEGORIES[0];
 
     return (
-      <div className="max-w-xl mx-auto px-4 py-4 space-y-5 pb-28 animate-fade-in">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6 space-y-6 pb-28 animate-fade-in">
         {/* Top Header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b border-theme/60 pb-4">
           <button
             onClick={() => setShowForm(false)}
-            className="w-9 h-9 rounded-full bg-surface-alt dark:bg-chip border border-theme flex items-center justify-center text-text-primary hover:bg-surface transition shadow-2xs"
+            className="w-10 h-10 rounded-full bg-surface-alt dark:bg-chip border border-theme flex items-center justify-center text-text-primary hover:bg-surface transition shadow-2xs"
           >
             <ArrowLeft2 size={18} />
           </button>
           <div>
-            <h1 className="text-xl font-heading text-text-primary leading-tight">
+            <h1 className="text-xl sm:text-2xl font-heading text-text-primary leading-tight">
               {activeCategoryObj.label}
             </h1>
             <p className="text-xs text-text-muted font-['Inter-Medium']">
-              Filing form · automatic timestamp & GPS location tag
+              Filing form · automatic timestamp & GPS coordinate stamp
             </p>
           </div>
         </div>
 
-        {/* Verification Alert Banner */}
-        {!isVerified && (
-          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center gap-3">
-            <ShieldTick size={24} className="text-amber-700 dark:text-amber-400 shrink-0" variant="Bold" />
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-heading text-amber-900 dark:text-amber-200">Verification Required</h4>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 font-['Inter-Medium']">
-                Submit your valid ID to activate official community report filing.
-              </p>
-            </div>
-            <Link
-              href="/verify"
-              className="px-3.5 py-1.5 rounded-full bg-accent text-accent-contrast text-xs font-heading hover:opacity-90 transition shrink-0 shadow-xs"
-            >
-              Verify
-            </Link>
-          </div>
-        )}
-
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-5 transition-colors">
-          {/* Category Switcher Pill List */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
-              Selected Incident Category
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {REPORT_CATEGORIES.map((cat) => {
-                const isSelected = category === cat.id;
-                const IconComp = cat.icon;
-                return (
-                  <button
-                    type="button"
-                    key={cat.id}
-                    onClick={() => setCategory(cat.id)}
-                    className={`p-2.5 rounded-2xl border text-left flex items-center gap-2.5 transition ${
-                      isSelected
-                        ? 'bg-surface-alt dark:bg-chip border-accent ring-1 ring-accent text-text-primary'
-                        : 'bg-surface dark:bg-card border-theme text-text-muted hover:border-accent'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${cat.color}`}>
-                      <IconComp size={16} variant="Bold" />
-                    </div>
-                    <span className="text-xs font-heading truncate">{cat.shortLabel}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
-              Incident Description *
-            </label>
-            <textarea
-              rows={3}
-              required
-              placeholder="Describe the issue (e.g. Deep road depression near the barangay health center, overflowing storm drain...)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-3.5 rounded-2xl bg-surface-alt dark:bg-chip border border-theme text-xs font-['Inter-Medium'] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent resize-none shadow-2xs"
-            />
-          </div>
-
-          {/* Barangay Location */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
-              Barangay *
-            </label>
-            <select
-              value={barangay}
-              onChange={(e) => setBarangay(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme text-xs font-heading text-text-primary outline-none focus:ring-1 focus:ring-accent shadow-2xs"
-            >
-              {barangayList.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Mandatory Photo Evidence Capture */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
-                Photo Evidence (Mandatory) *
-              </label>
-              <span className="text-[10px] text-accent font-['Inter-Medium']">Live Camera / Clear Photo</span>
-            </div>
-
-            {photoPreview ? (
-              <div className="relative rounded-2xl overflow-hidden border border-theme bg-stone-900">
-                <img src={photoPreview} alt="Evidence preview" className="w-full h-48 object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-3 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-heading">{barangay}, {activeLgu?.name || 'Liliw'}</p>
-                      <p className="text-[10px] text-stone-300 font-mono">Lat {latitude.toFixed(5)}, Long {longitude.toFixed(5)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
-                      className="p-1.5 rounded-full bg-rose-600/90 text-white hover:bg-rose-700 transition"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </div>
+        {/* Desktop Split Form Layout */}
+        <form onSubmit={handleSubmit} className="bg-surface dark:bg-card rounded-[28px] border border-theme p-6 sm:p-8 shadow-xs transition-colors">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            {/* Left Column: Form Details (Col 1-6) */}
+            <div className="lg:col-span-6 space-y-5">
+              {/* Category Switcher Pill List */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
+                  Selected Incident Category
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {REPORT_CATEGORIES.map((cat) => {
+                    const isSelected = category === cat.id;
+                    const IconComp = cat.icon;
+                    return (
+                      <button
+                        type="button"
+                        key={cat.id}
+                        onClick={() => setCategory(cat.id)}
+                        className={`p-2.5 rounded-2xl border text-left flex items-center gap-2.5 transition ${
+                          isSelected
+                            ? 'bg-surface-alt dark:bg-chip border-accent ring-1 ring-accent text-text-primary'
+                            : 'bg-surface dark:bg-card border-theme text-text-muted hover:border-accent'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${cat.color}`}>
+                          <IconComp size={16} variant="Bold" />
+                        </div>
+                        <span className="text-xs font-heading truncate">{cat.shortLabel}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            ) : (
-              <label className="border-2 border-dashed border-theme hover:border-accent rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-surface-alt dark:bg-chip transition">
-                <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
-                  <Camera size={22} variant="Bold" />
-                </div>
-                <div className="text-center">
-                  <p className="text-xs font-heading text-text-primary">Take Photo or Upload Image</p>
-                  <p className="text-[10px] text-text-muted font-['Inter-Medium']">Take on-site clear photo for rapid dispatch</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handlePhotoSelect}
-                  className="hidden"
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
+                  Incident Description *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Describe the issue (e.g. Deep road depression near the barangay health center, overflowing storm drain...)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full p-3.5 rounded-2xl bg-surface-alt dark:bg-chip border border-theme text-xs font-['Inter-Medium'] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent resize-none shadow-2xs"
                 />
-              </label>
-            )}
-          </div>
+              </div>
 
-          {/* Location Pinpoint Map */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
-                Geotagged Location (GPS Pin)
-              </label>
-              <button
-                type="button"
-                onClick={handleGetLiveGps}
-                disabled={locating}
-                className="inline-flex items-center gap-1 text-[11px] font-heading text-accent hover:underline"
-              >
-                <Gps size={13} className={locating ? 'animate-spin' : ''} />
-                <span>{locating ? 'Locating...' : 'Get Live GPS'}</span>
-              </button>
-            </div>
+              {/* Barangay Location */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
+                  Barangay *
+                </label>
+                <select
+                  value={barangay}
+                  onChange={(e) => setBarangay(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme text-xs font-heading text-text-primary outline-none focus:ring-1 focus:ring-accent shadow-2xs"
+                >
+                  {barangayList.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="rounded-2xl overflow-hidden border border-theme">
-              <LocationPickerMap
-                lat={latitude}
-                lng={longitude}
-                onLocationChange={(lat: number, lng: number) => { setLatitude(lat); setLongitude(lng); }}
-              />
-            </div>
-            <p className="text-[10px] text-text-muted font-['Inter-Medium'] flex items-center gap-1">
-              <Location size={12} className="text-accent shrink-0" />
-              <span>You can drag the pin directly on the map to pinpoint the exact location.</span>
-            </p>
-          </div>
+              {/* Mandatory Photo Evidence Capture */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
+                    Photo Evidence (Mandatory) *
+                  </label>
+                  <span className="text-[10px] text-accent font-['Inter-Medium']">Live Camera / Clear Photo</span>
+                </div>
 
-          {/* Submit Button */}
-          <div className="pt-2">
-            {!isVerified ? (
-              <Link
-                href="/verify"
-                className="w-full py-3.5 rounded-full bg-rose-600 text-white font-heading text-xs hover:bg-rose-700 transition flex items-center justify-center gap-2 shadow-xs"
-              >
-                <ShieldSecurity size={16} />
-                <span>Verification Required to Submit</span>
-              </Link>
-            ) : (
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3.5 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-xs"
-              >
-                {submitting ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-accent-contrast/20 border-t-accent-contrast rounded-full animate-spin" />
-                    <span>Transmitting Report...</span>
-                  </>
+                {photoPreview ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-theme bg-stone-900">
+                    <img src={photoPreview} alt="Evidence preview" className="w-full h-48 object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-3 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-heading">{barangay}, {activeLgu?.name || 'Liliw'}</p>
+                          <p className="text-[10px] text-stone-300 font-mono">Lat {latitude.toFixed(5)}, Long {longitude.toFixed(5)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                          className="p-1.5 rounded-full bg-rose-600/90 text-white hover:bg-rose-700 transition"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <TickCircle size={16} variant="Bold" />
-                    <span>Submit Official Report</span>
-                  </>
+                  <label className="border-2 border-dashed border-theme hover:border-accent rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-surface-alt dark:bg-chip transition">
+                    <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                      <Camera size={22} variant="Bold" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-heading text-text-primary">Take Photo or Upload Image</p>
+                      <p className="text-[10px] text-text-muted font-['Inter-Medium']">Take on-site clear photo for rapid dispatch</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                  </label>
                 )}
-              </button>
-            )}
+              </div>
+            </div>
+
+            {/* Right Column: Location Map & Submit Action (Col 7-12) */}
+            <div className="lg:col-span-6 space-y-5 flex flex-col justify-between">
+              {/* Location Pinpoint Map */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-heading text-text-muted uppercase tracking-wider">
+                    Geotagged Location (GPS Pin)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGetLiveGps}
+                    disabled={locating}
+                    className="inline-flex items-center gap-1 text-[11px] font-heading text-accent hover:underline"
+                  >
+                    <Gps size={13} className={locating ? 'animate-spin' : ''} />
+                    <span>{locating ? 'Locating...' : 'Get Live GPS'}</span>
+                  </button>
+                </div>
+
+                <div className="rounded-2xl overflow-hidden border border-theme h-64 lg:h-72">
+                  <LocationPickerMap
+                    lat={latitude}
+                    lng={longitude}
+                    onLocationChange={(lat: number, lng: number) => { setLatitude(lat); setLongitude(lng); }}
+                  />
+                </div>
+                <p className="text-[10px] text-text-muted font-['Inter-Medium'] flex items-center gap-1">
+                  <Location size={12} className="text-accent shrink-0" />
+                  <span>Drag the marker pin directly on the map to indicate the exact spot.</span>
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-4 border-t border-theme/60">
+                {!isVerified ? (
+                  <Link
+                    href="/verify"
+                    className="w-full py-3.5 rounded-full bg-rose-600 text-white font-heading text-xs hover:bg-rose-700 transition flex items-center justify-center gap-2 shadow-xs"
+                  >
+                    <ShieldSecurity size={16} />
+                    <span>Verification Required to Submit</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-3.5 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-xs"
+                  >
+                    {submitting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-accent-contrast/20 border-t-accent-contrast rounded-full animate-spin" />
+                        <span>Transmitting Report...</span>
+                      </>
+                    ) : (
+                      <>
+                        <TickCircle size={16} variant="Bold" />
+                        <span>Submit Official Report</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -495,7 +484,7 @@ function IssueReportingContent() {
 
   // ── MAIN SCREEN: CATEGORY GRID + TUTORIAL & MY SUBMISSIONS ──────────────────
   return (
-    <div className="max-w-xl mx-auto px-4 py-4 space-y-5 pb-28 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6 space-y-6 pb-28 animate-fade-in">
       {/* Title & Subtitle */}
       <div className="space-y-1 pt-1">
         <h1 className="text-3xl font-heading text-text-primary tracking-tight">
@@ -565,27 +554,37 @@ function IssueReportingContent() {
               Select Incident Category
             </h2>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {REPORT_CATEGORIES.map((cat) => {
                 const IconComp = cat.icon;
                 return (
                   <button
                     key={cat.id}
                     onClick={() => {
+                      if (!user) {
+                        showToast('Sign in required to file incident reports.', 'info');
+                        router.push('/auth/login');
+                        return;
+                      }
+                      if (!isVerified) {
+                        showToast('Identity verification required to file official community reports.', 'info');
+                        router.push('/verify');
+                        return;
+                      }
                       setCategory(cat.id);
                       setShowForm(true);
                     }}
-                    className="p-4 rounded-[24px] bg-surface dark:bg-card border border-theme text-left hover:border-accent hover:shadow-xs transition duration-200 group flex flex-col justify-between h-32"
+                    className="p-5 rounded-[24px] bg-surface dark:bg-card border border-theme text-left hover:border-accent hover:shadow-md transition duration-200 group flex flex-col justify-between h-36 cursor-pointer"
                   >
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs ${cat.color}`}>
-                      <IconComp size={20} variant="Bold" />
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs ${cat.color}`}>
+                      <IconComp size={22} variant="Bold" />
                     </div>
                     <div>
                       <h3 className="text-sm font-heading text-text-primary group-hover:text-accent transition leading-snug">
                         {cat.label}
                       </h3>
-                      <p className="text-[10px] text-text-muted font-['Inter-Medium'] line-clamp-1 pt-0.5">
-                        Tap to file report
+                      <p className="text-[11px] text-text-muted font-['Inter-Medium'] line-clamp-1 pt-0.5">
+                        Click to file incident report &rarr;
                       </p>
                     </div>
                   </button>
@@ -594,26 +593,7 @@ function IssueReportingContent() {
             </div>
           </div>
 
-          {/* 2. Verification Required Card if not verified */}
-          {!isVerified && (
-            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center gap-3">
-              <ShieldTick size={24} className="text-amber-700 dark:text-amber-400 shrink-0" variant="Bold" />
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-heading text-amber-900 dark:text-amber-200">Verification Required</h4>
-                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-['Inter-Medium']">
-                  Verified residency is required to submit municipal reports.
-                </p>
-              </div>
-              <Link
-                href="/verify"
-                className="px-3.5 py-1.5 rounded-full bg-accent text-accent-contrast text-xs font-heading hover:opacity-90 transition shrink-0 shadow-xs"
-              >
-                Verify
-              </Link>
-            </div>
-          )}
-
-          {/* 3. Comprehensive Reporting Tutorial & Guidelines Card */}
+          {/* 2. Comprehensive Reporting Tutorial & Guidelines Card */}
           <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-5 transition-colors">
             {/* Tutorial Header */}
             <div className="border-b border-theme pb-3 space-y-1">
@@ -732,15 +712,24 @@ function IssueReportingContent() {
             <h2 className="text-xs font-heading text-text-muted uppercase tracking-wider">
               Your Incident Submissions ({myReports.length})
             </h2>
-            <button
-              onClick={fetchMyReports}
-              className="text-[11px] font-heading text-accent hover:underline"
-            >
-              Refresh
-            </button>
+            {user && (
+              <button
+                onClick={fetchMyReports}
+                className="text-[11px] font-heading text-accent hover:underline"
+              >
+                Refresh
+              </button>
+            )}
           </div>
 
-          {loadingReports ? (
+          {!user ? (
+            <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-4 shadow-xs">
+              <AuthGate
+                title="Track Your Submitted Reports"
+                subtitle="Sign in with your verified resident account to view live resolution updates, engineer dispatches, and repair photos for your submitted reports."
+              />
+            </div>
+          ) : loadingReports ? (
             <div className="p-12 text-center text-xs text-text-muted bg-surface dark:bg-card rounded-[28px] border border-theme space-y-2">
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
               <p>Loading your submissions...</p>
