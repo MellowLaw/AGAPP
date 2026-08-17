@@ -124,7 +124,7 @@ export class PushService implements OnModuleInit {
             .trim()
             .slice(0, 180);
 
-          const title = `⚠️ Advisory: ${row.title}`;
+          const title = `Advisory: ${row.title}`;
           const body = plainBody || 'New advisory from your LGU.';
 
           // (a) In-app rows for every citizen (Channel 1 skips pushing these).

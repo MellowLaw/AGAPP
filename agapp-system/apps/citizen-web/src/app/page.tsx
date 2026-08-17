@@ -293,18 +293,18 @@ export default function CitizenHomePage() {
 
             {/* 4. Greeting & Location Meta Block */}
           <div className="pt-1">
-            <p className="text-xs text-text-muted font-['Inter-Medium'] mb-1">
+            <p className="text-xs text-text-muted font-['Inter-Medium'] mb-1" suppressHydrationWarning>
               {profile?.barangay ? `${profile.barangay} · ` : 'Poblacion · '}
-              {(activeLgu?.name || 'Liliw').replace(/^Municipality of\s*/i, '').replace(/,\s*Laguna/i, '')}, Laguna · {formatDateTime()}
+              {(activeLgu?.name || 'Liliw').replace(/^Municipality of\s*/i, '').replace(/,\s*Laguna/i, '')}, Laguna · <span suppressHydrationWarning>{formatDateTime()}</span>
             </p>
 
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-['Octarine-Bold'] text-text-primary tracking-tight leading-tight">
+                <h1 className="text-2xl sm:text-3xl font-['Octarine-Bold'] text-text-primary tracking-tight leading-tight" suppressHydrationWarning>
                   {getGreeting()}
                 </h1>
                 <div className="flex items-center gap-2 flex-nowrap mt-0.5">
-                  <h1 className="text-2xl sm:text-3xl font-['Octarine-Bold'] text-text-primary tracking-tight leading-tight truncate">
+                  <h1 className="text-2xl sm:text-3xl font-['Octarine-Bold'] text-text-primary tracking-tight leading-tight truncate" suppressHydrationWarning>
                     {profile?.full_name ? profile.full_name.split(' ')[0] + '!' : 'Resident!'}
                   </h1>
                   <img

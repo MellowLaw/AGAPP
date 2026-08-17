@@ -13,6 +13,8 @@ export interface CitizenProfile {
   role: string;
   lgu_id?: string;
   barangay?: string;
+  avatar_url?: string | null;
+  phone?: string | null;
   verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
   moderation_status?: 'active' | 'restricted' | 'banned';
   rejection_reason?: string;

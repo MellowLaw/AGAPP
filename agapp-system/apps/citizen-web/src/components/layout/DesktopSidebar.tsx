@@ -19,7 +19,6 @@ import {
   ArrowDown2,
   CloseCircle,
   TickCircle,
-  Clock,
   ShieldSecurity,
   User
 } from 'iconsax-react';
@@ -100,9 +99,6 @@ export function DesktopSidebar({ className = '' }: { className?: string }) {
     router.push('/');
   };
 
-  const isVerified = profile?.verification_status === 'verified';
-  const isPending = profile?.verification_status === 'pending';
-
   return (
     <>
       <aside
@@ -167,17 +163,24 @@ export function DesktopSidebar({ className = '' }: { className?: string }) {
                 className="flex items-center gap-3 pl-6 py-2 rounded-2xl hover:bg-surface-alt dark:hover:bg-chip transition max-w-[260px]"
               >
                 <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-accent/20 text-accent flex items-center justify-center font-['Octarine-Bold'] text-xs border border-accent/40">
-                  {initials(profile?.full_name || user.email || '?')}
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name || 'Profile'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span>{initials(profile?.full_name || user.email || '?')}</span>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 leading-tight">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-['Octarine-Bold'] text-text-primary truncate">
-                      {profile?.full_name || 'Resident'}
-                    </p>
-                    {isVerified && <TickCircle size={13} className="text-green-500 shrink-0" variant="Bold" />}
-                    {isPending && <Clock size={13} className="text-amber-500 shrink-0" variant="Bold" />}
-                  </div>
-                  <p className="text-[10px] text-text-muted font-['Inter-Medium'] truncate">
+                  <p className="text-xs font-['Octarine-Bold'] text-text-primary truncate">
+                    {profile?.full_name || 'Resident'}
+                  </p>
+                  <p className="text-[10px] text-text-muted font-['Inter-Medium'] truncate mt-0.5">
                     {profile?.barangay ? `Brgy. ${profile.barangay}` : (user.email || 'Resident Account')}
                   </p>
                 </div>

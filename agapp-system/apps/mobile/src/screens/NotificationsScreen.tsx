@@ -233,7 +233,7 @@ export function NotificationsScreen({ navigation }: any) {
                       fontSize: 15,
                       marginBottom: 4,
                     }}>
-                      {n.title}
+                      {(n.title || '').replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/gu, '').trim()}
                     </Text>
                     <Text style={{ color: T.textMuted, fontFamily: 'Inter-Medium', fontSize: 13, lineHeight: 18 }}>
                       {n.body}

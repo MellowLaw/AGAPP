@@ -17,6 +17,13 @@ import {
 } from 'iconsax-react';
 import { SkeletonList } from '../../components/common/Skeleton';
 
+function cleanNotificationTitle(title: string) {
+  if (!title) return 'Notification';
+  return title
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/gu, '')
+    .trim();
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -101,54 +108,65 @@ export default function NotificationsPage() {
         {unreadCount > 0 ? (
           <button
             onClick={markAllAsRead}
-            className="text-[11px] font-['Octarine-Bold'] text-accent hover:underline"
+            className="text-[11px] font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
           >
-            Mark read
+            <TickCircle size={14} />
+            <span>Mark all read</span>
           </button>
         ) : (
-          <div className="w-9 h-9" />
+          <div className="w-9" />
         )}
       </div>
 
       {/* Notifications List */}
-      <div className="space-y-3 pt-1">
+      <div className="space-y-2">
         {loading ? (
           <SkeletonList count={4} />
         ) : notifications.length === 0 ? (
-          <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-10 text-center space-y-2">
-            <NotificationBing size={32} className="text-text-muted mx-auto" />
+          <div className="text-center py-12 space-y-2">
+            <NotificationBing size={36} className="text-text-muted mx-auto opacity-50" />
             <p className="text-xs text-text-muted font-['Inter-Medium']">
               No notifications at this time.
             </p>
           </div>
         ) : (
-          notifications.map((n) => (
-            <div
-              key={n.id}
-              className={`p-4 rounded-[24px] border border-theme hover:border-accent/40 transition space-y-1.5 shadow-xs ${
-                n.is_read
-                  ? 'bg-surface dark:bg-card'
-                  : 'bg-surface-alt dark:bg-chip'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  {!n.is_read && (
-                    <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
-                  )}
-                  <span className="font-['Octarine-Bold'] text-xs text-text-primary truncate">
-                    {n.title}
+          notifications.map((n) => {
+            const isAdvisory = n.type === 'advisory' || (n.title && n.title.toLowerCase().includes('advisory'));
+            return (
+              <div
+                key={n.id}
+                className={`p-4 rounded-[24px] border border-theme hover:border-accent/40 transition space-y-1.5 shadow-xs ${
+                  n.is_read
+                    ? 'bg-surface dark:bg-card'
+                    : 'bg-surface-alt dark:bg-chip'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {!n.is_read ? (
+                      <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
+                    ) : (
+                      <Notification size={14} className="text-text-muted shrink-0" variant="Linear" />
+                    )}
+                    {isAdvisory && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-['Octarine-Bold'] uppercase tracking-wider shrink-0">
+                        Advisory
+                      </span>
+                    )}
+                    <span className="font-['Octarine-Bold'] text-xs text-text-primary truncate">
+                      {cleanNotificationTitle(n.title)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-text-muted font-['Inter-Medium'] shrink-0">
+                    {getRelativeTime(n.created_at)}
                   </span>
                 </div>
-                <span className="text-[10px] text-text-muted font-['Inter-Medium'] shrink-0">
-                  {getRelativeTime(n.created_at)}
-                </span>
+                <p className="text-xs text-text-muted leading-relaxed font-['Inter-Medium'] pl-4">
+                  {n.body || n.content || n.message}
+                </p>
               </div>
-              <p className="text-xs text-text-muted leading-relaxed font-['Inter-Medium'] pl-4">
-                {n.body || n.content || n.message}
-              </p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
