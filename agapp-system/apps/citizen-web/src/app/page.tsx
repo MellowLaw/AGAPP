@@ -40,7 +40,6 @@ export default function CitizenHomePage() {
 
   const [activeTab, setActiveTab] = useState<'for_you' | 'community'>('for_you');
   const [allNews, setAllNews] = useState<any[]>([]);
-  const [trendingThread, setTrendingThread] = useState<any | null>(null);
   const [myActivity, setMyActivity] = useState<any[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [loadingHome, setLoadingHome] = useState(true);
@@ -127,37 +126,7 @@ export default function CitizenHomePage() {
         setAllNews([]);
       }
 
-      // 2. Fetch Trending Forum Discussion
-      const { data: forumData } = await supabase
-        .from('forum_posts')
-        .select('*, forum_comments(id, is_approved)')
-        .eq('lgu_id', activeLgu.id)
-        .eq('is_approved', true)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (forumData && forumData.length > 0) {
-        // Pick the post with most comments or newest
-        const sortedThreads = [...forumData].sort((a: any, b: any) => {
-          const countA = a.forum_comments?.length || 0;
-          const countB = b.forum_comments?.length || 0;
-          return countB - countA;
-        });
-
-        const top = sortedThreads[0];
-        setTrendingThread({
-          id: top.id,
-          title: top.title,
-          content: top.content,
-          category: (Array.isArray(top.tags) && top.tags[0]) || top.category || 'General',
-          created_at: top.created_at,
-          commentsCount: top.forum_comments?.length || 0,
-        });
-      } else {
-        setTrendingThread(null);
-      }
-
-      // 3. User submissions activity if logged in
+      // 2. User submissions activity if logged in
       if (user?.id) {
         const [reportsRes, servicesRes] = await Promise.all([
           supabase
@@ -197,9 +166,9 @@ export default function CitizenHomePage() {
   const quickActions = [
     { label: 'E-Services', icon: Briefcase, href: '/services' },
     { label: 'Report', icon: Danger, href: '/report' },
-    { label: 'Citizen Guide', icon: Code, href: '/guides' },
+    { label: 'Citizen Guide', icon: Book, href: '/guides' },
     { label: 'News', icon: DocumentText, href: '/news' },
-    { label: 'Forum', icon: Messages1, href: '/forum' },
+    { label: 'Verify ID', icon: ShieldSecurity, href: '/verify' },
     { label: 'Chatbot', icon: MessageQuestion, href: '/chatbot' },
     { label: 'Explore', icon: Location, href: '/map' },
     { label: 'Emergency', icon: Call, href: '/emergency' },
@@ -264,11 +233,11 @@ export default function CitizenHomePage() {
 
         <Link
           href="/notifications"
-          className="relative p-2.5 rounded-full bg-surface dark:bg-card border border-theme text-text-primary hover:text-accent hover:border-accent transition shrink-0 flex items-center justify-center shadow-xs"
+          className="relative p-2 text-text-primary hover:text-accent transition shrink-0 flex items-center justify-center"
           title="Notifications"
         >
-          <NotificationBing size={20} variant="Bold" />
-          <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-accent border-2 border-surface dark:border-card shadow-xs" />
+          <NotificationBing size={22} variant="Bold" />
+          <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#E11D48]" />
         </Link>
       </div>
 
@@ -504,42 +473,40 @@ export default function CitizenHomePage() {
               </Link>
             )}
 
-            {/* 2. Trending Forum Discussion */}
-            {trendingThread && (
-              <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 text-[10px] font-['Octarine-Bold'] uppercase">
-                    #{trendingThread.category || 'General'}
-                  </span>
-                  <span className="text-[11px] text-text-muted font-['Inter-Medium']">
-                    {getRelativeTime(trendingThread.created_at)}
-                  </span>
-                </div>
-
-                <h4 className="text-sm font-['Octarine-Bold'] text-text-primary leading-snug">
-                  {trendingThread.title}
-                </h4>
-
-                <p className="text-xs text-text-muted leading-relaxed line-clamp-2 font-['Inter-Medium']">
-                  {trendingThread.content}
-                </p>
-
-                <div className="pt-2 border-t border-theme flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-text-muted font-['Inter-Medium']">
-                    <Messages size={16} className="text-accent" variant="Bold" />
-                    <span>+{trendingThread.commentsCount} replies</span>
-                  </div>
-
-                  <Link
-                    href="/forum"
-                    className="text-xs font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
-                  >
-                    <span>View Discussion</span>
-                    <ArrowRight2 size={14} />
-                  </Link>
-                </div>
+            {/* 2. Interactive Town Map Quick Card */}
+            <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 text-[10px] font-['Octarine-Bold'] uppercase">
+                  Interactive Map
+                </span>
+                <span className="text-[11px] text-text-muted font-['Inter-Medium']">
+                  {(activeLgu?.name || 'Liliw').replace(/^Municipality of\s*/i, '')}
+                </span>
               </div>
-            )}
+
+              <h4 className="text-sm font-['Octarine-Bold'] text-text-primary leading-snug">
+                Municipal Hall & Town Facilities
+              </h4>
+
+              <p className="text-xs text-text-muted leading-relaxed font-['Inter-Medium']">
+                View evacuation centers, emergency posts, barangay halls, and public landmarks on the map.
+              </p>
+
+              <div className="pt-2 border-t border-theme flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-text-muted font-['Inter-Medium']">
+                  <Location size={16} className="text-accent" variant="Bold" />
+                  <span>Public Navigation</span>
+                </div>
+
+                <Link
+                  href="/map"
+                  className="text-xs font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
+                >
+                  <span>Explore Town Map</span>
+                  <ArrowRight2 size={14} />
+                </Link>
+              </div>
+            </div>
 
             {/* 3. Municipal Quick Links & Emergency Hotlines */}
             <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 transition-colors">
@@ -556,8 +523,8 @@ export default function CitizenHomePage() {
                   className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between hover:border-accent transition group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center shrink-0">
-                      <Call size={16} variant="Bold" />
+                    <div className="w-8 h-8 flex items-center justify-center shrink-0 text-red-600 dark:text-red-400">
+                      <Call size={20} variant="Bold" />
                     </div>
                     <div>
                       <p className="text-xs font-['Octarine-Bold'] text-text-primary">MDRRMO / Rescue</p>
@@ -572,8 +539,8 @@ export default function CitizenHomePage() {
                   className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme flex items-center justify-between hover:border-accent transition group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
-                      <Book size={16} variant="Bold" />
+                    <div className="w-8 h-8 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
+                      <Book size={20} variant="Bold" />
                     </div>
                     <div>
                       <p className="text-xs font-['Octarine-Bold'] text-text-primary">Citizen's Charter</p>
@@ -650,47 +617,7 @@ export default function CitizenHomePage() {
                 </div>
               )}
 
-              {/* Section 2: Trending Discussion */}
-              {trendingThread && (
-                <div className="space-y-3">
-                  <h3 className="text-base font-['Octarine-Bold'] text-text-primary">Trending Discussion</h3>
-                  <div className="bg-surface dark:bg-card rounded-[28px] border border-theme p-5 shadow-xs space-y-3 hover:border-accent transition-colors">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 text-[10px] font-['Octarine-Bold'] uppercase">
-                        #{trendingThread.category || 'General'}
-                      </span>
-                      <span className="text-xs text-text-muted font-['Inter-Medium']">
-                        {getRelativeTime(trendingThread.created_at)}
-                      </span>
-                    </div>
-
-                    <h4 className="text-base font-['Octarine-Bold'] text-text-primary leading-snug">
-                      {trendingThread.title}
-                    </h4>
-
-                    <p className="text-xs text-text-muted leading-relaxed line-clamp-3 font-['Inter-Medium']">
-                      {trendingThread.content}
-                    </p>
-
-                    <div className="pt-2 border-t border-theme flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs text-text-muted font-['Inter-Medium']">
-                        <Messages size={16} className="text-accent" variant="Bold" />
-                        <span>+{trendingThread.commentsCount} replies</span>
-                      </div>
-
-                      <Link
-                        href="/forum"
-                        className="text-xs font-['Octarine-Bold'] text-accent hover:underline flex items-center gap-1"
-                      >
-                        <span>Join Discussion</span>
-                        <ArrowRight2 size={14} />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Section 3: News Feed */}
+              {/* Section 2: News Feed */}
               <div className="space-y-3">
                 <h3 className="text-base font-['Octarine-Bold'] text-text-primary">News Feed</h3>
 

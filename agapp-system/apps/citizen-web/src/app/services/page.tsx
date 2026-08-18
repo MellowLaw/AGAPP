@@ -37,7 +37,8 @@ import {
   FolderOpen,
   Eye,
   Add,
-  GalleryAdd
+  GalleryAdd,
+  Printer
 } from 'iconsax-react';
 import { AuthGate } from '../../components/auth/AuthGate';
 import { compressImageFile } from '../../lib/imageCompression';
@@ -1324,7 +1325,9 @@ export default function ServicesPage() {
             </div>
 
             <div>
-              <span className="text-[10px] font-heading uppercase text-emerald-700 dark:text-emerald-400 block tracking-wider">Application Queued!</span>
+              <span className="text-[10px] font-heading uppercase text-emerald-700 dark:text-emerald-400 block tracking-wider font-bold">
+                Digital Claim & Payment Pass
+              </span>
               <h3 className="text-lg font-heading text-text-primary">{claimModalData.service_type}</h3>
               <span className="text-xs font-mono font-bold text-accent block mt-0.5">
                 Ref: {claimModalData.reference_number}
@@ -1333,7 +1336,12 @@ export default function ServicesPage() {
 
             <div id="service-success-qr-container" className="p-4 bg-white rounded-2xl border border-theme inline-block mx-auto shadow-inner">
               <QRCodeSVG
-                value={`AGAPP-CLAIM:${claimModalData.reference_number}:${claimModalData.service_type}`}
+                value={JSON.stringify({
+                  type: 'AGAPP_PAYMENT_PASS',
+                  ref_no: claimModalData.reference_number,
+                  service: claimModalData.service_type,
+                  amount: claimModalData.form_details?.fee_note || 'Standard Rate'
+                })}
                 size={140}
                 level="H"
               />
@@ -1343,21 +1351,29 @@ export default function ServicesPage() {
             <div className="p-3 rounded-2xl bg-[#FEF3C7] dark:bg-[#2A2218] border border-[#FDE68A] dark:border-[#4B3B22] text-[10.5px] text-[#92400E] dark:text-[#FDE68A] text-left space-y-1">
               <strong className="flex items-center gap-1.5 font-heading text-[#92400E] dark:text-[#FDE68A]">
                 <Warning2 size={14} variant="Bold" className="text-[#D97706] dark:text-[#FBBF24] shrink-0" />
-                <span>Pickup Requirement Check:</span>
+                <span>Municipal Treasury & Claiming Instructions:</span>
               </strong>
-              <p className="text-[#78350F] dark:text-[#FDE68A]/90">
-                Present this QR code and bring the <strong>physical original/photocopies</strong> of your requirements at the <strong>{claimModalData.office_name || 'Municipal Desk'}</strong> counter.
+              <p className="text-[#78350F] dark:text-[#FDE68A]/90 leading-relaxed">
+                Present this QR code at the <strong>Municipal Hall Treasury Cashier</strong> for fast-lane payment, then bring your original documents to the <strong>{claimModalData.office_name || 'Assigned Office'}</strong> desk.
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => downloadQrCodeAsPng('service-success-qr-container', `AGAPP-Claim-QR-${claimModalData.reference_number}.png`)}
-                className="w-full py-2.5 rounded-full bg-surface-alt dark:bg-chip border border-theme text-text-primary font-heading text-xs hover:bg-surface transition shadow-xs flex items-center justify-center gap-1.5"
+                className="py-2.5 px-3 rounded-full bg-surface-alt dark:bg-chip border border-theme text-text-primary font-heading text-xs hover:bg-surface transition shadow-xs flex items-center justify-center gap-1.5 truncate"
               >
-                <DocumentDownload size={15} className="text-accent" />
-                <span>Save QR as PNG</span>
+                <DocumentDownload size={15} className="text-accent shrink-0" />
+                <span className="truncate">Save PNG</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="py-2.5 px-3 rounded-full bg-accent text-accent-contrast font-heading text-xs hover:opacity-90 transition shadow-xs flex items-center justify-center gap-1.5 truncate"
+              >
+                <Printer size={15} className="shrink-0" />
+                <span className="truncate">Print Pass</span>
               </button>
             </div>
 

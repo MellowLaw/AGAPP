@@ -7,7 +7,7 @@ import {
   Home2, 
   Briefcase, 
   TrendUp, 
-  Messages2, 
+  NotificationBing, 
   User,
   Messages1
 } from 'iconsax-react';
@@ -31,7 +31,7 @@ export function BottomNav() {
     { href: '/', label: 'Home', icon: Home2 },
     { href: '/services', label: 'Services', icon: Briefcase },
     { href: '/report', label: 'Reports', icon: TrendUp },
-    { href: '/forum', label: 'Forum', icon: Messages2 },
+    { href: '/news', label: 'News', icon: NotificationBing },
     { href: '/profile', label: 'Profile', icon: User },
   ];
 

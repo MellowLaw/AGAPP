@@ -22,7 +22,7 @@ import {
   User,
   Location,
   Briefcase,
-  Messages1
+  NotificationBing
 } from 'iconsax-react';
 
 type StepKey = 'id_front' | 'residency' | 'selfie' | 'review';
@@ -213,11 +213,11 @@ export default function VerifyIdentityPage() {
 
             <div className="p-4 rounded-2xl bg-surface-alt dark:bg-chip border border-theme flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-accent flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-900/60">
-                <Messages1 size={20} variant="Bold" />
+                <NotificationBing size={20} variant="Bold" />
               </div>
               <div>
-                <h3 className="text-xs font-['Octarine-Bold'] text-text-primary">Join Community Forum</h3>
-                <p className="text-[11px] text-text-muted font-['Inter-Medium']">Participate in neighborhood discussions, announcements, and polls.</p>
+                <h3 className="text-xs font-['Octarine-Bold'] text-text-primary">Verified Citizen Priority</h3>
+                <p className="text-[11px] text-text-muted font-['Inter-Medium']">Receive fast-track document processing and real-time municipal status alerts.</p>
               </div>
             </div>
           </div>

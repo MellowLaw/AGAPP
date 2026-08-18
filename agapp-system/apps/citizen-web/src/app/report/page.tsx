@@ -88,8 +88,8 @@ function IssueReportingContent() {
   const [barangay, setBarangay] = useState('Poblacion');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [latitude, setLatitude] = useState(14.1311);
-  const [longitude, setLongitude] = useState(121.4363);
+  const [latitude, setLatitude] = useState(activeLgu?.latitude || 14.1311);
+  const [longitude, setLongitude] = useState(activeLgu?.longitude || 121.4363);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -100,7 +100,11 @@ function IssueReportingContent() {
     if (barangayList.length > 0) {
       setBarangay(barangayList[0]);
     }
-  }, [activeLgu?.id]);
+    if (activeLgu?.latitude && activeLgu?.longitude) {
+      setLatitude(activeLgu.latitude);
+      setLongitude(activeLgu.longitude);
+    }
+  }, [activeLgu?.id, activeLgu?.latitude, activeLgu?.longitude]);
 
   // Load User's Own Submitted Reports ONLY (Private between Citizen & LGU)
   const fetchMyReports = async () => {

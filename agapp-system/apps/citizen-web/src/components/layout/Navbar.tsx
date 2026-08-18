@@ -33,9 +33,8 @@ export function Navbar() {
     { href: '/services', label: 'E-Services', icon: DocumentText },
     { href: '/report', label: 'Report Issue', icon: Danger },
     { href: '/tracking', label: 'Track Request', icon: Location },
-    { href: '/forum', label: 'Forum', icon: Messages1 },
-    { href: '/guides', label: 'Guides', icon: Book },
     { href: '/news', label: 'News', icon: NotificationBing },
+    { href: '/guides', label: 'Guides', icon: Book },
     { href: '/emergency', label: 'Emergency', icon: Call },
     { href: '/chatbot', label: 'Assistant', icon: MessageQuestion },
   ];
@@ -51,8 +50,10 @@ export function Navbar() {
                 <img src="/brand/logo.png" alt="AGAPP" className="w-full h-full object-contain rounded-xl" />
               </div>
               <div className="hidden sm:block leading-tight">
-                <span className="font-bold text-lg text-text-primary tracking-tight">AGAPP</span>
-                <span className="text-[10px] block font-semibold uppercase tracking-wider text-accent">Citizen Portal</span>
+                <span className="font-['Octarine-Bold'] text-lg text-text-primary tracking-tight block">agapp</span>
+                <span className="text-[10px] block font-['Octarine-Bold'] uppercase tracking-wider text-accent font-bold">
+                  Citizen Portal
+                </span>
               </div>
             </Link>
 

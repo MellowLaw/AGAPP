@@ -16,7 +16,8 @@
     "build:citizen-web": "npm run build --workspace=apps/citizen-web",
     "install:all": "npm install",
     "build:all": "npm run build --workspaces --if-present",
-    "build:shared": "npm run build --workspace=packages/shared"
+    "build:shared": "npm run build --workspace=packages/shared",
+    "test": "node scripts/test-runner.js"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

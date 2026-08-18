@@ -97,7 +97,7 @@ export default function ChatbotPage() {
     if (s.includes('report') || s.includes('camera')) return Camera;
     if (s.includes('service') || s.includes('clearance') || s.includes('permit') || s.includes('category')) return Category2;
     if (s.includes('map') || s.includes('explore') || s.includes('location')) return Location;
-    if (s.includes('forum') || s.includes('community') || s.includes('people')) return People;
+    if (s.includes('news') || s.includes('community') || s.includes('advisory') || s.includes('bulletin')) return NotificationBing;
     if (s.includes('profile') || s.includes('account') || s.includes('user')) return User;
     if (s.includes('verify') || s.includes('verification')) return ShieldTick;
     if (s.includes('guide') || s.includes('charter')) return Book;
@@ -111,13 +111,12 @@ export default function ChatbotPage() {
     if (s.includes('report')) return '/report';
     if (s.includes('service') || s.includes('clearance') || s.includes('permit')) return '/services';
     if (s.includes('map') || s.includes('explore') || s.includes('location')) return '/map';
-    if (s.includes('forum') || s.includes('community')) return '/forum';
+    if (s.includes('news') || s.includes('community') || s.includes('advisory') || s.includes('bulletin')) return '/news';
     if (s.includes('profile') || s.includes('account')) return '/profile';
     if (s.includes('verify') || s.includes('verification')) return '/verify';
     if (s.includes('guide') || s.includes('charter')) return '/guides';
     if (s.includes('emergency') || s.includes('hotline')) return '/emergency';
     if (s.includes('notification')) return '/notifications';
-    if (s.includes('news')) return '/news';
     return '/';
   };
 

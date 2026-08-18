@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useLgu } from '../../contexts/LguContext';
@@ -18,7 +18,8 @@ import {
   Call,
   ExportSquare,
   Clock,
-  CloseCircle
+  CloseCircle,
+  ArrowRight2
 } from 'iconsax-react';
 
 const TownMapClient = dynamic(
@@ -33,14 +34,6 @@ const TownMapClient = dynamic(
     )
   }
 );
-
-const LGU_COORDINATES: Record<string, [number, number]> = {
-  'liliw-laguna': [14.1311, 121.4363],
-  'nagcarlan-laguna': [14.1378, 121.4167],
-  'rizal-laguna': [14.1130, 121.3962],
-  'san-pablo-city-laguna': [14.0683, 121.3256],
-  'majayjay-laguna': [14.1436, 121.5161],
-};
 
 const CATEGORIES = [
   { id: 'all', label: 'All Facilities', icon: Category2, color: '#6B7280' },
@@ -58,12 +51,21 @@ export default function TownMapPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<any | null>(null);
 
+  const sidebarCategoryRef = useRef<HTMLDivElement>(null);
+  const floatingCategoryRef = useRef<HTMLDivElement>(null);
+
+  const handleHorizontalWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY !== 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  };
+
   const lguCenter: [number, number] = useMemo(() => {
     if (activeLgu?.latitude && activeLgu?.longitude) {
       return [Number(activeLgu.latitude), Number(activeLgu.longitude)];
     }
-    return LGU_COORDINATES[activeLgu?.id || ''] || [14.1311, 121.4363];
-  }, [activeLgu]);
+    return [14.1311, 121.4363];
+  }, [activeLgu?.latitude, activeLgu?.longitude]);
 
   useEffect(() => {
     async function loadFacilities() {
@@ -210,15 +212,19 @@ export default function TownMapPage() {
             )}
           </div>
 
-          {/* Category Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {/* Category Filter Chips (Smooth Scrollable on Wheel & Touch) */}
+          <div
+            ref={sidebarCategoryRef}
+            onWheel={handleHorizontalWheel}
+            className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scroll-smooth select-none cursor-grab active:cursor-grabbing scrollbar-thin scrollbar-thumb-stone-300 dark:scrollbar-thumb-stone-700"
+          >
             {CATEGORIES.map((c) => {
               const isSelected = selectedCategory === c.id;
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedCategory(c.id)}
-                  className={`px-3 py-1 rounded-full text-[10.5px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-2xs flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-full text-[10.5px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-2xs flex items-center gap-1.5 shrink-0 ${
                     isSelected
                       ? 'bg-accent text-accent-contrast'
                       : 'bg-surface-alt dark:bg-chip text-text-muted hover:text-text-primary border border-theme'
@@ -315,15 +321,19 @@ export default function TownMapPage() {
             </div>
           </div>
 
-          {/* Category Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+          {/* Category Filter Chips (Smooth Scrollable on Wheel & Touch) */}
+          <div
+            ref={floatingCategoryRef}
+            onWheel={handleHorizontalWheel}
+            className="flex items-center gap-1.5 overflow-x-auto pb-1.5 max-w-full scroll-smooth select-none cursor-grab active:cursor-grabbing scrollbar-thin scrollbar-thumb-stone-300 dark:scrollbar-thumb-stone-700"
+          >
             {CATEGORIES.map((c) => {
               const isSelected = selectedCategory === c.id;
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedCategory(c.id)}
-                  className={`px-3 py-1.5 rounded-full text-[11px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-sm flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-['Octarine-Bold'] whitespace-nowrap transition-all duration-200 shadow-sm flex items-center gap-1.5 shrink-0 ${
                     isSelected
                       ? 'bg-accent text-accent-contrast scale-105 shadow-md'
                       : 'bg-white/80 dark:bg-[#282422]/85 text-stone-700 dark:text-stone-200 hover:text-black dark:hover:text-white border border-white/60 dark:border-white/15 backdrop-blur-xl'

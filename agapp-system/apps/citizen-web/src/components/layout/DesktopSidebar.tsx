@@ -36,9 +36,8 @@ const CITIZEN_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Building },
   { label: 'E-Services', href: '/services', icon: DocumentText },
   { label: 'Report Issue', href: '/report', icon: Danger },
-  { label: 'Community Forum', href: '/forum', icon: Messages1 },
-  { label: 'Town Map', href: '/map', icon: Location },
   { label: 'News & Advisories', href: '/news', icon: NotificationBing },
+  { label: 'Town Map', href: '/map', icon: Location },
   { label: 'Citizen Guides', href: '/guides', icon: Book },
   { label: 'AI Assistant', href: '/chatbot', icon: MessageQuestion },
 ];
@@ -99,6 +98,15 @@ export function DesktopSidebar({ className = '' }: { className?: string }) {
     router.push('/');
   };
 
+  // Hide DesktopSidebar on auth, onboarding, and banned pages
+  if (
+    pathname?.startsWith('/auth') ||
+    pathname === '/lgu-select' ||
+    pathname === '/banned'
+  ) {
+    return null;
+  }
+
   return (
     <>
       <aside
@@ -111,8 +119,8 @@ export function DesktopSidebar({ className = '' }: { className?: string }) {
               <img src="/brand/logo.png" alt="AGAPP" className="w-full h-full object-contain" />
             </div>
             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap leading-tight">
-              <span className="font-['Octarine-Bold'] text-base tracking-tight text-text-primary block">AGAPP</span>
-              <span className="text-[10px] block font-['Inter-Medium'] uppercase tracking-wider text-accent font-bold">
+              <span className="font-['Octarine-Bold'] text-lg tracking-tight text-text-primary block">agapp</span>
+              <span className="text-[10px] block font-['Octarine-Bold'] uppercase tracking-wider text-accent font-bold">
                 Citizen Portal
               </span>
             </div>

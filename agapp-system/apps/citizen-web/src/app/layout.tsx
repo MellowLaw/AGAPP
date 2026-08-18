@@ -5,8 +5,7 @@ import { ThemeProvider } from '../contexts/ThemeContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { DesktopSidebar } from '../components/layout/DesktopSidebar';
-import { BottomNav } from '../components/layout/BottomNav';
+import { AppShell } from '../components/layout/AppShell';
 import { PwaInstallBanner } from '../components/pwa/PwaInstallBanner';
 
 export const metadata: Metadata = {
@@ -61,13 +60,9 @@ export default function RootLayout({
               <ToastProvider>
                 <PwaInstallBanner />
                 <ScreenBackground>
-                  <div className="flex min-h-screen">
-                    <DesktopSidebar className="hidden lg:flex" />
-                    <main className="flex-1 min-h-screen w-full relative lg:pl-[72px] pb-24 lg:pb-12">
-                      {children}
-                    </main>
-                  </div>
-                  <BottomNav />
+                  <AppShell>
+                    {children}
+                  </AppShell>
                 </ScreenBackground>
               </ToastProvider>
             </AuthProvider>

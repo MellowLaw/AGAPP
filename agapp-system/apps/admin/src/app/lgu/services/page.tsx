@@ -12,9 +12,10 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { lguIdFromName } from '@/lib/lgu';
 import { updateIfUnchanged, conflictMessage } from '@/lib/concurrency';
-import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload, Eye, DocumentText, FolderOpen, Warning2, InfoCircle, Building } from 'iconsax-react';
+import { User, Calendar, TickSquare, CloseCircle, Clock, Barcode, SearchNormal1, DocumentDownload, Eye, DocumentText, FolderOpen, Warning2, InfoCircle, Building, ScanBarcode } from 'iconsax-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { Skeleton, SkeletonDetailPane } from '@/components/ui/Skeleton';
+import { QrPaymentScannerModal } from '@/components/treasury/QrPaymentScannerModal';
 
 type ServiceStatus = 'Submitted' | 'Under Review' | 'In Progress' | 'Ready for Pickup' | 'Released' | 'Rejected';
 
@@ -99,6 +100,7 @@ export default function ServicesPage() {
   const [readyModal, setReadyModal] = useState<{ code: string } | null>(null);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
   const params = useSearchParams();
   const lguNameParam = params?.get('lguName') || 'Liliw, Laguna';
@@ -384,6 +386,16 @@ export default function ServicesPage() {
     >
       <ToastContainer />
 
+      <QrPaymentScannerModal
+        isOpen={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+        lguId={lguId}
+        onPaymentConfirmed={(ref) => {
+          fetchRequests({ silent: true });
+          showToast(`Official Receipt issued for ${ref}`, 'success');
+        }}
+      />
+
       <Modal isOpen={!!readyModal} onClose={() => setReadyModal(null)} title="Ready for Pickup" size="sm">
         <p className="text-sm text-text-muted mb-4">
           The citizen has been notified. Give them this claim code (or they can show the QR from their app) at the counter:
@@ -465,6 +477,16 @@ export default function ServicesPage() {
                 <option value="Released">Released</option>
                 <option value="Rejected">Rejected</option>
               </select>
+
+              <Button 
+                variant="secondary" 
+                className="h-10 !bg-emerald-600 !text-white !border-0 hover:opacity-90 flex items-center gap-1.5 shadow-2xs" 
+                onClick={() => setQrScannerOpen(true)}
+              >
+                <ScanBarcode className="w-4 h-4" />
+                <span>Scan QR Pass</span>
+              </Button>
+
               <Button variant="secondary" className="h-10 !bg-accent !text-white !border-0 hover:opacity-90" onClick={handleExportCsv}>
                 <DocumentDownload className="w-4 h-4 mr-1" />
                 Export CSV

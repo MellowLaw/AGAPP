@@ -30,11 +30,10 @@ export function AgappLogo({
       </div>
       {showText && (
         <span
-          className={`font-extrabold ${textClassName}`}
+          className={`font-['Octarine-Bold'] tracking-tight ${textClassName}`}
           style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: size * 0.5,
-            letterSpacing: '-0.06em',
+            fontFamily: "'Octarine-Bold', sans-serif",
+            fontSize: size * 0.58,
             color: textColor || 'var(--text-primary)',
           }}
         >

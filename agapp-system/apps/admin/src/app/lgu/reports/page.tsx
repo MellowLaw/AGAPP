@@ -292,23 +292,41 @@ export default function ReportsPage() {
     return false;
   };
 
-  const filteredReports = reportsList.filter(r => {
-    const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         r.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || r.status === filterStatus;
+  const filteredReports = useMemo(() => {
+    const list = reportsList.filter(r => {
+      const matchesSearch = r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           r.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = filterStatus === 'all' || r.status === filterStatus;
 
-    let matchesOffice = true;
-    if (officeFilter !== 'all') {
-      if (officeFilter === 'unassigned') {
-        matchesOffice = !r.assignedOffice;
-      } else {
-        matchesOffice = r.assignedOffice === officeFilter || (!r.assignedOffice && isCategoryForOffice(r.dbCategory, officeFilter));
+      let matchesOffice = true;
+      if (officeFilter !== 'all') {
+        if (officeFilter === 'unassigned') {
+          matchesOffice = !r.assignedOffice;
+        } else {
+          matchesOffice = r.assignedOffice === officeFilter || (!r.assignedOffice && isCategoryForOffice(r.dbCategory, officeFilter));
+        }
       }
-    }
 
-    return matchesSearch && matchesFilter && matchesOffice;
-  });
+      return matchesSearch && matchesFilter && matchesOffice;
+    });
+
+    // Smart Prioritization: High Urgency (Disaster/Flood/Power) + AI Verified reports at top
+    return list.sort((a, b) => {
+      const getPriorityScore = (item: typeof a) => {
+        let score = 0;
+        const cat = (item.dbCategory || '').toLowerCase();
+        if (cat.includes('flood') || cat.includes('disaster') || cat.includes('hazard')) score += 50;
+        if (cat.includes('pole') || cat.includes('drainage') || cat.includes('pothole')) score += 30;
+        if (item.aiVerified) score += 20;
+        if (item.status === 'submitted') score += 15;
+        if (item.status === 'in_progress') score += 10;
+        return score;
+      };
+      return getPriorityScore(b) - getPriorityScore(a);
+    });
+  }, [reportsList, searchQuery, filterStatus, officeFilter]);
+
   const pageCount = Math.max(1, Math.ceil(filteredReports.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const paginated = useMemo(() => filteredReports.slice((safePage - 1) * pageSize, safePage * pageSize), [filteredReports, safePage]);

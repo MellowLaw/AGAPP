@@ -34,7 +34,7 @@ interface CommandSearchModalProps {
   onClose: () => void;
 }
 
-type SearchCategory = 'all' | 'services' | 'news' | 'forum' | 'reports' | 'facilities' | 'guides' | 'actions';
+type SearchCategory = 'all' | 'services' | 'news' | 'reports' | 'facilities' | 'guides' | 'actions';
 
 const QUICK_ACTIONS = [
   { label: 'Submit Incident Report', description: 'File hazard, road damage, or public safety report', href: '/report', icon: Danger, category: 'reports' },
@@ -45,7 +45,6 @@ const QUICK_ACTIONS = [
   { label: 'AI Municipal Assistant', description: 'Ask questions in Tagalog or English about procedures', href: '/chatbot', icon: MessageQuestion, category: 'actions' },
   { label: 'Resident Identity Verification', description: 'Upload government ID for fast-track processing', href: '/verify', icon: ShieldSecurity, category: 'actions' },
   { label: 'My Resident Profile & Settings', description: 'Manage account, contact number & barangay', href: '/profile', icon: User, category: 'actions' },
-  { label: 'Community Discussion Forum', description: 'View barangay topics, feedback & community initiatives', href: '/forum', icon: Messages1, category: 'forum' },
   { label: 'News & Official Bulletins', description: 'Live municipal announcements & weather advisories', href: '/news', icon: NotificationBing, category: 'news' },
   { label: 'Citizen Requirements Guides', description: 'Step-by-step procedures and required documents', href: '/guides', icon: Book, category: 'guides' },
 ];
@@ -73,13 +72,11 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
   const [results, setResults] = useState<{
     services: any[];
     news: any[];
-    forum: any[];
     facilities: any[];
     guides: any[];
   }>({
     services: [],
     news: [],
-    forum: [],
     facilities: [],
     guides: [],
   });
@@ -104,7 +101,7 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
-      setResults({ services: [], news: [], forum: [], facilities: [], guides: [] });
+      setResults({ services: [], news: [], facilities: [], guides: [] });
       setSearching(false);
       return;
     }
@@ -114,7 +111,7 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
       try {
         const lguId = activeLgu?.id || 'liliw-laguna';
 
-        const [srvRes, newsRes, forumRes, facRes, guideRes] = await Promise.all([
+        const [srvRes, newsRes, facRes, guideRes] = await Promise.all([
           supabase
             .from('lgu_services')
             .select('*')
@@ -126,12 +123,6 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
             .select('*')
             .eq('lgu_id', lguId)
             .or(`title.ilike.%${q}%,content.ilike.%${q}%,category.ilike.%${q}%`)
-            .limit(5),
-          supabase
-            .from('forum_posts')
-            .select('*')
-            .eq('lgu_id', lguId)
-            .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
             .limit(5),
           supabase
             .from('lgu_facilities')
@@ -150,7 +141,6 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
         setResults({
           services: srvRes.data || [],
           news: newsRes.data || [],
-          forum: forumRes.data || [],
           facilities: facRes.data || [],
           guides: guideRes.data || [],
         });
@@ -184,7 +174,6 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
   const totalResultsCount =
     results.services.length +
     results.news.length +
-    results.forum.length +
     results.facilities.length +
     results.guides.length +
     (searchQuery.trim() ? matchingActions.length + matchingReports.length : 0);
@@ -205,7 +194,7 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
             <input
               ref={inputRef}
               type="text"
-              placeholder={`Search services, news, forums, reports, locations in ${activeLgu?.name?.replace('Municipality of ', '') || 'Liliw'}...`}
+              placeholder={`Search services, news, guides, reports, locations in ${activeLgu?.name?.replace('Municipality of ', '') || 'Liliw'}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 text-sm sm:text-base font-['Inter-Medium'] bg-transparent outline-none text-text-primary placeholder:text-text-muted"
@@ -236,7 +225,6 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
               { id: 'all', label: 'All' },
               { id: 'services', label: 'E-Services' },
               { id: 'news', label: 'News & Bulletins' },
-              { id: 'forum', label: 'Forums' },
               { id: 'reports', label: 'Report Incident' },
               { id: 'facilities', label: 'Map Locations' },
               { id: 'guides', label: 'Guides' },
@@ -408,39 +396,7 @@ export function CommandSearchModal({ isOpen, onClose }: CommandSearchModalProps)
                 </div>
               )}
 
-              {/* 3. Community Forum Matches */}
-              {(selectedFilter === 'all' || selectedFilter === 'forum') && results.forum.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-['Octarine-Bold'] uppercase tracking-wider text-accent block pl-1">
-                    Community Forum Discussions ({results.forum.length})
-                  </span>
-                  <div className="space-y-2">
-                    {results.forum.map((post) => (
-                      <Link
-                        key={post.id}
-                        href="/forum"
-                        onClick={onClose}
-                        className="p-3 rounded-2xl bg-surface-alt dark:bg-chip border border-theme hover:border-accent transition flex items-center justify-between gap-3 group"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <StatusBadge status={Array.isArray(post.tags) ? post.tags[0] : post.tags || 'Topic'} />
-                            <h4 className="text-xs font-['Octarine-Bold'] text-text-primary group-hover:text-accent transition truncate">
-                              {post.title}
-                            </h4>
-                          </div>
-                          <p className="text-[11px] text-text-muted font-['Inter-Medium'] truncate mt-1">
-                            {post.content}
-                          </p>
-                        </div>
-                        <ArrowRight2 size={14} className="text-text-muted group-hover:text-accent shrink-0" />
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 4. Town Map Facilities Matches */}
+              {/* 3. Town Map Facilities Matches */}
               {(selectedFilter === 'all' || selectedFilter === 'facilities') && results.facilities.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[10px] font-['Octarine-Bold'] uppercase tracking-wider text-accent block pl-1">
